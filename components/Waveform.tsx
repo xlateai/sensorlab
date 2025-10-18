@@ -55,7 +55,11 @@ export default function Waveform({
     }
     
     return () => {
-      stopAudioMonitoring();
+      // Proper cleanup for hot reload
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [isActive, hasPermission]);
 
@@ -103,15 +107,17 @@ export default function Waveform({
           // Simulate audio samples based on metering level
           const level = Math.max(0, Math.min(1, (status.metering + 40) / 40));
           
-          // Generate simulated samples that vary around the current level
+          // Generate simulated samples that match natural audio behavior
           const newSamples: number[] = [];
-          const samplesPerUpdate = 100; // Simulate 100 samples per update
+          const samplesPerUpdate = 100;
           
           for (let i = 0; i < samplesPerUpdate; i++) {
-            // Create realistic audio variation around the current level
-            const variation = (Math.random() - 0.5) * 0.3;
-            const sample = (level + variation) * (Math.random() > 0.5 ? 1 : -1);
-            newSamples.push(Math.max(-1, Math.min(1, sample)));
+            // Create realistic audio variation - silence = tiny, loud = big
+            const baseVariation = (Math.random() - 0.5) * 0.1; // Small background noise
+            const levelVariation = level * (Math.random() - 0.5) * 0.8; // Scale with actual volume
+            const sample = (baseVariation + levelVariation) * (Math.random() > 0.5 ? 1 : -1);
+            // Don't clamp - let loud sounds go beyond bounds naturally
+            newSamples.push(sample);
           }
           
           // Maintain a rolling buffer of recent samples
@@ -158,25 +164,26 @@ export default function Waveform({
       return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
     }
 
-    // Match Rust implementation: vertical waveform
+    // EXACTLY match Rust implementation: samples[sample_index] * scale
     const len = height;
-    const waveformScale = width * 0.5 * scale;
-    const center = width * 0.5;
+    const waveformScale = width * 0.5 * scale; // Rust: width as f32 * 0.5 * 0.8
+    const center = width * 0.5;                // Rust: width as f32 * 0.5
     
-    const step = Math.max(1, samples.length) / len;
-    const stride = 2; // Match Rust stride
+    const step = Math.max(1, samples.length) / len; // Rust: samples.len().max(1) as f32 / len as f32
+    const stride = 2; // Rust: let stride = 2;
     
     let pathData = '';
     let prevX: number | null = null;
     let prevY: number | null = null;
 
     for (let i = 0; i < len; i += stride) {
-      const sampleIndex = Math.floor(i * step);
+      const sampleIndex = Math.floor(i * step); // Rust: (i as f32 * step) as usize
       if (sampleIndex >= samples.length) break;
       
+      // DIRECT multiplication like Rust: samples[sample_index] * scale
       const offset = samples[sampleIndex] * waveformScale;
-      const x = center + offset;
-      const y = i;
+      const x = center + offset; // Rust: (center + offset) as isize
+      const y = i;               // Rust: i as isize
       
       if (prevX !== null && prevY !== null) {
         if (pathData === '') {
