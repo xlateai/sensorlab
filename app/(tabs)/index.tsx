@@ -1,8 +1,11 @@
 import { StyleSheet, View } from 'react-native';
+import Waveform from '@/components/Waveform';
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container} />
+    <View style={styles.container}>
+      <Waveform />
+    </View>
   );
 }
 
@@ -10,5 +13,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
