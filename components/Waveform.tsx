@@ -3,6 +3,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedProps,
@@ -25,15 +26,20 @@ export default function Waveform({
   width = 80,
   height = screenHeight,
   isActive = true,
-  scale = 0.8,
+  scale = 1.6, // 2x default horizontal zoom
 }: WaveformProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   
   const audioSamples = useSharedValue<number[]>([]);
+  
+  // Gesture controls
+  const amplitudeScale = useSharedValue(2.0); // 2x default amplitude
+  const timeZoom = useSharedValue(1.0); // Default time zoom
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -48,23 +54,27 @@ export default function Waveform({
 
   // Start/stop monitoring
   useEffect(() => {
-    if (isActive && hasPermission) {
+    if (isActive && hasPermission && !isRecording) {
       startAudioMonitoring();
-    } else {
+    } else if (!isActive || !hasPermission) {
       stopAudioMonitoring();
     }
     
     return () => {
       // Proper cleanup for hot reload
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      stopAudioMonitoring();
     };
   }, [isActive, hasPermission]);
 
   const startAudioMonitoring = async () => {
+    if (isRecording || recording) {
+      console.log('Already recording, skipping...');
+      return;
+    }
+
     try {
+      setIsRecording(true);
+      
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -113,8 +123,8 @@ export default function Waveform({
           
           for (let i = 0; i < samplesPerUpdate; i++) {
             // Create realistic audio variation - silence = tiny, loud = big
-            const baseVariation = (Math.random() - 0.5) * 0.1; // Small background noise
-            const levelVariation = level * (Math.random() - 0.5) * 0.8; // Scale with actual volume
+            const baseVariation = (Math.random() - 0.5) * 0.05; // Reduced background noise
+            const levelVariation = level * (Math.random() - 0.5) * 1.2; // Increased amplification for loud sounds
             const sample = (baseVariation + levelVariation) * (Math.random() > 0.5 ? 1 : -1);
             // Don't clamp - let loud sounds go beyond bounds naturally
             newSamples.push(sample);
@@ -123,8 +133,8 @@ export default function Waveform({
           // Maintain a rolling buffer of recent samples
           audioBufferRef.current.push(...newSamples);
           
-          // Keep only recent samples (equivalent to buffer_duration in Rust)
-          const maxSamples = height * 2; // Keep enough for smooth visualization
+          // 2x slower: Keep twice as many samples for slower movement
+          const maxSamples = Math.floor(height * 4 * timeZoom.value); // Adjustable based on time zoom
           if (audioBufferRef.current.length > maxSamples) {
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
           }
@@ -135,6 +145,7 @@ export default function Waveform({
 
     } catch (err) {
       console.log('Recording failed:', err);
+      setIsRecording(false);
     }
   };
 
@@ -146,16 +157,35 @@ export default function Waveform({
     if (recording) {
       try {
         await recording.stopAndUnloadAsync();
-        setRecording(null);
       } catch (err) {
         console.log('Stop failed:', err);
       }
+      setRecording(null);
     }
+    setIsRecording(false);
   };
 
   const updateAudioSamples = (samples: number[]) => {
     audioSamples.value = samples;
   };
+
+  // Pinch gesture for zoom control
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      const focalX = event.focalX;
+      const focalY = event.focalY;
+      
+      // Determine if gesture is primarily horizontal or vertical based on focal point movement
+      const isHorizontal = Math.abs(focalX - width / 2) > Math.abs(focalY - height / 2);
+      
+      if (isHorizontal) {
+        // Horizontal pinch - amplitude control
+        amplitudeScale.value = Math.max(0.1, Math.min(10.0, amplitudeScale.value * event.scale));
+      } else {
+        // Vertical pinch - time zoom control  
+        timeZoom.value = Math.max(0.5, Math.min(5.0, timeZoom.value * event.scale));
+      }
+    });
 
   const animatedProps = useAnimatedProps(() => {
     const samples = audioSamples.value;
@@ -164,26 +194,26 @@ export default function Waveform({
       return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
     }
 
-    // EXACTLY match Rust implementation: samples[sample_index] * scale
+    // EXACTLY match Rust implementation with gesture controls
     const len = height;
-    const waveformScale = width * 0.5 * scale; // Rust: width as f32 * 0.5 * 0.8
-    const center = width * 0.5;                // Rust: width as f32 * 0.5
+    const waveformScale = width * 0.5 * scale * amplitudeScale.value; // Apply amplitude scaling
+    const center = width * 0.5;
     
-    const step = Math.max(1, samples.length) / len; // Rust: samples.len().max(1) as f32 / len as f32
-    const stride = 2; // Rust: let stride = 2;
+    const step = Math.max(1, samples.length) / len;
+    const stride = 2;
     
     let pathData = '';
     let prevX: number | null = null;
     let prevY: number | null = null;
 
     for (let i = 0; i < len; i += stride) {
-      const sampleIndex = Math.floor(i * step); // Rust: (i as f32 * step) as usize
+      const sampleIndex = Math.floor(i * step);
       if (sampleIndex >= samples.length) break;
       
-      // DIRECT multiplication like Rust: samples[sample_index] * scale
+      // DIRECT multiplication with gesture-controlled amplitude
       const offset = samples[sampleIndex] * waveformScale;
-      const x = center + offset; // Rust: (center + offset) as isize
-      const y = i;               // Rust: i as isize
+      const x = center + offset;
+      const y = i;
       
       if (prevX !== null && prevY !== null) {
         if (pathData === '') {
@@ -200,18 +230,20 @@ export default function Waveform({
   });
 
   return (
-    <View style={[styles.container, { width, height }]}>
-      <Svg width={width} height={height}>
-        <AnimatedPath
-          animatedProps={animatedProps}
-          stroke={colors.tint}
-          strokeWidth={2}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
-    </View>
+    <GestureDetector gesture={pinchGesture}>
+      <View style={[styles.container, { width, height }]}>
+        <Svg width={width} height={height}>
+          <AnimatedPath
+            animatedProps={animatedProps}
+            stroke={colors.tint}
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </View>
+    </GestureDetector>
   );
 }
 
