@@ -2,38 +2,30 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Platform, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, {
-  Easing,
-  interpolate,
   runOnJS,
   useAnimatedProps,
   useSharedValue,
-  withRepeat,
-  withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight } = Dimensions.get('window');
 
 interface WaveformProps {
   width?: number;
   height?: number;
   isActive?: boolean;
-  maxAmplitude?: number;
-  frequency?: number;
-  strokeWidth?: number;
+  scale?: number;
 }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function Waveform({ 
-  width = 60,
-  height = screenHeight, // Full screen height
+  width = 80,
+  height = screenHeight,
   isActive = true,
-  maxAmplitude = 30,
-  frequency = 2,
-  strokeWidth = 2
+  scale = 0.8,
 }: WaveformProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -41,30 +33,27 @@ export default function Waveform({
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   
-  const animationProgress = useSharedValue(0);
-  const audioLevel = useSharedValue(0);
-  const amplitudeAnimation = useSharedValue(0);
+  const audioSamples = useSharedValue<number[]>([]);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioBufferRef = useRef<number[]>([]);
 
-  // Request audio permissions
+  // Request permissions
   useEffect(() => {
     (async () => {
-      if (Platform.OS !== 'web') {
-        const { status } = await Audio.requestPermissionsAsync();
-        setHasPermission(status === 'granted');
-      }
+      const { status } = await Audio.requestPermissionsAsync();
+      setHasPermission(status === 'granted');
     })();
   }, []);
 
-  // Start/stop audio monitoring
+  // Start/stop monitoring
   useEffect(() => {
     if (isActive && hasPermission) {
       startAudioMonitoring();
     } else {
       stopAudioMonitoring();
     }
-
+    
     return () => {
       stopAudioMonitoring();
     };
@@ -77,48 +66,69 @@ export default function Waveform({
         playsInSilentModeIOS: true,
       });
 
-      const recordingOptions: Audio.RecordingOptions = {
+      const { recording: newRecording } = await Audio.Recording.createAsync({
+        isMeteringEnabled: true,
         android: {
-          extension: '.m4a',
-          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          extension: '.wav',
+          outputFormat: Audio.AndroidOutputFormat.DEFAULT,
+          audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
           sampleRate: 44100,
-          numberOfChannels: 2,
+          numberOfChannels: 1,
           bitRate: 128000,
         },
         ios: {
-          extension: '.m4a',
-          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-          audioQuality: Audio.IOSAudioQuality.HIGH,
+          extension: '.wav',
+          outputFormat: Audio.IOSOutputFormat.LINEARPCM,
+          audioQuality: Audio.IOSAudioQuality.MAX,
           sampleRate: 44100,
-          numberOfChannels: 2,
+          numberOfChannels: 1,
           bitRate: 128000,
           linearPCMBitDepth: 16,
           linearPCMIsBigEndian: false,
           linearPCMIsFloat: false,
         },
         web: {
-          mimeType: 'audio/webm',
+          mimeType: 'audio/wav',
           bitsPerSecond: 128000,
         },
-      };
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(recordingOptions);
+      });
+      
       setRecording(newRecording);
 
-      // Start monitoring audio levels
+      // Simulate fine-grained audio data collection
+      // Note: expo-av doesn't provide raw samples, so we'll simulate based on metering
       intervalRef.current = setInterval(async () => {
-        if (newRecording) {
-          const status = await newRecording.getStatusAsync();
-          if (status.isRecording && status.metering !== undefined) {
-            const normalizedLevel = Math.max(0, Math.min(1, (status.metering + 100) / 100));
-            runOnJS(updateAudioLevel)(normalizedLevel);
+        const status = await newRecording.getStatusAsync();
+        if (status.isRecording && status.metering !== undefined) {
+          // Simulate audio samples based on metering level
+          const level = Math.max(0, Math.min(1, (status.metering + 40) / 40));
+          
+          // Generate simulated samples that vary around the current level
+          const newSamples: number[] = [];
+          const samplesPerUpdate = 100; // Simulate 100 samples per update
+          
+          for (let i = 0; i < samplesPerUpdate; i++) {
+            // Create realistic audio variation around the current level
+            const variation = (Math.random() - 0.5) * 0.3;
+            const sample = (level + variation) * (Math.random() > 0.5 ? 1 : -1);
+            newSamples.push(Math.max(-1, Math.min(1, sample)));
           }
+          
+          // Maintain a rolling buffer of recent samples
+          audioBufferRef.current.push(...newSamples);
+          
+          // Keep only recent samples (equivalent to buffer_duration in Rust)
+          const maxSamples = height * 2; // Keep enough for smooth visualization
+          if (audioBufferRef.current.length > maxSamples) {
+            audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
+          }
+          
+          runOnJS(updateAudioSamples)([...audioBufferRef.current]);
         }
-      }, 50); // Update every 50ms for smooth animation
+      }, 16); // ~60fps updates
 
     } catch (err) {
-      console.log('Failed to start recording', err);
+      console.log('Recording failed:', err);
     }
   };
 
@@ -127,132 +137,71 @@ export default function Waveform({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-
     if (recording) {
       try {
         await recording.stopAndUnloadAsync();
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-        });
         setRecording(null);
       } catch (err) {
-        console.log('Failed to stop recording', err);
+        console.log('Stop failed:', err);
       }
     }
   };
 
-  const updateAudioLevel = (level: number) => {
-    audioLevel.value = withTiming(level, { duration: 50 });
+  const updateAudioSamples = (samples: number[]) => {
+    audioSamples.value = samples;
   };
 
-  useEffect(() => {
-    if (isActive) {
-      // Start the wave animation
-      animationProgress.value = withRepeat(
-        withTiming(1, {
-          duration: 2000,
-          easing: Easing.linear,
-        }),
-        -1,
-        false
-      );
-
-      // Animate amplitude for a breathing effect
-      amplitudeAnimation.value = withRepeat(
-        withTiming(1, {
-          duration: 3000,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        -1,
-        true
-      );
-    } else {
-      animationProgress.value = withTiming(0, { duration: 500 });
-      amplitudeAnimation.value = withTiming(0, { duration: 500 });
-      audioLevel.value = withTiming(0, { duration: 500 });
-    }
-  }, [isActive]);
-
   const animatedProps = useAnimatedProps(() => {
-    const numberOfWaves = frequency;
-    const baseAmplitude = interpolate(
-      amplitudeAnimation.value,
-      [0, 1],
-      [maxAmplitude * 0.1, maxAmplitude * 0.3]
-    );
+    const samples = audioSamples.value;
     
-    // Combine base animation with real audio level
-    const currentAmplitude = baseAmplitude + (audioLevel.value * maxAmplitude * 0.7);
-    
-    let pathData = `M ${width / 2} 0`;
-
-    // Generate smooth wave path from top to bottom
-    for (let i = 0; i <= height; i += 2) {
-      const progress = i / height;
-      const waveOffset = Math.sin(
-        (progress * Math.PI * numberOfWaves * 2) + 
-        (animationProgress.value * Math.PI * 2)
-      ) * currentAmplitude * Math.sin(progress * Math.PI);
-      
-      const x = width / 2 + waveOffset;
-      pathData += ` L ${x} ${i}`;
+    if (samples.length === 0) {
+      return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
     }
 
-    return {
-      d: pathData,
-    };
-  });
-
-  const secondaryAnimatedProps = useAnimatedProps(() => {
-    const numberOfWaves = frequency;
-    const baseAmplitude = interpolate(
-      amplitudeAnimation.value,
-      [0, 1],
-      [maxAmplitude * 0.05, maxAmplitude * 0.2]
-    );
+    // Match Rust implementation: vertical waveform
+    const len = height;
+    const waveformScale = width * 0.5 * scale;
+    const center = width * 0.5;
     
-    // Secondary wave with different audio response
-    const currentAmplitude = baseAmplitude + (audioLevel.value * maxAmplitude * 0.5);
+    const step = Math.max(1, samples.length) / len;
+    const stride = 2; // Match Rust stride
     
-    let pathData = `M ${width / 2} 0`;
+    let pathData = '';
+    let prevX: number | null = null;
+    let prevY: number | null = null;
 
-    for (let i = 0; i <= height; i += 2) {
-      const progress = i / height;
-      const waveOffset = Math.sin(
-        (progress * Math.PI * numberOfWaves * 2) + 
-        (animationProgress.value * Math.PI * 2) + Math.PI / 3
-      ) * currentAmplitude * Math.sin(progress * Math.PI);
+    for (let i = 0; i < len; i += stride) {
+      const sampleIndex = Math.floor(i * step);
+      if (sampleIndex >= samples.length) break;
       
-      const x = width / 2 + waveOffset;
-      pathData += ` L ${x} ${i}`;
+      const offset = samples[sampleIndex] * waveformScale;
+      const x = center + offset;
+      const y = i;
+      
+      if (prevX !== null && prevY !== null) {
+        if (pathData === '') {
+          pathData = `M ${prevX} ${prevY}`;
+        }
+        pathData += ` L ${x} ${y}`;
+      }
+      
+      prevX = x;
+      prevY = y;
     }
 
-    return {
-      d: pathData,
-    };
+    return { d: pathData || `M ${center} 0 L ${center} ${height}` };
   });
 
   return (
     <View style={[styles.container, { width, height }]}>
-      <Svg width={width} height={height} style={styles.svg}>
+      <Svg width={width} height={height}>
         <AnimatedPath
           animatedProps={animatedProps}
           stroke={colors.tint}
-          strokeWidth={strokeWidth}
+          strokeWidth={2}
           fill="none"
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity={0.8}
-        />
-        {/* Secondary wave for depth */}
-        <AnimatedPath
-          animatedProps={secondaryAnimatedProps}
-          stroke={colors.tint}
-          strokeWidth={strokeWidth * 0.7}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.4}
         />
       </Svg>
     </View>
@@ -261,11 +210,7 @@ export default function Waveform({
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-  },
-  svg: {
-    overflow: 'visible',
+    justifyContent: 'center',
   },
 });
