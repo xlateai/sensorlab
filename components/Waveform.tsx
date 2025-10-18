@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
 import { Audio } from 'expo-av';
+import React, { useEffect, useRef, useState } from 'react';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -144,12 +144,22 @@ export default function Waveform({
   const updateWaveform = (level: number) => {
     if (!mountedRef.current) return;
     
+    // Validate input level
+    if (!isFinite(level) || isNaN(level)) return;
+    
     // Convert audio level to amplitude similar to Rust implementation
     // Normalize the level from dB to a 0-1 range with more sensitivity
     const normalizedLevel = Math.max(0, Math.min(1, (level + 60) / 60));
     
+    // Validate normalized level
+    if (!isFinite(normalizedLevel) || isNaN(normalizedLevel)) return;
+    
     // Add the new sample to our buffer
-    const newSample = normalizedLevel * (Math.random() * 0.2 + 0.8); // Add slight variation
+    const randomFactor = Math.random() * 0.2 + 0.8;
+    const newSample = normalizedLevel * randomFactor;
+    
+    // Final validation of the sample
+    if (!isFinite(newSample) || isNaN(newSample)) return;
     
     // Maintain a high-granularity buffer (similar to Rust's sample buffer)
     const maxBufferSize = Math.floor(height / 2); // Match vertical resolution
@@ -160,121 +170,52 @@ export default function Waveform({
     }
   };
 
-  // Generate vertical waveform path (top to bottom) with line drawing
-  const generateVerticalWaveformPath = () => {
+  // Generate single vertical waveform path (top to bottom) - cleaner version
+  const generateCleanVerticalWaveform = () => {
     if (audioData.length < 2) return '';
 
     const samples = audioData;
-    const vertical = true; // Always vertical as per Rust code
     const len = height;
-    const scale = width * 0.5 * 0.8; // 80% of half width for amplitude scaling
-    const center = width * 0.5; // Center horizontally
+    const scale = width * 0.3; // Single-side amplitude scaling
+    const center = width * 0.5;
     
     const step = samples.length > 1 ? samples.length / len : 1;
     const stride = 2; // Sample every 2 pixels for performance
     
     let path = '';
-    let prevX: number | null = null;
-    let prevY: number | null = null;
-
-    // Iterate through vertical pixels (top to bottom)
+    
     for (let i = 0; i < len; i += stride) {
       const sampleIndex = Math.floor(i * step);
       if (sampleIndex >= samples.length) break;
       
       const sample = samples[sampleIndex];
+      if (!isFinite(sample) || isNaN(sample)) continue; // Skip invalid numbers
+      
       const offset = sample * scale;
       
-      // Vertical layout: x varies with amplitude, y increases downward
+      // Single waveform: x varies with amplitude, y increases downward
       const x = center + offset;
       const y = i;
       
-      if (prevX !== null && prevY !== null) {
-        // Draw line from previous point to current point
-        if (path === '') {
-          path = `M ${prevX} ${prevY}`;
-        }
-        path += ` L ${x} ${y}`;
-      } else {
-        path = `M ${x} ${y}`;
-      }
+      // Validate coordinates before adding to path
+      if (!isFinite(x) || !isFinite(y) || isNaN(x) || isNaN(y)) continue;
       
-      prevX = x;
-      prevY = y;
+      if (i === 0) {
+        path = `M ${x.toFixed(2)} ${y.toFixed(2)}`;
+      } else {
+        path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
+      }
     }
 
     return path;
   };
 
-  // Generate mirrored waveform (both sides) for fuller visualization
-  const generateMirroredVerticalWaveform = () => {
-    if (audioData.length < 2) return { leftPath: '', rightPath: '', combinedPath: '' };
-
-    const samples = audioData;
-    const len = height;
-    const scale = width * 0.25 * 0.8; // Reduced scale for mirrored display
-    const center = width * 0.5;
-    
-    const step = samples.length > 1 ? samples.length / len : 1;
-    const stride = 1; // Higher granularity for smooth lines
-    
-    let leftPath = '';
-    let rightPath = '';
-    
-    for (let i = 0; i < len; i += stride) {
-      const sampleIndex = Math.floor(i * step);
-      if (sampleIndex >= samples.length) break;
-      
-      const sample = samples[sampleIndex];
-      const offset = sample * scale;
-      
-      // Left side (negative offset)
-      const leftX = center - offset;
-      // Right side (positive offset)  
-      const rightX = center + offset;
-      const y = i;
-      
-      if (i === 0) {
-        leftPath = `M ${leftX} ${y}`;
-        rightPath = `M ${rightX} ${y}`;
-      } else {
-        leftPath += ` L ${leftX} ${y}`;
-        rightPath += ` L ${rightX} ${y}`;
-      }
-    }
-    
-    // Create filled area between the two paths
-    const combinedPath = leftPath + ' ' + rightPath.split(' ').reverse().join(' ') + ' Z';
-    
-    return { leftPath, rightPath, combinedPath };
-  };
-
-  // Memoize the waveform data to prevent unnecessary recalculations
-  const waveformPaths = generateMirroredVerticalWaveform();
-
   return (
     <View style={[styles.container, { width, height }]}>
       <Svg width={width} height={height} style={styles.svg}>
-        {/* Main vertical waveform with mirrored sides */}
+        {/* Single clean waveform line */}
         <Path
-          d={waveformPaths.combinedPath}
-          fill="rgba(0, 255, 136, 0.2)"
-          stroke="none"
-        />
-        
-        {/* Left side waveform line */}
-        <Path
-          d={waveformPaths.leftPath}
-          fill="none"
-          stroke="#00FF88"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        
-        {/* Right side waveform line */}
-        <Path
-          d={waveformPaths.rightPath}
+          d={generateCleanVerticalWaveform()}
           fill="none"
           stroke="#00FF88"
           strokeWidth="2"
