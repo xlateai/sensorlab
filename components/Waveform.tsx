@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 interface WaveformProps {
   width?: number;
@@ -23,7 +23,7 @@ interface WaveformProps {
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function Waveform({ 
-  width = 80,
+  width = screenWidth,
   height = screenHeight,
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
@@ -170,21 +170,36 @@ export default function Waveform({
   };
 
   // Pinch gesture for zoom control
+  const savedFocalX = useSharedValue(0);
+  const savedFocalY = useSharedValue(0);
+  const gestureStarted = useSharedValue(false);
+  
   const pinchGesture = Gesture.Pinch()
+    .onBegin((event) => {
+      savedFocalX.value = event.focalX;
+      savedFocalY.value = event.focalY;
+      gestureStarted.value = true;
+    })
     .onUpdate((event) => {
-      const focalX = event.focalX;
-      const focalY = event.focalY;
+      if (!gestureStarted.value) return;
       
-      // Determine if gesture is primarily horizontal or vertical based on focal point movement
-      const isHorizontal = Math.abs(focalX - width / 2) > Math.abs(focalY - height / 2);
+      // Calculate movement from start position
+      const deltaX = Math.abs(event.focalX - savedFocalX.value);
+      const deltaY = Math.abs(event.focalY - savedFocalY.value);
+      
+      // If horizontal movement is greater, it's a horizontal gesture
+      const isHorizontal = deltaX > deltaY;
       
       if (isHorizontal) {
-        // Horizontal pinch - amplitude control
-        amplitudeScale.value = Math.max(0.1, Math.min(10.0, amplitudeScale.value * event.scale));
-      } else {
-        // Vertical pinch - time zoom control  
+        // Horizontal pinch - time zoom control (affects how much timeline we see)
         timeZoom.value = Math.max(0.5, Math.min(5.0, timeZoom.value * event.scale));
+      } else {
+        // Vertical pinch - amplitude control (affects waveform height)
+        amplitudeScale.value = Math.max(0.1, Math.min(10.0, amplitudeScale.value * event.scale));
       }
+    })
+    .onEnd(() => {
+      gestureStarted.value = false;
     });
 
   const animatedProps = useAnimatedProps(() => {
@@ -249,7 +264,8 @@ export default function Waveform({
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
 });
