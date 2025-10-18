@@ -2,14 +2,16 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -37,9 +39,13 @@ export default function Waveform({
   
   const audioSamples = useSharedValue<number[]>([]);
   
-  // Gesture controls
-  const amplitudeScale = useSharedValue(2.0); // 2x default amplitude
-  const timeZoom = useSharedValue(1.0); // Default time zoom
+  // Normalized zoom controls (0-1 range)
+  const xZoom = useSharedValue(0.5); // Time zoom (horizontal)
+  const yZoom = useSharedValue(0.5); // Amplitude zoom (vertical)
+  
+  // HUD visibility
+  const showHUD = useSharedValue(false);
+  const hudOpacity = useSharedValue(0);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -134,7 +140,9 @@ export default function Waveform({
           audioBufferRef.current.push(...newSamples);
           
           // 2x slower: Keep twice as many samples for slower movement
-          const maxSamples = Math.floor(height * 4 * timeZoom.value); // Adjustable based on time zoom
+          // Convert xZoom (0-1) to timeZoom (0.5-5.0)
+          const timeZoomValue = 0.5 + (xZoom.value * 4.5); // 0->0.5, 1->5.0
+          const maxSamples = Math.floor(height * 4 * timeZoomValue);
           if (audioBufferRef.current.length > maxSamples) {
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
           }
@@ -169,16 +177,34 @@ export default function Waveform({
     audioSamples.value = samples;
   };
 
-  // Pinch gesture for zoom control
+  // Touch and gesture handling
   const savedFocalX = useSharedValue(0);
   const savedFocalY = useSharedValue(0);
   const gestureStarted = useSharedValue(false);
   
+  const hideHUD = () => {
+    showHUD.value = false;
+  };
+
+  // Single tap gesture to show HUD
+  const tapGesture = Gesture.Tap()
+    .onBegin(() => {
+      showHUD.value = true;
+      hudOpacity.value = withTiming(1, { duration: 200 });
+    })
+    .onEnd(() => {
+      hudOpacity.value = withTiming(0, { duration: 500 });
+      setTimeout(() => runOnJS(hideHUD)(), 500);
+    });
+  
+  // Pinch gesture for zoom control
   const pinchGesture = Gesture.Pinch()
     .onBegin((event) => {
       savedFocalX.value = event.focalX;
       savedFocalY.value = event.focalY;
       gestureStarted.value = true;
+      showHUD.value = true;
+      hudOpacity.value = withTiming(1, { duration: 200 });
     })
     .onUpdate((event) => {
       if (!gestureStarted.value) return;
@@ -191,16 +217,22 @@ export default function Waveform({
       const isHorizontal = deltaX > deltaY;
       
       if (isHorizontal) {
-        // Horizontal pinch - time zoom control (affects how much timeline we see)
-        timeZoom.value = Math.max(0.5, Math.min(5.0, timeZoom.value * event.scale));
+        // Horizontal pinch - time zoom control (X axis)
+        const scaleFactor = (event.scale - 1) * 0.1; // Reduce sensitivity
+        xZoom.value = Math.max(0, Math.min(1, xZoom.value + scaleFactor));
       } else {
-        // Vertical pinch - amplitude control (affects waveform height)
-        amplitudeScale.value = Math.max(0.1, Math.min(10.0, amplitudeScale.value * event.scale));
+        // Vertical pinch - amplitude control (Y axis)
+        const scaleFactor = (event.scale - 1) * 0.1; // Reduce sensitivity
+        yZoom.value = Math.max(0, Math.min(1, yZoom.value + scaleFactor));
       }
     })
     .onEnd(() => {
       gestureStarted.value = false;
+      hudOpacity.value = withTiming(0, { duration: 500 });
+      setTimeout(() => runOnJS(hideHUD)(), 500);
     });
+  
+  const composedGesture = Gesture.Race(tapGesture, pinchGesture);
 
   const animatedProps = useAnimatedProps(() => {
     const samples = audioSamples.value;
@@ -209,9 +241,13 @@ export default function Waveform({
       return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
     }
 
+    // Convert normalized zoom values to actual scales
+    // yZoom: 0->0.1, 0.5->2.0, 1->10.0 (amplitude scale)
+    const amplitudeScale = 0.1 + (yZoom.value * yZoom.value * 9.9); // Quadratic for better feel
+    
     // EXACTLY match Rust implementation with gesture controls
     const len = height;
-    const waveformScale = width * 0.5 * scale * amplitudeScale.value; // Apply amplitude scaling
+    const waveformScale = width * 0.5 * scale * amplitudeScale;
     const center = width * 0.5;
     
     const step = Math.max(1, samples.length) / len;
@@ -244,8 +280,17 @@ export default function Waveform({
     return { d: pathData || `M ${center} 0 L ${center} ${height}` };
   });
 
+  // HUD animations
+  const hudStyle = useAnimatedStyle(() => ({
+    opacity: hudOpacity.value,
+    pointerEvents: showHUD.value ? 'none' : 'none',
+  }));
+
+  const AnimatedText = Animated.createAnimatedComponent(Text);
+  const AnimatedLine = Animated.createAnimatedComponent(Line);
+
   return (
-    <GestureDetector gesture={pinchGesture}>
+    <GestureDetector gesture={composedGesture}>
       <View style={[styles.container, { width, height }]}>
         <Svg width={width} height={height}>
           <AnimatedPath
@@ -257,6 +302,46 @@ export default function Waveform({
             strokeLinejoin="round"
           />
         </Svg>
+        
+        {/* HUD Overlay */}
+        <Animated.View style={[styles.hudContainer, hudStyle]}>
+          <Svg width={width} height={height} style={styles.hudSvg}>
+            {/* Crosshair - Horizontal line */}
+            <AnimatedLine
+              x1={0}
+              y1={height / 2}
+              x2={width}
+              y2={height / 2}
+              stroke={colors.tint}
+              strokeWidth={1}
+              opacity={0.5}
+            />
+            {/* Crosshair - Vertical line */}
+            <AnimatedLine
+              x1={width / 2}
+              y1={0}
+              x2={width / 2}
+              y2={height}
+              stroke={colors.tint}
+              strokeWidth={1}
+              opacity={0.5}
+            />
+          </Svg>
+          
+          {/* X Zoom Label */}
+          <Animated.View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 25 }]}>
+            <AnimatedText style={[styles.labelText, { color: colors.tint }]}>
+              X: {(xZoom.value * 100).toFixed(0)}%
+            </AnimatedText>
+          </Animated.View>
+          
+          {/* Y Zoom Label */}
+          <Animated.View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
+            <AnimatedText style={[styles.labelText, { color: colors.tint }]}>
+              Y: {(yZoom.value * 100).toFixed(0)}%
+            </AnimatedText>
+          </Animated.View>
+        </Animated.View>
       </View>
     </GestureDetector>
   );
@@ -267,5 +352,37 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  hudContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none',
+  },
+  hudSvg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  xLabel: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  yLabel: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  labelText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
   },
 });
