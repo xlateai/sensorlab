@@ -1,16 +1,16 @@
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useEffect } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import Animated, {
-  useSharedValue,
+  Easing,
+  interpolate,
   useAnimatedProps,
+  useSharedValue,
   withRepeat,
   withTiming,
-  interpolate,
-  Easing,
 } from 'react-native-reanimated';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import Svg, { Path } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
