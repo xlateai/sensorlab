@@ -139,9 +139,9 @@ export default function Waveform({
           // Maintain a rolling buffer of recent samples
           audioBufferRef.current.push(...newSamples);
           
-          // 2x slower: Keep twice as many samples for slower movement
-          // Convert xZoom (0-1) to timeZoom (0.5-5.0)
-          const timeZoomValue = 0.5 + (xZoom.value * 4.5); // 0->0.5, 1->5.0
+          // Convert yZoom (0-1) to timeZoom for duration control
+          // Y axis controls how much timeline/duration we see
+          const timeZoomValue = 0.5 + (yZoom.value * 4.5); // 0->0.5, 1->5.0
           const maxSamples = Math.floor(height * 4 * timeZoomValue);
           if (audioBufferRef.current.length > maxSamples) {
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
@@ -216,17 +216,26 @@ export default function Waveform({
       const deltaX = Math.abs(event.focalX - savedFocalX.value);
       const deltaY = Math.abs(event.focalY - savedFocalY.value);
       
-      // If horizontal movement is greater, it's a horizontal gesture
-      const isHorizontal = deltaX > deltaY;
+      // Require significant movement in one direction for clear distinction
+      const threshold = 20; // pixels
+      const totalMovement = deltaX + deltaY;
+      
+      if (totalMovement < threshold) return; // Wait for clear intent
+      
+      // If horizontal movement is significantly greater, it's a horizontal gesture
+      const isHorizontal = deltaX > deltaY * 1.5; // Bias towards horizontal
+      const isVertical = deltaY > deltaX * 1.5;   // Bias towards vertical
+      
+      if (!isHorizontal && !isVertical) return; // Ambiguous gesture, ignore
       
       if (isHorizontal) {
-        // Horizontal pinch - time zoom control (X axis)
-        const scaleFactor = (event.scale - 1) * 0.1; // Reduce sensitivity
+        // Horizontal pinch - amplitude control (X axis) 
+        const scaleFactor = (event.scale - 1) * 0.2; // Increased sensitivity
         xZoom.value = Math.max(0, Math.min(1, xZoom.value + scaleFactor));
         runOnJS(updateDisplayValues)();
-      } else {
-        // Vertical pinch - amplitude control (Y axis)
-        const scaleFactor = (event.scale - 1) * 0.1; // Reduce sensitivity
+      } else if (isVertical) {
+        // Vertical pinch - duration/timeline control (Y axis)
+        const scaleFactor = (event.scale - 1) * 0.2; // Increased sensitivity  
         yZoom.value = Math.max(0, Math.min(1, yZoom.value + scaleFactor));
         runOnJS(updateDisplayValues)();
       }
@@ -247,8 +256,9 @@ export default function Waveform({
     }
 
     // Convert normalized zoom values to actual scales
-    // yZoom: 0->0.1, 0.5->2.0, 1->10.0 (amplitude scale)
-    const amplitudeScale = 0.1 + (yZoom.value * yZoom.value * 9.9); // Quadratic for better feel
+    // xZoom: 0->0.1, 0.5->2.0, 1->10.0 (amplitude scale)
+    // X axis controls amplitude (waveform height)
+    const amplitudeScale = 0.1 + (xZoom.value * xZoom.value * 9.9); // Quadratic for better feel
     
     // EXACTLY match Rust implementation with gesture controls
     const len = height;
@@ -335,9 +345,12 @@ export default function Waveform({
             </Svg>
             
             {/* X Zoom Label */}
-            <View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 25 }]}>
+            <View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 45 }]}>
               <Text style={[styles.labelText, { color: colors.tint }]}>
                 X: {xZoomDisplay}%
+              </Text>
+              <Text style={[styles.subLabelText, { color: colors.tint }]}>
+                (amplitude)
               </Text>
             </View>
             
@@ -345,6 +358,9 @@ export default function Waveform({
             <View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
               <Text style={[styles.labelText, { color: colors.tint }]}>
                 Y: {yZoomDisplay}%
+              </Text>
+              <Text style={[styles.subLabelText, { color: colors.tint }]}>
+                (duration)
               </Text>
             </View>
           </Animated.View>
@@ -391,5 +407,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     fontFamily: 'monospace',
+  },
+  subLabelText: {
+    fontSize: 10,
+    fontWeight: 'normal',
+    fontFamily: 'monospace',
+    opacity: 0.7,
+    textAlign: 'center',
   },
 });
