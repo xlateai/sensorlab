@@ -20,15 +20,17 @@ interface WaveformProps {
   height?: number;
   isActive?: boolean;
   scale?: number;
+  orientation?: 'horizontal' | 'vertical';
 }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function Waveform({ 
-  width = screenWidth,
-  height = screenHeight,
+  width = screenWidth * 0.3, // 30% of screen width by default
+  height = screenHeight * 0.3, // 30% of screen height by default
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
+  orientation = 'horizontal', // horizontal mode by default
 }: WaveformProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -143,7 +145,8 @@ export default function Waveform({
           // Convert yZoom (0-1) to timeZoom for duration control
           // Y axis controls how much timeline/duration we see
           const timeZoomValue = 0.5 + (yZoom.value * 4.5); // 0->0.5, 1->5.0
-          const maxSamples = Math.floor(height * 4 * timeZoomValue);
+          const dimensionForSamples = orientation === 'horizontal' ? width : height;
+          const maxSamples = Math.floor(dimensionForSamples * 4 * timeZoomValue);
           if (audioBufferRef.current.length > maxSamples) {
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
           }
@@ -199,16 +202,27 @@ export default function Waveform({
         const touchX = Math.max(0, Math.min(width, touch.x));
         const touchY = Math.max(0, Math.min(height, touch.y));
         
-        // Y position controls speed (0% at top, 100% at bottom)
-        const yProgress = touchY / height;
-        yZoom.value = yProgress;
-        
-        // X position controls amplitude symmetrically from center
-        const centerX = width / 2;
-        const maxDistance = width / 2;
-        const distanceFromCenter = Math.abs(touchX - centerX);
-        const xProgress = Math.min(1, distanceFromCenter / maxDistance);
-        xZoom.value = xProgress;
+        if (orientation === 'horizontal') {
+          // Horizontal mode: X position controls speed, Y position controls amplitude
+          const xProgress = touchX / width;
+          yZoom.value = xProgress;
+          
+          const centerY = height / 2;
+          const maxDistance = height / 2;
+          const distanceFromCenter = Math.abs(touchY - centerY);
+          const yProgress = Math.min(1, distanceFromCenter / maxDistance);
+          xZoom.value = yProgress;
+        } else {
+          // Vertical mode: Y position controls speed, X position controls amplitude
+          const yProgress = touchY / height;
+          yZoom.value = yProgress;
+          
+          const centerX = width / 2;
+          const maxDistance = width / 2;
+          const distanceFromCenter = Math.abs(touchX - centerX);
+          const xProgress = Math.min(1, distanceFromCenter / maxDistance);
+          xZoom.value = xProgress;
+        }
         
         runOnJS(updateDisplayValues)();
       }
@@ -229,16 +243,27 @@ export default function Waveform({
       const touchX = Math.max(0, Math.min(width, event.x));
       const touchY = Math.max(0, Math.min(height, event.y));
       
-      // Y position controls speed (0% at top, 100% at bottom)
-      const yProgress = touchY / height;
-      yZoom.value = yProgress;
-      
-      // X position controls amplitude symmetrically from center
-      const centerX = width / 2;
-      const maxDistance = width / 2;
-      const distanceFromCenter = Math.abs(touchX - centerX);
-      const xProgress = Math.min(1, distanceFromCenter / maxDistance);
-      xZoom.value = xProgress;
+      if (orientation === 'horizontal') {
+        // Horizontal mode: X position controls speed, Y position controls amplitude
+        const xProgress = touchX / width;
+        yZoom.value = xProgress;
+        
+        const centerY = height / 2;
+        const maxDistance = height / 2;
+        const distanceFromCenter = Math.abs(touchY - centerY);
+        const yProgress = Math.min(1, distanceFromCenter / maxDistance);
+        xZoom.value = yProgress;
+      } else {
+        // Vertical mode: Y position controls speed, X position controls amplitude
+        const yProgress = touchY / height;
+        yZoom.value = yProgress;
+        
+        const centerX = width / 2;
+        const maxDistance = width / 2;
+        const distanceFromCenter = Math.abs(touchX - centerX);
+        const xProgress = Math.min(1, distanceFromCenter / maxDistance);
+        xZoom.value = xProgress;
+      }
       
       runOnJS(updateDisplayValues)();
     })
@@ -253,7 +278,11 @@ export default function Waveform({
     const samples = audioSamples.value;
     
     if (samples.length === 0) {
-      return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
+      if (orientation === 'horizontal') {
+        return { d: `M 0 ${height / 2} L ${width} ${height / 2}` };
+      } else {
+        return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
+      }
     }
 
     // Convert normalized zoom values to actual scales
@@ -261,39 +290,71 @@ export default function Waveform({
     // X axis controls amplitude (waveform height)
     const amplitudeScale = 0.1 + (xZoom.value * xZoom.value * 9.9); // Quadratic for better feel
     
-    // EXACTLY match Rust implementation with gesture controls
-    const len = height;
-    const waveformScale = width * 0.5 * scale * amplitudeScale;
-    const center = width * 0.5;
-    
-    const step = Math.max(1, samples.length) / len;
-    const stride = 2;
-    
     let pathData = '';
     let prevX: number | null = null;
     let prevY: number | null = null;
+    
+    if (orientation === 'horizontal') {
+      // Horizontal mode: waveform goes from left to right
+      const len = width;
+      const waveformScale = height * 0.5 * scale * amplitudeScale;
+      const center = height * 0.5;
+      
+      const step = Math.max(1, samples.length) / len;
+      const stride = 2;
 
-    for (let i = 0; i < len; i += stride) {
-      const sampleIndex = Math.floor(i * step);
-      if (sampleIndex >= samples.length) break;
-      
-      // DIRECT multiplication with gesture-controlled amplitude
-      const offset = samples[sampleIndex] * waveformScale;
-      const x = Math.max(0, Math.min(width, center + offset)); // Constrain to screen bounds
-      const y = i;
-      
-      if (prevX !== null && prevY !== null) {
-        if (pathData === '') {
-          pathData = `M ${prevX} ${prevY}`;
+      for (let i = 0; i < len; i += stride) {
+        const sampleIndex = Math.floor(i * step);
+        if (sampleIndex >= samples.length) break;
+        
+        // DIRECT multiplication with gesture-controlled amplitude
+        const offset = samples[sampleIndex] * waveformScale;
+        const x = i;
+        const y = Math.max(0, Math.min(height, center + offset)); // Constrain to screen bounds
+        
+        if (prevX !== null && prevY !== null) {
+          if (pathData === '') {
+            pathData = `M ${prevX} ${prevY}`;
+          }
+          pathData += ` L ${x} ${y}`;
         }
-        pathData += ` L ${x} ${y}`;
+        
+        prevX = x;
+        prevY = y;
       }
       
-      prevX = x;
-      prevY = y;
-    }
+      return { d: pathData || `M 0 ${center} L ${width} ${center}` };
+    } else {
+      // Vertical mode: waveform goes from top to bottom (original behavior)
+      const len = height;
+      const waveformScale = width * 0.5 * scale * amplitudeScale;
+      const center = width * 0.5;
+      
+      const step = Math.max(1, samples.length) / len;
+      const stride = 2;
 
-    return { d: pathData || `M ${center} 0 L ${center} ${height}` };
+      for (let i = 0; i < len; i += stride) {
+        const sampleIndex = Math.floor(i * step);
+        if (sampleIndex >= samples.length) break;
+        
+        // DIRECT multiplication with gesture-controlled amplitude
+        const offset = samples[sampleIndex] * waveformScale;
+        const x = Math.max(0, Math.min(width, center + offset)); // Constrain to screen bounds
+        const y = i;
+        
+        if (prevX !== null && prevY !== null) {
+          if (pathData === '') {
+            pathData = `M ${prevX} ${prevY}`;
+          }
+          pathData += ` L ${x} ${y}`;
+        }
+        
+        prevX = x;
+        prevY = y;
+      }
+
+      return { d: pathData || `M ${center} 0 L ${center} ${height}` };
+    }
   });
 
   // HUD animations
@@ -307,11 +368,11 @@ export default function Waveform({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <View style={[styles.container, { width, height }]}>
+      <View style={[styles.container, styles.waveformBoundary, { width, height }]}>
         <Svg width={width} height={height}>
           <AnimatedPath
             animatedProps={animatedProps}
-            stroke={colors.tint}
+            stroke="#00ff00"
             strokeWidth={2}
             fill="none"
             strokeLinecap="round"
@@ -323,44 +384,42 @@ export default function Waveform({
         {showHUD && (
           <Animated.View style={[styles.hudContainer, hudStyle]}>
             <Svg width={width} height={height} style={styles.hudSvg}>
-              {/* Crosshair - Horizontal line */}
+              {/* Crosshair lines */}
               <AnimatedLine
                 x1={0}
                 y1={height / 2}
                 x2={width}
                 y2={height / 2}
-                stroke={colors.tint}
+                stroke="#00ff00"
                 strokeWidth={1}
                 opacity={0.5}
               />
-              {/* Crosshair - Vertical line */}
               <AnimatedLine
                 x1={width / 2}
                 y1={0}
                 x2={width / 2}
                 y2={height}
-                stroke={colors.tint}
+                stroke="#00ff00"
                 strokeWidth={1}
                 opacity={0.5}
               />
             </Svg>
             
-            {/* X Zoom Label */}
+            {/* Control Labels */}
             <View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 45 }]}>
-              <Text style={[styles.labelText, { color: colors.tint }]}>
-                X: {xZoomDisplay}%
+              <Text style={[styles.labelText, { color: '#00ff00' }]}>
+                {orientation === 'horizontal' ? 'Y' : 'X'}: {xZoomDisplay}%
               </Text>
-              <Text style={[styles.subLabelText, { color: colors.tint }]}>
+              <Text style={[styles.subLabelText, { color: '#00ff00' }]}>
                 (amplitude)
               </Text>
             </View>
             
-            {/* Y Zoom Label */}
             <View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
-              <Text style={[styles.labelText, { color: colors.tint }]}>
-                Y: {yZoomDisplay}%
+              <Text style={[styles.labelText, { color: '#00ff00' }]}>
+                {orientation === 'horizontal' ? 'X' : 'Y'}: {yZoomDisplay}%
               </Text>
-              <Text style={[styles.subLabelText, { color: colors.tint }]}>
+              <Text style={[styles.subLabelText, { color: '#00ff00' }]}>
                 (speed)
               </Text>
             </View>
@@ -373,9 +432,13 @@ export default function Waveform({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
+    // Remove flex: 1 to allow explicit width/height control
+  },
+  waveformBoundary: {
+    borderWidth: 2,
+    borderColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   hudContainer: {
     position: 'absolute',
