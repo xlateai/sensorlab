@@ -26,8 +26,8 @@ interface WaveformProps {
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function Waveform({ 
-  width = screenWidth * 0.3, // 30% of screen width by default
-  height = screenHeight * 0.3, // 30% of screen height by default
+  width = screenWidth, // Full screen width by default
+  height = screenHeight * 0.4, // 40% of screen height by default
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
   orientation = 'horizontal', // horizontal mode by default
