@@ -43,8 +43,9 @@ export default function Waveform({
   const audioSamples = useSharedValue<number[]>([]);
   
   // Back to shared values for zoom to work with worklets
-  const xZoom = useSharedValue(0.5);
-  const yZoom = useSharedValue(0.5);
+  // Start with reasonable defaults so waveform is visible
+  const xZoom = useSharedValue(0.3); // Some amplitude by default
+  const yZoom = useSharedValue(0.5); // Medium speed by default
   const hudOpacity = useSharedValue(0);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -184,22 +185,58 @@ export default function Waveform({
 
   // Touch and gesture handling
   
-  // Pan gesture for direct finger position control
+  // Combined touch detection for reliable HUD display
+  const touchGesture = Gesture.Manual()
+    .onTouchesDown((event) => {
+      runOnJS(setShowHUD)(true);
+      hudOpacity.value = withTiming(1, { duration: 200 });
+    })
+    .onTouchesMove((event) => {
+      const touch = event.allTouches[0];
+      if (touch) {
+        // Ensure coordinates are within bounds and valid
+        const touchX = Math.max(0, Math.min(width, touch.x));
+        const touchY = Math.max(0, Math.min(height, touch.y));
+        
+        // Y position controls speed (0% at top, 100% at bottom)
+        const yProgress = touchY / height;
+        yZoom.value = yProgress;
+        
+        // X position controls amplitude symmetrically from center
+        const centerX = width / 2;
+        const maxDistance = width / 2;
+        const distanceFromCenter = Math.abs(touchX - centerX);
+        const xProgress = Math.min(1, distanceFromCenter / maxDistance);
+        xZoom.value = xProgress;
+        
+        runOnJS(updateDisplayValues)();
+      }
+    })
+    .onTouchesUp(() => {
+      hudOpacity.value = withTiming(0, { duration: 500 });
+      setTimeout(() => runOnJS(setShowHUD)(false), 500);
+    });
+
+  // Fallback pan gesture for additional reliability
   const panGesture = Gesture.Pan()
-    .onBegin((event) => {
+    .onBegin(() => {
       runOnJS(setShowHUD)(true);
       hudOpacity.value = withTiming(1, { duration: 200 });
     })
     .onUpdate((event) => {
+      // Ensure coordinates are within bounds
+      const touchX = Math.max(0, Math.min(width, event.x));
+      const touchY = Math.max(0, Math.min(height, event.y));
+      
       // Y position controls speed (0% at top, 100% at bottom)
-      const yProgress = Math.max(0, Math.min(1, event.y / height));
+      const yProgress = touchY / height;
       yZoom.value = yProgress;
       
       // X position controls amplitude symmetrically from center
       const centerX = width / 2;
       const maxDistance = width / 2;
-      const distanceFromCenter = Math.abs(event.x - centerX);
-      const xProgress = Math.max(0, Math.min(1, distanceFromCenter / maxDistance));
+      const distanceFromCenter = Math.abs(touchX - centerX);
+      const xProgress = Math.min(1, distanceFromCenter / maxDistance);
       xZoom.value = xProgress;
       
       runOnJS(updateDisplayValues)();
@@ -209,7 +246,7 @@ export default function Waveform({
       setTimeout(() => runOnJS(setShowHUD)(false), 500);
     });
   
-  const composedGesture = panGesture;
+  const composedGesture = Gesture.Race(touchGesture, panGesture);
 
   const animatedProps = useAnimatedProps(() => {
     const samples = audioSamples.value;
@@ -241,7 +278,7 @@ export default function Waveform({
       
       // DIRECT multiplication with gesture-controlled amplitude
       const offset = samples[sampleIndex] * waveformScale;
-      const x = center + offset;
+      const x = Math.max(0, Math.min(width, center + offset)); // Constrain to screen bounds
       const y = i;
       
       if (prevX !== null && prevY !== null) {
