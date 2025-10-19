@@ -180,7 +180,8 @@ export default function Waveform({
 
   const updateDisplayValues = () => {
     setXZoomDisplay(Math.round(xZoom.value * 100));
-    setYZoomDisplay(Math.round(yZoom.value * 100));
+    // Invert Y display so 100% is at top (fastest) and 0% is at bottom (slowest)
+    setYZoomDisplay(Math.round((1 - yZoom.value) * 100));
   };
 
   // Touch and gesture handling
