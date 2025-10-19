@@ -3,6 +3,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -27,13 +28,14 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function Waveform({ 
   width = screenWidth, // Full screen width by default
-  height = screenHeight * 0.4, // 40% of screen height by default
+  height = screenHeight * 0.25, // 25% of screen height by default
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
   orientation = 'horizontal', // horizontal mode by default
 }: WaveformProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -368,7 +370,13 @@ export default function Waveform({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <View style={[styles.container, styles.waveformBoundary, { width, height }]}>
+      <View style={[styles.container, styles.waveformBoundary, { 
+        width, 
+        height, 
+        marginTop: insets.top,
+        marginLeft: insets.left,
+        marginRight: insets.right 
+      }]}>
         <Svg width={width} height={height}>
           <AnimatedPath
             animatedProps={animatedProps}
@@ -435,9 +443,8 @@ const styles = StyleSheet.create({
     // Remove flex: 1 to allow explicit width/height control
   },
   waveformBoundary: {
-    borderWidth: 2,
-    borderColor: 'white',
-    borderRadius: 12,
+    backgroundColor: '#121212',
+    borderRadius: 25,
     overflow: 'hidden',
   },
   hudContainer: {
