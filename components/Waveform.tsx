@@ -36,15 +36,15 @@ export default function Waveform({
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [showHUD, setShowHUD] = useState(false);
+  const [xZoomDisplay, setXZoomDisplay] = useState(50);
+  const [yZoomDisplay, setYZoomDisplay] = useState(50);
   
   const audioSamples = useSharedValue<number[]>([]);
   
-  // Normalized zoom controls (0-1 range)
-  const xZoom = useSharedValue(0.5); // Time zoom (horizontal)
-  const yZoom = useSharedValue(0.5); // Amplitude zoom (vertical)
-  
-  // HUD visibility
-  const showHUD = useSharedValue(false);
+  // Back to shared values for zoom to work with worklets
+  const xZoom = useSharedValue(0.5);
+  const yZoom = useSharedValue(0.5);
   const hudOpacity = useSharedValue(0);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -177,24 +177,26 @@ export default function Waveform({
     audioSamples.value = samples;
   };
 
+  const updateDisplayValues = () => {
+    setXZoomDisplay(Math.round(xZoom.value * 100));
+    setYZoomDisplay(Math.round(yZoom.value * 100));
+  };
+
   // Touch and gesture handling
   const savedFocalX = useSharedValue(0);
   const savedFocalY = useSharedValue(0);
   const gestureStarted = useSharedValue(false);
   
-  const hideHUD = () => {
-    showHUD.value = false;
-  };
-
   // Single tap gesture to show HUD
   const tapGesture = Gesture.Tap()
     .onBegin(() => {
-      showHUD.value = true;
+      runOnJS(updateDisplayValues)();
+      runOnJS(setShowHUD)(true);
       hudOpacity.value = withTiming(1, { duration: 200 });
     })
     .onEnd(() => {
       hudOpacity.value = withTiming(0, { duration: 500 });
-      setTimeout(() => runOnJS(hideHUD)(), 500);
+      setTimeout(() => runOnJS(setShowHUD)(false), 500);
     });
   
   // Pinch gesture for zoom control
@@ -203,7 +205,8 @@ export default function Waveform({
       savedFocalX.value = event.focalX;
       savedFocalY.value = event.focalY;
       gestureStarted.value = true;
-      showHUD.value = true;
+      runOnJS(updateDisplayValues)();
+      runOnJS(setShowHUD)(true);
       hudOpacity.value = withTiming(1, { duration: 200 });
     })
     .onUpdate((event) => {
@@ -220,16 +223,18 @@ export default function Waveform({
         // Horizontal pinch - time zoom control (X axis)
         const scaleFactor = (event.scale - 1) * 0.1; // Reduce sensitivity
         xZoom.value = Math.max(0, Math.min(1, xZoom.value + scaleFactor));
+        runOnJS(updateDisplayValues)();
       } else {
         // Vertical pinch - amplitude control (Y axis)
         const scaleFactor = (event.scale - 1) * 0.1; // Reduce sensitivity
         yZoom.value = Math.max(0, Math.min(1, yZoom.value + scaleFactor));
+        runOnJS(updateDisplayValues)();
       }
     })
     .onEnd(() => {
       gestureStarted.value = false;
       hudOpacity.value = withTiming(0, { duration: 500 });
-      setTimeout(() => runOnJS(hideHUD)(), 500);
+      setTimeout(() => runOnJS(setShowHUD)(false), 500);
     });
   
   const composedGesture = Gesture.Race(tapGesture, pinchGesture);
@@ -283,7 +288,7 @@ export default function Waveform({
   // HUD animations
   const hudStyle = useAnimatedStyle(() => ({
     opacity: hudOpacity.value,
-    pointerEvents: showHUD.value ? 'none' : 'none',
+    pointerEvents: 'none',
   }));
 
   const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -304,44 +309,46 @@ export default function Waveform({
         </Svg>
         
         {/* HUD Overlay */}
-        <Animated.View style={[styles.hudContainer, hudStyle]}>
-          <Svg width={width} height={height} style={styles.hudSvg}>
-            {/* Crosshair - Horizontal line */}
-            <AnimatedLine
-              x1={0}
-              y1={height / 2}
-              x2={width}
-              y2={height / 2}
-              stroke={colors.tint}
-              strokeWidth={1}
-              opacity={0.5}
-            />
-            {/* Crosshair - Vertical line */}
-            <AnimatedLine
-              x1={width / 2}
-              y1={0}
-              x2={width / 2}
-              y2={height}
-              stroke={colors.tint}
-              strokeWidth={1}
-              opacity={0.5}
-            />
-          </Svg>
-          
-          {/* X Zoom Label */}
-          <Animated.View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 25 }]}>
-            <AnimatedText style={[styles.labelText, { color: colors.tint }]}>
-              X: {(xZoom.value * 100).toFixed(0)}%
-            </AnimatedText>
+        {showHUD && (
+          <Animated.View style={[styles.hudContainer, hudStyle]}>
+            <Svg width={width} height={height} style={styles.hudSvg}>
+              {/* Crosshair - Horizontal line */}
+              <AnimatedLine
+                x1={0}
+                y1={height / 2}
+                x2={width}
+                y2={height / 2}
+                stroke={colors.tint}
+                strokeWidth={1}
+                opacity={0.5}
+              />
+              {/* Crosshair - Vertical line */}
+              <AnimatedLine
+                x1={width / 2}
+                y1={0}
+                x2={width / 2}
+                y2={height}
+                stroke={colors.tint}
+                strokeWidth={1}
+                opacity={0.5}
+              />
+            </Svg>
+            
+            {/* X Zoom Label */}
+            <View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 25 }]}>
+              <Text style={[styles.labelText, { color: colors.tint }]}>
+                X: {xZoomDisplay}%
+              </Text>
+            </View>
+            
+            {/* Y Zoom Label */}
+            <View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
+              <Text style={[styles.labelText, { color: colors.tint }]}>
+                Y: {yZoomDisplay}%
+              </Text>
+            </View>
           </Animated.View>
-          
-          {/* Y Zoom Label */}
-          <Animated.View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
-            <AnimatedText style={[styles.labelText, { color: colors.tint }]}>
-              Y: {(yZoom.value * 100).toFixed(0)}%
-            </AnimatedText>
-          </Animated.View>
-        </Animated.View>
+        )}
       </View>
     </GestureDetector>
   );
