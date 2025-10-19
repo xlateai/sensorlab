@@ -183,70 +183,33 @@ export default function Waveform({
   };
 
   // Touch and gesture handling
-  const savedFocalX = useSharedValue(0);
-  const savedFocalY = useSharedValue(0);
-  const gestureStarted = useSharedValue(false);
   
-  // Single tap gesture to show HUD
-  const tapGesture = Gesture.Tap()
-    .onBegin(() => {
-      runOnJS(updateDisplayValues)();
-      runOnJS(setShowHUD)(true);
-      hudOpacity.value = withTiming(1, { duration: 200 });
-    })
-    .onEnd(() => {
-      hudOpacity.value = withTiming(0, { duration: 500 });
-      setTimeout(() => runOnJS(setShowHUD)(false), 500);
-    });
-  
-  // Pinch gesture for zoom control
-  const pinchGesture = Gesture.Pinch()
+  // Pan gesture for direct finger position control
+  const panGesture = Gesture.Pan()
     .onBegin((event) => {
-      savedFocalX.value = event.focalX;
-      savedFocalY.value = event.focalY;
-      gestureStarted.value = true;
-      runOnJS(updateDisplayValues)();
       runOnJS(setShowHUD)(true);
       hudOpacity.value = withTiming(1, { duration: 200 });
     })
     .onUpdate((event) => {
-      if (!gestureStarted.value) return;
+      // Y position controls speed (0% at top, 100% at bottom)
+      const yProgress = Math.max(0, Math.min(1, event.y / height));
+      yZoom.value = yProgress;
       
-      // Calculate movement from start position
-      const deltaX = Math.abs(event.focalX - savedFocalX.value);
-      const deltaY = Math.abs(event.focalY - savedFocalY.value);
+      // X position controls amplitude symmetrically from center
+      const centerX = width / 2;
+      const maxDistance = width / 2;
+      const distanceFromCenter = Math.abs(event.x - centerX);
+      const xProgress = Math.max(0, Math.min(1, distanceFromCenter / maxDistance));
+      xZoom.value = xProgress;
       
-      // Require significant movement in one direction for clear distinction
-      const threshold = 20; // pixels
-      const totalMovement = deltaX + deltaY;
-      
-      if (totalMovement < threshold) return; // Wait for clear intent
-      
-      // If horizontal movement is significantly greater, it's a horizontal gesture
-      const isHorizontal = deltaX > deltaY * 1.5; // Bias towards horizontal
-      const isVertical = deltaY > deltaX * 1.5;   // Bias towards vertical
-      
-      if (!isHorizontal && !isVertical) return; // Ambiguous gesture, ignore
-      
-      if (isHorizontal) {
-        // Horizontal pinch - amplitude control (X axis) 
-        const scaleFactor = (event.scale - 1) * 0.2; // Increased sensitivity
-        xZoom.value = Math.max(0, Math.min(1, xZoom.value + scaleFactor));
-        runOnJS(updateDisplayValues)();
-      } else if (isVertical) {
-        // Vertical pinch - duration/timeline control (Y axis)
-        const scaleFactor = (event.scale - 1) * 0.2; // Increased sensitivity  
-        yZoom.value = Math.max(0, Math.min(1, yZoom.value + scaleFactor));
-        runOnJS(updateDisplayValues)();
-      }
+      runOnJS(updateDisplayValues)();
     })
     .onEnd(() => {
-      gestureStarted.value = false;
       hudOpacity.value = withTiming(0, { duration: 500 });
       setTimeout(() => runOnJS(setShowHUD)(false), 500);
     });
   
-  const composedGesture = Gesture.Race(tapGesture, pinchGesture);
+  const composedGesture = panGesture;
 
   const animatedProps = useAnimatedProps(() => {
     const samples = audioSamples.value;
@@ -360,7 +323,7 @@ export default function Waveform({
                 Y: {yZoomDisplay}%
               </Text>
               <Text style={[styles.subLabelText, { color: colors.tint }]}>
-                (duration)
+                (speed)
               </Text>
             </View>
           </Animated.View>
