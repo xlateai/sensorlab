@@ -1,8 +1,9 @@
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -31,7 +32,7 @@ export default function Waveform({
   height = screenHeight * 0.25, // 25% of screen height by default
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
-  orientation = 'horizontal', // horizontal mode by default
+  orientation: initialOrientation = 'horizontal', // horizontal mode by default
 }: WaveformProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -43,6 +44,7 @@ export default function Waveform({
   const [showHUD, setShowHUD] = useState(false);
   const [xZoomDisplay, setXZoomDisplay] = useState(50);
   const [yZoomDisplay, setYZoomDisplay] = useState(50);
+  const [orientation, setOrientation] = useState(initialOrientation);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -433,6 +435,21 @@ export default function Waveform({
             </View>
           </Animated.View>
         )}
+        
+        {/* Control Overlay Bar */}
+        <View style={styles.controlOverlay}>
+          <TouchableOpacity 
+            style={styles.fullscreenButton}
+            onPress={() => setOrientation(orientation === 'horizontal' ? 'vertical' : 'horizontal')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={orientation === 'horizontal' ? 'expand' : 'contract'} 
+              size={24} 
+              color="#00ff00" 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </GestureDetector>
   );
@@ -485,5 +502,36 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     opacity: 0.7,
     textAlign: 'center',
+  },
+  controlOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    pointerEvents: 'box-none', // Allow touches to pass through except for button
+  },
+  fullscreenButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
