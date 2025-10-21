@@ -497,13 +497,19 @@ export default function Waveform({
         
         {/* Settings Button - Top Left */}
         <TouchableOpacity 
-          style={[styles.settingsButton, isFullscreen && styles.settingsButtonFullscreen]}
+          style={[
+            styles.settingsButton,
+            isFullscreen && {
+              top: Math.max(16, insets.top + 16),
+              left: Math.max(16, insets.left + 16),
+            }
+          ]}
           onPress={toggleSettings}
           activeOpacity={0.7}
         >
           <Ionicons 
             name={showSettings ? "close" : "settings"} 
-            size={isFullscreen ? 22 : 18} 
+            size={18} 
             color="#00ff00" 
           />
         </TouchableOpacity>
@@ -511,7 +517,10 @@ export default function Waveform({
         {/* Zoom Button - Top Right */}
         <Animated.View style={[
           styles.zoomButton,
-          isFullscreen && styles.zoomButtonFullscreen,
+          isFullscreen && {
+            top: Math.max(16, insets.top + 16),
+            right: Math.max(16, insets.right + 16),
+          },
           zoomButtonAnimatedStyle
         ]}>
           <TouchableOpacity 
@@ -522,7 +531,7 @@ export default function Waveform({
           >
             <Ionicons 
               name="search" 
-              size={isFullscreen ? 22 : 18} 
+              size={18} 
               color="#00ff00" 
             />
           </TouchableOpacity>
@@ -554,11 +563,17 @@ export default function Waveform({
         </Animated.View>
 
         {/* Control Overlay Bar */}
-        <View style={styles.controlOverlay}>
+        <View style={[
+          styles.controlOverlay,
+          isFullscreen && {
+            paddingBottom: Math.max(12, insets.bottom + 12),
+            paddingLeft: Math.max(16, insets.left + 16),
+            paddingRight: Math.max(16, insets.right + 16),
+          }
+        ]}>
           {/* Mic Button - Bottom Left */}
           <Animated.View style={[
             styles.controlButton,
-            isFullscreen && styles.controlButtonFullscreen,
             micButtonAnimatedStyle
           ]}>
             <TouchableOpacity 
@@ -573,7 +588,7 @@ export default function Waveform({
                   ? (isPushingToTalk ? 'mic' : 'mic-off')
                   : (isMuted ? 'mic-off' : 'mic')
                 } 
-                size={isFullscreen ? 22 : 18} 
+                size={18} 
                 color="#00ff00" 
               />
             </TouchableOpacity>
@@ -581,10 +596,7 @@ export default function Waveform({
           
           {/* Fullscreen/Maximize Button - Bottom Right */}
           <TouchableOpacity 
-            style={[
-              styles.controlButton,
-              isFullscreen && styles.controlButtonFullscreen
-            ]}
+            style={styles.controlButton}
             onPress={() => {
               if (!isFullscreen) {
                 // Maximizing: save current orientation and switch to vertical
@@ -697,11 +709,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  controlButtonFullscreen: {
-    width: 43, // 20% bigger than 36px
-    height: 43,
-    borderRadius: 21.5,
-  },
+
   buttonTouchArea: {
     width: '100%',
     height: '100%',
@@ -722,11 +730,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 255, 0, 0.3)',
     zIndex: 300, // Higher than settings overlay
   },
-  settingsButtonFullscreen: {
-    width: 43,
-    height: 43,
-    borderRadius: 21.5,
-  },
   zoomButton: {
     position: 'absolute',
     top: 16,
@@ -740,11 +743,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 0, 0.3)',
     zIndex: 100,
-  },
-  zoomButtonFullscreen: {
-    width: 43,
-    height: 43,
-    borderRadius: 21.5,
   },
   settingsOverlay: {
     position: 'absolute',
