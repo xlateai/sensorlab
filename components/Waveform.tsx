@@ -47,6 +47,7 @@ export default function Waveform({
   const [orientation, setOrientation] = useState(initialOrientation);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [originalOrientation, setOriginalOrientation] = useState(initialOrientation);
+  const [isMuted, setIsMuted] = useState(false);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -159,7 +160,13 @@ export default function Waveform({
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
           }
           
-          runOnJS(updateAudioSamples)([...audioBufferRef.current]);
+          // Only update samples if not muted
+          if (!isMuted) {
+            runOnJS(updateAudioSamples)([...audioBufferRef.current]);
+          } else {
+            // When muted, show a flat line
+            runOnJS(updateAudioSamples)([]);
+          }
         }
       }, 16); // ~60fps updates
 
@@ -462,8 +469,22 @@ export default function Waveform({
         
         {/* Control Overlay Bar */}
         <View style={styles.controlOverlay}>
+          {/* Mic Mute/Unmute Button - Bottom Left */}
           <TouchableOpacity 
-            style={styles.fullscreenButton}
+            style={styles.controlButton}
+            onPress={() => setIsMuted(!isMuted)}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={isMuted ? 'mic-off' : 'mic'} 
+              size={18} 
+              color="#00ff00" 
+            />
+          </TouchableOpacity>
+          
+          {/* Fullscreen/Maximize Button - Bottom Right */}
+          <TouchableOpacity 
+            style={styles.controlButton}
             onPress={() => {
               if (!isFullscreen) {
                 // Maximizing: save current orientation and switch to vertical
@@ -480,7 +501,7 @@ export default function Waveform({
           >
             <Ionicons 
               name={isFullscreen ? 'contract' : 'expand'} 
-              size={24} 
+              size={18} 
               color="#00ff00" 
             />
           </TouchableOpacity>
@@ -552,11 +573,29 @@ const styles = StyleSheet.create({
     right: 0,
     height: 60,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 12,
     pointerEvents: 'box-none', // Allow touches to pass through except for button
+  },
+  controlButton: {
+    width: 36, // 25% smaller than 48px
+    height: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   fullscreenButton: {
     width: 48,
