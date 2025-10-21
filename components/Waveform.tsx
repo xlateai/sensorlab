@@ -139,12 +139,17 @@ export default function Waveform({
           const samplesPerUpdate = 100;
           
           for (let i = 0; i < samplesPerUpdate; i++) {
-            // Create realistic audio variation - silence = tiny, loud = big
-            const baseVariation = (Math.random() - 0.5) * 0.05; // Reduced background noise
-            const levelVariation = level * (Math.random() - 0.5) * 1.2; // Increased amplification for loud sounds
-            const sample = (baseVariation + levelVariation) * (Math.random() > 0.5 ? 1 : -1);
-            // Don't clamp - let loud sounds go beyond bounds naturally
-            newSamples.push(sample);
+            if (mutedSharedValue.value) {
+              // When muted, add silence (zeros) to the buffer
+              newSamples.push(0);
+            } else {
+              // Create realistic audio variation - silence = tiny, loud = big
+              const baseVariation = (Math.random() - 0.5) * 0.05; // Reduced background noise
+              const levelVariation = level * (Math.random() - 0.5) * 1.2; // Increased amplification for loud sounds
+              const sample = (baseVariation + levelVariation) * (Math.random() > 0.5 ? 1 : -1);
+              // Don't clamp - let loud sounds go beyond bounds naturally
+              newSamples.push(sample);
+            }
           }
           
           // Maintain a rolling buffer of recent samples
@@ -161,13 +166,7 @@ export default function Waveform({
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
           }
           
-          // Only update samples if not muted
-          if (!mutedSharedValue.value) {
-            runOnJS(updateAudioSamples)([...audioBufferRef.current]);
-          } else {
-            // When muted, show a flat line
-            runOnJS(updateAudioSamples)([]);
-          }
+          runOnJS(updateAudioSamples)([...audioBufferRef.current]);
         }
       }, 16); // ~60fps updates
 
@@ -201,11 +200,7 @@ export default function Waveform({
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
     mutedSharedValue.value = newMutedState;
-    
-    // If we're muting, immediately clear the waveform
-    if (newMutedState) {
-      audioSamples.value = [];
-    }
+    // No need to clear the waveform immediately - let the buffer continue with silence
   };
 
   const updateDisplayValues = () => {
