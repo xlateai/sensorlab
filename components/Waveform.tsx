@@ -57,6 +57,7 @@ export default function Waveform({
   const [isRecordingMode, setIsRecordingMode] = useState(false);
   const [isActivelyRecording, setIsActivelyRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   
   const audioSamples = useSharedValue<number[]>([]);
@@ -73,6 +74,7 @@ export default function Waveform({
   const zoomButtonScale = useSharedValue(1);
   const recordButtonScale = useSharedValue(1);
   const recordButtonOpacity = useSharedValue(1);
+  const minimizeOpacity = useSharedValue(1);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -247,6 +249,12 @@ export default function Waveform({
     const newShowSettings = !showSettings;
     setShowSettings(newShowSettings);
     settingsOpacity.value = withTiming(newShowSettings ? 1 : 0, { duration: 100 }); // 3x faster (300ms -> 100ms)
+  };
+
+  const toggleMinimize = () => {
+    const newMinimized = !isMinimized;
+    setIsMinimized(newMinimized);
+    minimizeOpacity.value = withTiming(newMinimized ? 0.3 : 1, { duration: 200 });
   };
 
   const updateDisplayValues = () => {
@@ -536,6 +544,11 @@ export default function Waveform({
     };
   });
 
+  // Minimize animation style
+  const minimizeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: minimizeOpacity.value,
+  }));
+
   const AnimatedText = Animated.createAnimatedComponent(Text);
   const AnimatedLine = Animated.createAnimatedComponent(Line);
 
@@ -545,13 +558,13 @@ export default function Waveform({
 
   return (
     <GestureDetector gesture={zoomGesture}>
-      <View style={{ width: actualWidth, height: 'auto' }}>
+      <Animated.View style={[{ width: actualWidth, height: 'auto' }, minimizeAnimatedStyle]}>
         <View style={[
           styles.container, 
           isFullscreen ? styles.fullscreenContainer : styles.waveformBoundary, 
           { 
             width: actualWidth, 
-            height: actualHeight, 
+            height: isMinimized ? 60 : actualHeight, // Minimize to just show top bar with buttons
             ...(isFullscreen ? {} : {
               marginTop: insets.top,
               marginLeft: insets.left,
@@ -559,19 +572,21 @@ export default function Waveform({
             })
           }
         ]}>
-          <Svg width={actualWidth} height={actualHeight}>
-            <AnimatedPath
-              animatedProps={animatedProps}
-              stroke="#00ff00"
-              strokeWidth={2}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
+          {!isMinimized && (
+            <Svg width={actualWidth} height={actualHeight}>
+              <AnimatedPath
+                animatedProps={animatedProps}
+                stroke="#00ff00"
+                strokeWidth={2}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          )}
           
           {/* HUD Overlay */}
-          {showHUD && (
+          {showHUD && !isMinimized && (
             <Animated.View style={[styles.hudContainer, hudStyle]}>
               <Svg width={actualWidth} height={actualHeight} style={styles.hudSvg}>
                 {/* Crosshair lines */}
@@ -635,6 +650,24 @@ export default function Waveform({
             />
           </TouchableOpacity>
 
+          {/* Minimize Button - Top Center */}
+          <TouchableOpacity 
+            style={[
+              styles.minimizeButton,
+              isFullscreen && {
+                top: Math.max(16, insets.top + 16),
+              }
+            ]}
+            onPress={toggleMinimize}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={isMinimized ? "chevron-down" : "remove"} 
+              size={18} 
+              color="#00ff00" 
+            />
+          </TouchableOpacity>
+
           {/* Zoom Button - Top Right */}
           <Animated.View style={[
             styles.zoomButton,
@@ -659,7 +692,8 @@ export default function Waveform({
           </Animated.View>
 
           {/* Settings Overlay */}
-          <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]} pointerEvents="box-none">
+          {!isMinimized && (
+            <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]} pointerEvents="box-none">
             <View style={styles.settingRow}>
               <Text style={styles.settingLabel}>Push to Talk</Text>
               <Switch
@@ -682,6 +716,7 @@ export default function Waveform({
               />
             </View>
           </Animated.View>
+          )}
 
           {/* Control Overlay Bar */}
           <View style={[
@@ -742,29 +777,31 @@ export default function Waveform({
         </View>
         
         {/* Record Button Container */}
-        <View style={[styles.recordContainer, { 
-          width: actualWidth,
-          marginLeft: isFullscreen ? 0 : insets.left,
-          marginRight: isFullscreen ? 0 : insets.right 
-        }]}>
-          <Animated.View style={[
-            styles.recordButton, 
-            recordButtonAnimatedStyle,
-            isActivelyRecording && styles.recordButtonRecording
-          ]}>
-            <TouchableOpacity
-              style={styles.recordButtonTouchArea}
-              onPressIn={handleRecordPressIn}
-              onPressOut={handleRecordPressOut}
-              onLongPress={handleRecordLongPress}
-              delayLongPress={500}
-              activeOpacity={0.9}
-            />
-          </Animated.View>
-        </View>
+        {!isMinimized && (
+          <View style={[styles.recordContainer, { 
+            width: actualWidth,
+            marginLeft: isFullscreen ? 0 : insets.left,
+            marginRight: isFullscreen ? 0 : insets.right 
+          }]}>
+            <Animated.View style={[
+              styles.recordButton, 
+              recordButtonAnimatedStyle,
+              isActivelyRecording && styles.recordButtonRecording
+            ]}>
+              <TouchableOpacity
+                style={styles.recordButtonTouchArea}
+                onPressIn={handleRecordPressIn}
+                onPressOut={handleRecordPressOut}
+                onLongPress={handleRecordLongPress}
+                delayLongPress={500}
+                activeOpacity={0.9}
+              />
+            </Animated.View>
+          </View>
+        )}
 
 
-      </View>
+      </Animated.View>
     </GestureDetector>
   );
 }
@@ -887,6 +924,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 0, 0.3)',
     zIndex: 300, // Higher than settings overlay
+  },
+  minimizeButton: {
+    position: 'absolute',
+    top: 16,
+    left: '50%',
+    marginLeft: -18, // Half of width to center
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    zIndex: 250, // Between settings and zoom
   },
   zoomButton: {
     position: 'absolute',
