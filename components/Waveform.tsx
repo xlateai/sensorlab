@@ -254,7 +254,7 @@ export default function Waveform({
   const toggleMinimize = () => {
     const newMinimized = !isMinimized;
     setIsMinimized(newMinimized);
-    minimizeOpacity.value = withTiming(newMinimized ? 0.3 : 1, { duration: 200 });
+    // No opacity animation needed since we removed the fade effect
   };
 
   const updateDisplayValues = () => {
@@ -546,7 +546,7 @@ export default function Waveform({
 
   // Minimize animation style
   const minimizeAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: minimizeOpacity.value,
+    opacity: 1, // Remove fade effect - always full opacity
   }));
 
   const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -632,23 +632,25 @@ export default function Waveform({
           )}
           
           {/* Settings Button - Top Left */}
-          <TouchableOpacity 
-            style={[
-              styles.settingsButton,
-              isFullscreen && {
-                top: Math.max(16, insets.top + 16),
-                left: Math.max(16, insets.left + 16),
-              }
-            ]}
-            onPress={toggleSettings}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name={showSettings ? "close" : "settings"} 
-              size={18} 
-              color="#00ff00" 
-            />
-          </TouchableOpacity>
+          {!isMinimized && (
+            <TouchableOpacity 
+              style={[
+                styles.settingsButton,
+                isFullscreen && {
+                  top: Math.max(16, insets.top + 16),
+                  left: Math.max(16, insets.left + 16),
+                }
+              ]}
+              onPress={toggleSettings}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={showSettings ? "close" : "settings"} 
+                size={18} 
+                color="#00ff00" 
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Minimize Button - Top Center */}
           <TouchableOpacity 
@@ -668,28 +670,42 @@ export default function Waveform({
             />
           </TouchableOpacity>
 
+          {/* Recording Dot - To the right of minimize button */}
+          {isActivelyRecording && (
+            <View style={[
+              styles.recordingDot,
+              isFullscreen && {
+                top: Math.max(16, insets.top + 16),
+              }
+            ]}>
+              <View style={styles.recordingDotInner} />
+            </View>
+          )}
+
           {/* Zoom Button - Top Right */}
-          <Animated.View style={[
-            styles.zoomButton,
-            isFullscreen && {
-              top: Math.max(16, insets.top + 16),
-              right: Math.max(16, insets.right + 16),
-            },
-            zoomButtonAnimatedStyle
-          ]}>
-            <TouchableOpacity 
-              style={styles.buttonTouchArea}
-              onPressIn={handleZoomPressIn}
-              onPressOut={handleZoomPressOut}
-              activeOpacity={0.7}
-            >
-              <Ionicons 
-                name="search" 
-                size={18} 
-                color="#00ff00" 
-              />
-            </TouchableOpacity>
-          </Animated.View>
+          {!isMinimized && (
+            <Animated.View style={[
+              styles.zoomButton,
+              isFullscreen && {
+                top: Math.max(16, insets.top + 16),
+                right: Math.max(16, insets.right + 16),
+              },
+              zoomButtonAnimatedStyle
+            ]}>
+              <TouchableOpacity 
+                style={styles.buttonTouchArea}
+                onPressIn={handleZoomPressIn}
+                onPressOut={handleZoomPressOut}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name="search" 
+                  size={18} 
+                  color="#00ff00" 
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           {/* Settings Overlay */}
           {!isMinimized && (
@@ -719,61 +735,63 @@ export default function Waveform({
           )}
 
           {/* Control Overlay Bar */}
-          <View style={[
-            styles.controlOverlay,
-            isFullscreen && {
-              paddingBottom: Math.max(12, insets.bottom + 12),
-              paddingLeft: Math.max(16, insets.left + 16),
-              paddingRight: Math.max(16, insets.right + 16),
-            }
-          ]}>
-            {/* Mic Button - Bottom Left */}
-            <Animated.View style={[
-              styles.controlButton,
-              micButtonAnimatedStyle
+          {!isMinimized && (
+            <View style={[
+              styles.controlOverlay,
+              isFullscreen && {
+                paddingBottom: Math.max(12, insets.bottom + 12),
+                paddingLeft: Math.max(16, insets.left + 16),
+                paddingRight: Math.max(16, insets.right + 16),
+              }
             ]}>
+              {/* Mic Button - Bottom Left */}
+              <Animated.View style={[
+                styles.controlButton,
+                micButtonAnimatedStyle
+              ]}>
+                <TouchableOpacity 
+                  style={styles.buttonTouchArea}
+                  onPress={pushToTalkEnabled ? undefined : toggleMute}
+                  onPressIn={pushToTalkEnabled ? handleMicPressIn : undefined}
+                  onPressOut={pushToTalkEnabled ? handleMicPressOut : undefined}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={pushToTalkEnabled 
+                      ? (isPushingToTalk ? 'mic' : 'mic-off')
+                      : (isMuted ? 'mic-off' : 'mic')
+                    } 
+                    size={18} 
+                    color="#00ff00" 
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+              
+              {/* Fullscreen/Maximize Button - Bottom Right */}
               <TouchableOpacity 
-                style={styles.buttonTouchArea}
-                onPress={pushToTalkEnabled ? undefined : toggleMute}
-                onPressIn={pushToTalkEnabled ? handleMicPressIn : undefined}
-                onPressOut={pushToTalkEnabled ? handleMicPressOut : undefined}
+                style={styles.controlButton}
+                onPress={() => {
+                  if (!isFullscreen) {
+                    // Maximizing: save current orientation and switch to vertical
+                    setOriginalOrientation(orientation);
+                    setOrientation('vertical');
+                    setIsFullscreen(true);
+                  } else {
+                    // Minimizing: restore original orientation
+                    setOrientation(originalOrientation);
+                    setIsFullscreen(false);
+                  }
+                }}
                 activeOpacity={0.7}
               >
                 <Ionicons 
-                  name={pushToTalkEnabled 
-                    ? (isPushingToTalk ? 'mic' : 'mic-off')
-                    : (isMuted ? 'mic-off' : 'mic')
-                  } 
-                  size={18} 
+                  name={isFullscreen ? 'contract' : 'expand'} 
+                  size={isFullscreen ? 22 : 18} 
                   color="#00ff00" 
                 />
               </TouchableOpacity>
-            </Animated.View>
-            
-            {/* Fullscreen/Maximize Button - Bottom Right */}
-            <TouchableOpacity 
-              style={styles.controlButton}
-              onPress={() => {
-                if (!isFullscreen) {
-                  // Maximizing: save current orientation and switch to vertical
-                  setOriginalOrientation(orientation);
-                  setOrientation('vertical');
-                  setIsFullscreen(true);
-                } else {
-                  // Minimizing: restore original orientation
-                  setOrientation(originalOrientation);
-                  setIsFullscreen(false);
-                }
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons 
-                name={isFullscreen ? 'contract' : 'expand'} 
-                size={isFullscreen ? 22 : 18} 
-                color="#00ff00" 
-              />
-            </TouchableOpacity>
-          </View>
+            </View>
+          )}
         </View>
         
         {/* Record Button Container */}
@@ -939,6 +957,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 0, 0.3)',
     zIndex: 250, // Between settings and zoom
+  },
+  recordingDot: {
+    position: 'absolute',
+    top: 16,
+    left: '50%',
+    marginLeft: 28, // To the right of minimize button (18 + 10 spacing)
+    width: 12,
+    height: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 260, // Above minimize button
+  },
+  recordingDotInner: {
+    width: 8,
+    height: 8,
+    backgroundColor: '#ff0000',
+    borderRadius: 4,
+    shadowColor: '#ff0000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 4,
   },
   zoomButton: {
     position: 'absolute',
