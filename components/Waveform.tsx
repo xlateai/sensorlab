@@ -27,6 +27,75 @@ interface WaveformProps {
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+// Mini Waveform component for displaying saved recordings
+interface MiniWaveformProps {
+  samples: number[];
+  duration: number;
+  width: number;
+  height: number;
+}
+
+const MiniWaveform: React.FC<MiniWaveformProps> = ({ samples, duration, width, height }) => {
+  const pathData = React.useMemo(() => {
+    if (samples.length === 0) {
+      const center = height / 2;
+      return `M 0 ${center} L ${width} ${center}`;
+    }
+
+    const waveformScale = height * 0.4; // Smaller scale for mini view
+    const center = height / 2;
+    const step = Math.max(1, samples.length) / width;
+    const stride = Math.max(1, Math.floor(samples.length / 200)); // Reduce samples for efficiency
+    
+    let path = '';
+    let prevX: number | null = null;
+    let prevY: number | null = null;
+
+    for (let i = 0; i < width; i += 2) {
+      const sampleIndex = Math.floor(i * step);
+      if (sampleIndex >= samples.length) break;
+      
+      const sample = samples[sampleIndex] || 0;
+      const offset = sample * waveformScale;
+      const x = i;
+      const y = Math.max(0, Math.min(height, center + offset));
+      
+      if (prevX !== null && prevY !== null) {
+        if (path === '') {
+          path = `M ${prevX} ${prevY}`;
+        }
+        path += ` L ${x} ${y}`;
+      }
+      
+      prevX = x;
+      prevY = y;
+    }
+    
+    return path || `M 0 ${center} L ${width} ${center}`;
+  }, [samples, width, height]);
+
+  const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    return `${seconds}s`;
+  };
+
+  return (
+    <View style={styles.miniWaveformContainer}>
+      <Svg width={width} height={height}>
+        <Path
+          d={pathData}
+          stroke="#00ff00"
+          strokeWidth={1}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+      <Text style={styles.miniWaveformDuration}>{formatDuration(duration)}</Text>
+    </View>
+  );
+};
+
 export default function Waveform({ 
   width = screenWidth, // Full screen width by default
   height = screenHeight * 0.25, // 25% of screen height by default
@@ -52,6 +121,10 @@ export default function Waveform({
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
   const [isPushingToTalk, setIsPushingToTalk] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
+  const [isRecordingMode, setIsRecordingMode] = useState(false);
+  const [isActivelyRecording, setIsActivelyRecording] = useState(false);
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
+  const [savedRecordings, setSavedRecordings] = useState<Array<{id: string, samples: number[], duration: number, timestamp: number}>>([]);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -65,6 +138,8 @@ export default function Waveform({
   const micButtonOpacity = useSharedValue(1);
   const settingsOpacity = useSharedValue(0);
   const zoomButtonScale = useSharedValue(1);
+  const recordButtonScale = useSharedValue(1);
+  const recordButtonOpacity = useSharedValue(1);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -147,31 +222,39 @@ export default function Waveform({
           const samplesPerUpdate = 100;
           
           for (let i = 0; i < samplesPerUpdate; i++) {
-            if (mutedSharedValue.value) {
-              // When muted, add silence (zeros) to the buffer
-              newSamples.push(0);
-            } else {
+            const shouldShowAudio = !mutedSharedValue.value;
+            
+            if (shouldShowAudio) {
               // Create realistic audio variation - silence = tiny, loud = big
               const baseVariation = (Math.random() - 0.5) * 0.05; // Reduced background noise
               const levelVariation = level * (Math.random() - 0.5) * 1.2; // Increased amplification for loud sounds
               const sample = (baseVariation + levelVariation) * (Math.random() > 0.5 ? 1 : -1);
               // Don't clamp - let loud sounds go beyond bounds naturally
               newSamples.push(sample);
+            } else {
+              // When muted or not recording, add silence (zeros) to the buffer
+              newSamples.push(0);
             }
           }
           
           // Maintain a rolling buffer of recent samples
           audioBufferRef.current.push(...newSamples);
           
-          // Convert yZoom (0-1) to timeZoom for duration control
-          // Y axis controls how much timeline/duration we see
-          const timeZoomValue = 0.5 + (yZoom.value * 4.5); // 0->0.5, 1->5.0
-          const currentWidth = isFullscreen ? screenWidth : width;
-          const currentHeight = isFullscreen ? screenHeight : height;
-          const dimensionForSamples = orientation === 'horizontal' ? currentWidth : currentHeight;
-          const maxSamples = Math.floor(dimensionForSamples * 4 * timeZoomValue);
-          if (audioBufferRef.current.length > maxSamples) {
-            audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
+          // When recording, limit buffer to recording duration, otherwise use zoom controls
+          if (isRecordingMode || isActivelyRecording) {
+            // Keep all samples from recording start - no rolling window
+            // The waveform will show the full recording from start to current time
+          } else {
+            // Convert yZoom (0-1) to timeZoom for duration control
+            // Y axis controls how much timeline/duration we see
+            const timeZoomValue = 0.5 + (yZoom.value * 4.5); // 0->0.5, 1->5.0
+            const currentWidth = isFullscreen ? screenWidth : width;
+            const currentHeight = isFullscreen ? screenHeight : height;
+            const dimensionForSamples = orientation === 'horizontal' ? currentWidth : currentHeight;
+            const maxSamples = Math.floor(dimensionForSamples * 4 * timeZoomValue);
+            if (audioBufferRef.current.length > maxSamples) {
+              audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
+            }
           }
           
           runOnJS(updateAudioSamples)([...audioBufferRef.current]);
@@ -257,6 +340,85 @@ export default function Waveform({
     hudOpacity.value = withTiming(0, { duration: 500 });
     setTimeout(() => setShowHUD(false), 500);
     zoomButtonScale.value = withTiming(1, { duration: 150 });
+  };
+
+  // Record button handlers
+  const recordPressStartTime = useRef<number | null>(null);
+  
+  const handleRecordPressIn = () => {
+    recordPressStartTime.current = Date.now();
+    // Slight scale down when pressing
+    recordButtonScale.value = withTiming(0.95, { duration: 100 });
+  };
+
+  const handleRecordPressOut = () => {
+    const pressDuration = recordPressStartTime.current ? Date.now() - recordPressStartTime.current : 0;
+    
+    if (pressDuration < 500) {
+      // Quick tap - just return to normal scale
+      recordButtonScale.value = withTiming(1, { duration: 100 });
+      // Toggle recording mode
+      toggleRecordingMode();
+    } else {
+      // Long press - stop hold-to-record
+      stopHoldRecording();
+    }
+  };
+
+  const handleRecordLongPress = () => {
+    // Start hold-to-record mode - scale up to show it's active
+    recordButtonScale.value = withTiming(1.15, { duration: 150 });
+    startHoldRecording();
+  };
+
+  const toggleRecordingMode = () => {
+    if (!isRecordingMode) {
+      setIsRecordingMode(true);
+      setRecordingStartTime(Date.now());
+      setIsActivelyRecording(true);
+    } else {
+      finishRecording();
+    }
+  };
+
+  const startHoldRecording = () => {
+    if (!isActivelyRecording) {
+      setRecordingStartTime(Date.now());
+      setIsActivelyRecording(true);
+      // Button stays enlarged while holding to record
+    }
+  };
+
+  const stopHoldRecording = () => {
+    if (isActivelyRecording && !isRecordingMode) {
+      // Return to normal scale when stopping hold recording
+      recordButtonScale.value = withTiming(1, { duration: 150 });
+      finishRecording();
+    }
+  };
+
+  const finishRecording = () => {
+    if (recordingStartTime && isActivelyRecording) {
+      const recordingDuration = Date.now() - recordingStartTime;
+      const recordingSamples = [...audioBufferRef.current]; // Copy current samples
+      
+      // Create new recording entry
+      const newRecording = {
+        id: Date.now().toString(),
+        samples: recordingSamples,
+        duration: recordingDuration,
+        timestamp: Date.now()
+      };
+      
+      setSavedRecordings(prev => [...prev, newRecording]);
+      setIsRecordingMode(false);
+      setIsActivelyRecording(false);
+      setRecordingStartTime(null);
+      
+      // Reset waveform for next recording
+      audioBufferRef.current = [];
+      audioSamples.value = [];
+    }
   };
 
   // Zoom gesture - active across the entire waveform when zoom button is pressed
@@ -416,6 +578,12 @@ export default function Waveform({
     backgroundColor: isZooming ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)',
   }));
 
+  // Record button animation
+  const recordButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: recordButtonScale.value }],
+    backgroundColor: isActivelyRecording ? 'rgba(255, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+  }));
+
   const AnimatedText = Animated.createAnimatedComponent(Text);
   const AnimatedLine = Animated.createAnimatedComponent(Line);
 
@@ -425,199 +593,242 @@ export default function Waveform({
 
   return (
     <GestureDetector gesture={zoomGesture}>
-      <View style={[
-        styles.container, 
-        isFullscreen ? styles.fullscreenContainer : styles.waveformBoundary, 
-        { 
-          width: actualWidth, 
-          height: actualHeight, 
-          ...(isFullscreen ? {} : {
-            marginTop: insets.top,
-            marginLeft: insets.left,
-            marginRight: insets.right 
-          })
-        }
-      ]}>
-        <Svg width={actualWidth} height={actualHeight}>
-          <AnimatedPath
-            animatedProps={animatedProps}
-            stroke="#00ff00"
-            strokeWidth={2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
-        
-        {/* HUD Overlay */}
-        {showHUD && (
-          <Animated.View style={[styles.hudContainer, hudStyle]}>
-            <Svg width={actualWidth} height={actualHeight} style={styles.hudSvg}>
-              {/* Crosshair lines */}
-              <AnimatedLine
-                x1={0}
-                y1={actualHeight / 2}
-                x2={actualWidth}
-                y2={actualHeight / 2}
-                stroke="#00ff00"
-                strokeWidth={1}
-                opacity={0.5}
-              />
-              <AnimatedLine
-                x1={actualWidth / 2}
-                y1={0}
-                x2={actualWidth / 2}
-                y2={actualHeight}
-                stroke="#00ff00"
-                strokeWidth={1}
-                opacity={0.5}
-              />
-            </Svg>
-            
-            {/* Control Labels */}
-            <View style={[styles.xLabel, { left: actualWidth / 2 + 10, top: actualHeight / 2 - 45 }]}>
-              <Text style={[styles.labelText, { color: '#00ff00' }]}>
-                {orientation === 'horizontal' ? 'Y' : 'X'}: {xZoomDisplay}%
-              </Text>
-              <Text style={[styles.subLabelText, { color: '#00ff00' }]}>
-                (amplitude)
-              </Text>
-            </View>
-            
-            <View style={[styles.yLabel, { left: actualWidth / 2 + 10, top: actualHeight / 2 + 5 }]}>
-              <Text style={[styles.labelText, { color: '#00ff00' }]}>
-                {orientation === 'horizontal' ? 'X' : 'Y'}: {yZoomDisplay}%
-              </Text>
-              <Text style={[styles.subLabelText, { color: '#00ff00' }]}>
-                (speed)
-              </Text>
-            </View>
-          </Animated.View>
-        )}
-        
-        {/* Settings Button - Top Left */}
-        <TouchableOpacity 
-          style={[
-            styles.settingsButton,
-            isFullscreen && {
-              top: Math.max(16, insets.top + 16),
-              left: Math.max(16, insets.left + 16),
-            }
-          ]}
-          onPress={toggleSettings}
-          activeOpacity={0.7}
-        >
-          <Ionicons 
-            name={showSettings ? "close" : "settings"} 
-            size={18} 
-            color="#00ff00" 
-          />
-        </TouchableOpacity>
-
-        {/* Zoom Button - Top Right */}
-        <Animated.View style={[
-          styles.zoomButton,
-          isFullscreen && {
-            top: Math.max(16, insets.top + 16),
-            right: Math.max(16, insets.right + 16),
-          },
-          zoomButtonAnimatedStyle
+      <View style={{ width: actualWidth, height: 'auto' }}>
+        <View style={[
+          styles.container, 
+          isFullscreen ? styles.fullscreenContainer : styles.waveformBoundary, 
+          { 
+            width: actualWidth, 
+            height: actualHeight, 
+            ...(isFullscreen ? {} : {
+              marginTop: insets.top,
+              marginLeft: insets.left,
+              marginRight: insets.right 
+            })
+          }
         ]}>
+          <Svg width={actualWidth} height={actualHeight}>
+            <AnimatedPath
+              animatedProps={animatedProps}
+              stroke="#00ff00"
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+          
+          {/* HUD Overlay */}
+          {showHUD && (
+            <Animated.View style={[styles.hudContainer, hudStyle]}>
+              <Svg width={actualWidth} height={actualHeight} style={styles.hudSvg}>
+                {/* Crosshair lines */}
+                <AnimatedLine
+                  x1={0}
+                  y1={actualHeight / 2}
+                  x2={actualWidth}
+                  y2={actualHeight / 2}
+                  stroke="#00ff00"
+                  strokeWidth={1}
+                  opacity={0.5}
+                />
+                <AnimatedLine
+                  x1={actualWidth / 2}
+                  y1={0}
+                  x2={actualWidth / 2}
+                  y2={actualHeight}
+                  stroke="#00ff00"
+                  strokeWidth={1}
+                  opacity={0.5}
+                />
+              </Svg>
+              
+              {/* Control Labels */}
+              <View style={[styles.xLabel, { left: actualWidth / 2 + 10, top: actualHeight / 2 - 45 }]}>
+                <Text style={[styles.labelText, { color: '#00ff00' }]}>
+                  {orientation === 'horizontal' ? 'Y' : 'X'}: {xZoomDisplay}%
+                </Text>
+                <Text style={[styles.subLabelText, { color: '#00ff00' }]}>
+                  (amplitude)
+                </Text>
+              </View>
+              
+              <View style={[styles.yLabel, { left: actualWidth / 2 + 10, top: actualHeight / 2 + 5 }]}>
+                <Text style={[styles.labelText, { color: '#00ff00' }]}>
+                  {orientation === 'horizontal' ? 'X' : 'Y'}: {yZoomDisplay}%
+                </Text>
+                <Text style={[styles.subLabelText, { color: '#00ff00' }]}>
+                  (speed)
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+          
+          {/* Settings Button - Top Left */}
           <TouchableOpacity 
-            style={styles.buttonTouchArea}
-            onPressIn={handleZoomPressIn}
-            onPressOut={handleZoomPressOut}
+            style={[
+              styles.settingsButton,
+              isFullscreen && {
+                top: Math.max(16, insets.top + 16),
+                left: Math.max(16, insets.left + 16),
+              }
+            ]}
+            onPress={toggleSettings}
             activeOpacity={0.7}
           >
             <Ionicons 
-              name="search" 
+              name={showSettings ? "close" : "settings"} 
               size={18} 
               color="#00ff00" 
             />
           </TouchableOpacity>
-        </Animated.View>
 
-        {/* Settings Overlay */}
-        <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]} pointerEvents="box-none">
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Push to Talk</Text>
-            <Switch
-              value={pushToTalkEnabled}
-              onValueChange={(value) => {
-                setPushToTalkEnabled(value);
-                if (value) {
-                  // When enabling push-to-talk, start in muted state
-                  setIsMuted(true);
-                  mutedSharedValue.value = true;
-                } else {
-                  // When disabling push-to-talk, unmute
-                  setIsMuted(false);
-                  mutedSharedValue.value = false;
-                }
-              }}
-              trackColor={{ false: '#767577', true: '#00ff0060' }}
-              thumbColor={pushToTalkEnabled ? '#00ff00' : '#f4f3f4'}
-              ios_backgroundColor="#3e3e3e"
-            />
-          </View>
-        </Animated.View>
-
-        {/* Control Overlay Bar */}
-        <View style={[
-          styles.controlOverlay,
-          isFullscreen && {
-            paddingBottom: Math.max(12, insets.bottom + 12),
-            paddingLeft: Math.max(16, insets.left + 16),
-            paddingRight: Math.max(16, insets.right + 16),
-          }
-        ]}>
-          {/* Mic Button - Bottom Left */}
+          {/* Zoom Button - Top Right */}
           <Animated.View style={[
-            styles.controlButton,
-            micButtonAnimatedStyle
+            styles.zoomButton,
+            isFullscreen && {
+              top: Math.max(16, insets.top + 16),
+              right: Math.max(16, insets.right + 16),
+            },
+            zoomButtonAnimatedStyle
           ]}>
             <TouchableOpacity 
               style={styles.buttonTouchArea}
-              onPress={pushToTalkEnabled ? undefined : toggleMute}
-              onPressIn={pushToTalkEnabled ? handleMicPressIn : undefined}
-              onPressOut={pushToTalkEnabled ? handleMicPressOut : undefined}
+              onPressIn={handleZoomPressIn}
+              onPressOut={handleZoomPressOut}
               activeOpacity={0.7}
             >
               <Ionicons 
-                name={pushToTalkEnabled 
-                  ? (isPushingToTalk ? 'mic' : 'mic-off')
-                  : (isMuted ? 'mic-off' : 'mic')
-                } 
+                name="search" 
                 size={18} 
                 color="#00ff00" 
               />
             </TouchableOpacity>
           </Animated.View>
-          
-          {/* Fullscreen/Maximize Button - Bottom Right */}
-          <TouchableOpacity 
-            style={styles.controlButton}
-            onPress={() => {
-              if (!isFullscreen) {
-                // Maximizing: save current orientation and switch to vertical
-                setOriginalOrientation(orientation);
-                setOrientation('vertical');
-                setIsFullscreen(true);
-              } else {
-                // Minimizing: restore original orientation
-                setOrientation(originalOrientation);
-                setIsFullscreen(false);
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name={isFullscreen ? 'contract' : 'expand'} 
-              size={isFullscreen ? 22 : 18} 
-              color="#00ff00" 
-            />
-          </TouchableOpacity>
+
+          {/* Settings Overlay */}
+          <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]} pointerEvents="box-none">
+            <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Push to Talk</Text>
+              <Switch
+                value={pushToTalkEnabled}
+                onValueChange={(value) => {
+                  setPushToTalkEnabled(value);
+                  if (value) {
+                    // When enabling push-to-talk, start in muted state
+                    setIsMuted(true);
+                    mutedSharedValue.value = true;
+                  } else {
+                    // When disabling push-to-talk, unmute
+                    setIsMuted(false);
+                    mutedSharedValue.value = false;
+                  }
+                }}
+                trackColor={{ false: '#767577', true: '#00ff0060' }}
+                thumbColor={pushToTalkEnabled ? '#00ff00' : '#f4f3f4'}
+                ios_backgroundColor="#3e3e3e"
+              />
+            </View>
+          </Animated.View>
+
+          {/* Control Overlay Bar */}
+          <View style={[
+            styles.controlOverlay,
+            isFullscreen && {
+              paddingBottom: Math.max(12, insets.bottom + 12),
+              paddingLeft: Math.max(16, insets.left + 16),
+              paddingRight: Math.max(16, insets.right + 16),
+            }
+          ]}>
+            {/* Mic Button - Bottom Left */}
+            <Animated.View style={[
+              styles.controlButton,
+              micButtonAnimatedStyle
+            ]}>
+              <TouchableOpacity 
+                style={styles.buttonTouchArea}
+                onPress={pushToTalkEnabled ? undefined : toggleMute}
+                onPressIn={pushToTalkEnabled ? handleMicPressIn : undefined}
+                onPressOut={pushToTalkEnabled ? handleMicPressOut : undefined}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={pushToTalkEnabled 
+                    ? (isPushingToTalk ? 'mic' : 'mic-off')
+                    : (isMuted ? 'mic-off' : 'mic')
+                  } 
+                  size={18} 
+                  color="#00ff00" 
+                />
+              </TouchableOpacity>
+            </Animated.View>
+            
+            {/* Fullscreen/Maximize Button - Bottom Right */}
+            <TouchableOpacity 
+              style={styles.controlButton}
+              onPress={() => {
+                if (!isFullscreen) {
+                  // Maximizing: save current orientation and switch to vertical
+                  setOriginalOrientation(orientation);
+                  setOrientation('vertical');
+                  setIsFullscreen(true);
+                } else {
+                  // Minimizing: restore original orientation
+                  setOrientation(originalOrientation);
+                  setIsFullscreen(false);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={isFullscreen ? 'contract' : 'expand'} 
+                size={isFullscreen ? 22 : 18} 
+                color="#00ff00" 
+              />
+            </TouchableOpacity>
+          </View>
         </View>
+        
+        {/* Record Button Container */}
+        <View style={[styles.recordContainer, { 
+          width: actualWidth,
+          marginLeft: isFullscreen ? 0 : insets.left,
+          marginRight: isFullscreen ? 0 : insets.right 
+        }]}>
+          <Animated.View style={[
+            styles.recordButton, 
+            recordButtonAnimatedStyle,
+            isActivelyRecording && styles.recordButtonRecording
+          ]}>
+            <TouchableOpacity
+              style={styles.recordButtonTouchArea}
+              onPressIn={handleRecordPressIn}
+              onPressOut={handleRecordPressOut}
+              onLongPress={handleRecordLongPress}
+              delayLongPress={500}
+              activeOpacity={0.9}
+            />
+          </Animated.View>
+        </View>
+
+        {/* Recordings Container */}
+        {savedRecordings.length > 0 && (
+          <View style={[styles.recordingsContainer, { 
+            width: actualWidth,
+            marginLeft: isFullscreen ? 0 : insets.left,
+            marginRight: isFullscreen ? 0 : insets.right 
+          }]}>
+            {savedRecordings.map((recording, index) => (
+              <MiniWaveform 
+                key={recording.id}
+                samples={recording.samples}
+                duration={recording.duration}
+                width={actualWidth - 32}
+                height={40}
+              />
+            ))}
+          </View>
+        )}
       </View>
     </GestureDetector>
   );
@@ -629,8 +840,18 @@ const styles = StyleSheet.create({
   },
   waveformBoundary: {
     backgroundColor: '#121212',
-    borderRadius: 25,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   fullscreenContainer: {
     position: 'absolute',
@@ -789,5 +1010,83 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  // Record button container - matches waveform container style
+  recordContainer: {
+    height: 80,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    marginHorizontal: 16,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  recordButton: {
+    width: 45, // 25% smaller than 60
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#ff4d6d', // Nice red-pinkish color
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff4d6d',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  recordButtonTouchArea: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordButtonInner: {
+    // Remove inner design - button itself is now the visual element
+    display: 'none',
+  },
+  recordButtonRecording: {
+    // Glow effect when recording
+    shadowColor: '#ff4d6d',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 12,
+  },
+  recordingsContainer: {
+    backgroundColor: '#0a0a0a',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxHeight: 200,
+  },
+  miniWaveformContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.2)',
+  },
+  miniWaveformDuration: {
+    color: '#00ff00',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 4,
+    fontFamily: 'monospace',
   },
 });
