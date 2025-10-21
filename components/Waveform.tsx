@@ -45,6 +45,7 @@ export default function Waveform({
   const [xZoomDisplay, setXZoomDisplay] = useState(50);
   const [yZoomDisplay, setYZoomDisplay] = useState(50);
   const [orientation, setOrientation] = useState(initialOrientation);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -149,7 +150,9 @@ export default function Waveform({
           // Convert yZoom (0-1) to timeZoom for duration control
           // Y axis controls how much timeline/duration we see
           const timeZoomValue = 0.5 + (yZoom.value * 4.5); // 0->0.5, 1->5.0
-          const dimensionForSamples = orientation === 'horizontal' ? width : height;
+          const currentWidth = isFullscreen ? screenWidth : width;
+          const currentHeight = isFullscreen ? screenHeight : height;
+          const dimensionForSamples = orientation === 'horizontal' ? currentWidth : currentHeight;
           const maxSamples = Math.floor(dimensionForSamples * 4 * timeZoomValue);
           if (audioBufferRef.current.length > maxSamples) {
             audioBufferRef.current = audioBufferRef.current.slice(-maxSamples);
@@ -202,27 +205,31 @@ export default function Waveform({
     .onTouchesMove((event) => {
       const touch = event.allTouches[0];
       if (touch) {
+        // Use actual dimensions for touch handling
+        const currentWidth = isFullscreen ? screenWidth : width;
+        const currentHeight = isFullscreen ? screenHeight : height;
+        
         // Ensure coordinates are within bounds and valid
-        const touchX = Math.max(0, Math.min(width, touch.x));
-        const touchY = Math.max(0, Math.min(height, touch.y));
+        const touchX = Math.max(0, Math.min(currentWidth, touch.x));
+        const touchY = Math.max(0, Math.min(currentHeight, touch.y));
         
         if (orientation === 'horizontal') {
           // Horizontal mode: X position controls speed, Y position controls amplitude
-          const xProgress = touchX / width;
+          const xProgress = touchX / currentWidth;
           yZoom.value = xProgress;
           
-          const centerY = height / 2;
-          const maxDistance = height / 2;
+          const centerY = currentHeight / 2;
+          const maxDistance = currentHeight / 2;
           const distanceFromCenter = Math.abs(touchY - centerY);
           const yProgress = Math.min(1, distanceFromCenter / maxDistance);
           xZoom.value = yProgress;
         } else {
           // Vertical mode: Y position controls speed, X position controls amplitude
-          const yProgress = touchY / height;
+          const yProgress = touchY / currentHeight;
           yZoom.value = yProgress;
           
-          const centerX = width / 2;
-          const maxDistance = width / 2;
+          const centerX = currentWidth / 2;
+          const maxDistance = currentWidth / 2;
           const distanceFromCenter = Math.abs(touchX - centerX);
           const xProgress = Math.min(1, distanceFromCenter / maxDistance);
           xZoom.value = xProgress;
@@ -243,27 +250,31 @@ export default function Waveform({
       hudOpacity.value = withTiming(1, { duration: 200 });
     })
     .onUpdate((event) => {
+      // Use actual dimensions for pan gesture handling
+      const currentWidth = isFullscreen ? screenWidth : width;
+      const currentHeight = isFullscreen ? screenHeight : height;
+      
       // Ensure coordinates are within bounds
-      const touchX = Math.max(0, Math.min(width, event.x));
-      const touchY = Math.max(0, Math.min(height, event.y));
+      const touchX = Math.max(0, Math.min(currentWidth, event.x));
+      const touchY = Math.max(0, Math.min(currentHeight, event.y));
       
       if (orientation === 'horizontal') {
         // Horizontal mode: X position controls speed, Y position controls amplitude
-        const xProgress = touchX / width;
+        const xProgress = touchX / currentWidth;
         yZoom.value = xProgress;
         
-        const centerY = height / 2;
-        const maxDistance = height / 2;
+        const centerY = currentHeight / 2;
+        const maxDistance = currentHeight / 2;
         const distanceFromCenter = Math.abs(touchY - centerY);
         const yProgress = Math.min(1, distanceFromCenter / maxDistance);
         xZoom.value = yProgress;
       } else {
         // Vertical mode: Y position controls speed, X position controls amplitude
-        const yProgress = touchY / height;
+        const yProgress = touchY / currentHeight;
         yZoom.value = yProgress;
         
-        const centerX = width / 2;
-        const maxDistance = width / 2;
+        const centerX = currentWidth / 2;
+        const maxDistance = currentWidth / 2;
         const distanceFromCenter = Math.abs(touchX - centerX);
         const xProgress = Math.min(1, distanceFromCenter / maxDistance);
         xZoom.value = xProgress;
@@ -280,12 +291,14 @@ export default function Waveform({
 
   const animatedProps = useAnimatedProps(() => {
     const samples = audioSamples.value;
+    const currentWidth = isFullscreen ? screenWidth : width;
+    const currentHeight = isFullscreen ? screenHeight : height;
     
     if (samples.length === 0) {
       if (orientation === 'horizontal') {
-        return { d: `M 0 ${height / 2} L ${width} ${height / 2}` };
+        return { d: `M 0 ${currentHeight / 2} L ${currentWidth} ${currentHeight / 2}` };
       } else {
-        return { d: `M ${width / 2} 0 L ${width / 2} ${height}` };
+        return { d: `M ${currentWidth / 2} 0 L ${currentWidth / 2} ${currentHeight}` };
       }
     }
 
@@ -300,9 +313,9 @@ export default function Waveform({
     
     if (orientation === 'horizontal') {
       // Horizontal mode: waveform goes from left to right
-      const len = width;
-      const waveformScale = height * 0.5 * scale * amplitudeScale;
-      const center = height * 0.5;
+      const len = currentWidth;
+      const waveformScale = currentHeight * 0.5 * scale * amplitudeScale;
+      const center = currentHeight * 0.5;
       
       const step = Math.max(1, samples.length) / len;
       const stride = 2;
@@ -314,7 +327,7 @@ export default function Waveform({
         // DIRECT multiplication with gesture-controlled amplitude
         const offset = samples[sampleIndex] * waveformScale;
         const x = i;
-        const y = Math.max(0, Math.min(height, center + offset)); // Constrain to screen bounds
+        const y = Math.max(0, Math.min(currentHeight, center + offset)); // Constrain to screen bounds
         
         if (prevX !== null && prevY !== null) {
           if (pathData === '') {
@@ -327,12 +340,12 @@ export default function Waveform({
         prevY = y;
       }
       
-      return { d: pathData || `M 0 ${center} L ${width} ${center}` };
+      return { d: pathData || `M 0 ${center} L ${currentWidth} ${center}` };
     } else {
       // Vertical mode: waveform goes from top to bottom (original behavior)
-      const len = height;
-      const waveformScale = width * 0.5 * scale * amplitudeScale;
-      const center = width * 0.5;
+      const len = currentHeight;
+      const waveformScale = currentWidth * 0.5 * scale * amplitudeScale;
+      const center = currentWidth * 0.5;
       
       const step = Math.max(1, samples.length) / len;
       const stride = 2;
@@ -343,7 +356,7 @@ export default function Waveform({
         
         // DIRECT multiplication with gesture-controlled amplitude
         const offset = samples[sampleIndex] * waveformScale;
-        const x = Math.max(0, Math.min(width, center + offset)); // Constrain to screen bounds
+        const x = Math.max(0, Math.min(currentWidth, center + offset)); // Constrain to screen bounds
         const y = i;
         
         if (prevX !== null && prevY !== null) {
@@ -357,7 +370,7 @@ export default function Waveform({
         prevY = y;
       }
 
-      return { d: pathData || `M ${center} 0 L ${center} ${height}` };
+      return { d: pathData || `M ${center} 0 L ${center} ${currentHeight}` };
     }
   });
 
@@ -370,16 +383,26 @@ export default function Waveform({
   const AnimatedText = Animated.createAnimatedComponent(Text);
   const AnimatedLine = Animated.createAnimatedComponent(Line);
 
+  // Calculate actual dimensions based on fullscreen state
+  const actualWidth = isFullscreen ? screenWidth : width;
+  const actualHeight = isFullscreen ? screenHeight : height;
+
   return (
     <GestureDetector gesture={composedGesture}>
-      <View style={[styles.container, styles.waveformBoundary, { 
-        width, 
-        height, 
-        marginTop: insets.top,
-        marginLeft: insets.left,
-        marginRight: insets.right 
-      }]}>
-        <Svg width={width} height={height}>
+      <View style={[
+        styles.container, 
+        isFullscreen ? styles.fullscreenContainer : styles.waveformBoundary, 
+        { 
+          width: actualWidth, 
+          height: actualHeight, 
+          ...(isFullscreen ? {} : {
+            marginTop: insets.top,
+            marginLeft: insets.left,
+            marginRight: insets.right 
+          })
+        }
+      ]}>
+        <Svg width={actualWidth} height={actualHeight}>
           <AnimatedPath
             animatedProps={animatedProps}
             stroke="#00ff00"
@@ -393,22 +416,22 @@ export default function Waveform({
         {/* HUD Overlay */}
         {showHUD && (
           <Animated.View style={[styles.hudContainer, hudStyle]}>
-            <Svg width={width} height={height} style={styles.hudSvg}>
+            <Svg width={actualWidth} height={actualHeight} style={styles.hudSvg}>
               {/* Crosshair lines */}
               <AnimatedLine
                 x1={0}
-                y1={height / 2}
-                x2={width}
-                y2={height / 2}
+                y1={actualHeight / 2}
+                x2={actualWidth}
+                y2={actualHeight / 2}
                 stroke="#00ff00"
                 strokeWidth={1}
                 opacity={0.5}
               />
               <AnimatedLine
-                x1={width / 2}
+                x1={actualWidth / 2}
                 y1={0}
-                x2={width / 2}
-                y2={height}
+                x2={actualWidth / 2}
+                y2={actualHeight}
                 stroke="#00ff00"
                 strokeWidth={1}
                 opacity={0.5}
@@ -416,7 +439,7 @@ export default function Waveform({
             </Svg>
             
             {/* Control Labels */}
-            <View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 45 }]}>
+            <View style={[styles.xLabel, { left: actualWidth / 2 + 10, top: actualHeight / 2 - 45 }]}>
               <Text style={[styles.labelText, { color: '#00ff00' }]}>
                 {orientation === 'horizontal' ? 'Y' : 'X'}: {xZoomDisplay}%
               </Text>
@@ -425,7 +448,7 @@ export default function Waveform({
               </Text>
             </View>
             
-            <View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
+            <View style={[styles.yLabel, { left: actualWidth / 2 + 10, top: actualHeight / 2 + 5 }]}>
               <Text style={[styles.labelText, { color: '#00ff00' }]}>
                 {orientation === 'horizontal' ? 'X' : 'Y'}: {yZoomDisplay}%
               </Text>
@@ -440,11 +463,14 @@ export default function Waveform({
         <View style={styles.controlOverlay}>
           <TouchableOpacity 
             style={styles.fullscreenButton}
-            onPress={() => setOrientation(orientation === 'horizontal' ? 'vertical' : 'horizontal')}
+            onPress={() => {
+              setIsFullscreen(!isFullscreen);
+              setOrientation('vertical'); // Always set to vertical when maximizing
+            }}
             activeOpacity={0.7}
           >
             <Ionicons 
-              name={orientation === 'horizontal' ? 'expand' : 'contract'} 
+              name={isFullscreen ? 'contract' : 'expand'} 
               size={24} 
               color="#00ff00" 
             />
@@ -463,6 +489,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
     borderRadius: 25,
     overflow: 'hidden',
+  },
+  fullscreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: '#121212',
+    zIndex: 1000,
   },
   hudContainer: {
     position: 'absolute',
