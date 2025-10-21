@@ -280,28 +280,31 @@ export default function Waveform({
   
   const handleRecordPressIn = () => {
     recordPressStartTime.current = Date.now();
-    // Slight scale down when pressing
-    recordButtonScale.value = withTiming(0.95, { duration: 100 });
+    // Immediately start recording and scale up big (30% bigger)
+    recordButtonScale.value = withTiming(1.3, { duration: 150 });
+    startHoldRecording();
   };
 
   const handleRecordPressOut = () => {
     const pressDuration = recordPressStartTime.current ? Date.now() - recordPressStartTime.current : 0;
     
     if (pressDuration < 500) {
-      // Quick tap - just return to normal scale
+      // Quick tap - toggle recording mode, return to normal scale
       recordButtonScale.value = withTiming(1, { duration: 100 });
-      // Toggle recording mode
+      // Stop the hold recording that started on press in
+      stopHoldRecording();
+      // Then toggle recording mode for persistent recording
       toggleRecordingMode();
     } else {
-      // Long press - stop hold-to-record
+      // Long press - stop hold-to-record and return to normal scale
+      recordButtonScale.value = withTiming(1, { duration: 150 });
       stopHoldRecording();
     }
   };
 
   const handleRecordLongPress = () => {
-    // Start hold-to-record mode - scale up to show it's active
-    recordButtonScale.value = withTiming(1.15, { duration: 150 });
-    startHoldRecording();
+    // This is no longer needed since we start immediately on press in
+    // But keep it for compatibility
   };
 
   const toggleRecordingMode = () => {
@@ -335,15 +338,14 @@ export default function Waveform({
       const recordingDuration = Date.now() - recordingStartTime;
       const recordingSamples = [...audioBufferRef.current]; // Copy current samples
       
-      // Create new recording entry
       // Recording completed successfully
       setIsRecordingMode(false);
       setIsActivelyRecording(false);
       setRecordingStartTime(null);
       
-      // Reset waveform for next recording
-      audioBufferRef.current = [];
-      audioSamples.value = [];
+      // Don't reset the waveform - keep it showing the recorded audio
+      // audioBufferRef.current = [];
+      // audioSamples.value = [];
     }
   };
 
@@ -507,7 +509,7 @@ export default function Waveform({
   // Record button animation
   const recordButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: recordButtonScale.value }],
-    backgroundColor: isActivelyRecording ? 'rgba(255, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: isActivelyRecording ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 255, 0, 0.4)',
   }));
 
   const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -953,17 +955,9 @@ const styles = StyleSheet.create({
     width: 45, // 25% smaller than 60
     height: 45,
     borderRadius: 22.5,
-    backgroundColor: '#ff4d6d', // Nice red-pinkish color
+    backgroundColor: 'rgba(0, 255, 0, 0.4)', // Faded green to show it's not recording
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#ff4d6d',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
   },
   recordButtonTouchArea: {
     width: '100%',
@@ -976,15 +970,7 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   recordButtonRecording: {
-    // Glow effect when recording
-    shadowColor: '#ff4d6d',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 12,
+    // No glow effect when recording - just the color change
   },
 
 });
