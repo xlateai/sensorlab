@@ -27,74 +27,7 @@ interface WaveformProps {
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-// Mini Waveform component for displaying saved recordings
-interface MiniWaveformProps {
-  samples: number[];
-  duration: number;
-  width: number;
-  height: number;
-}
 
-const MiniWaveform: React.FC<MiniWaveformProps> = ({ samples, duration, width, height }) => {
-  const pathData = React.useMemo(() => {
-    if (samples.length === 0) {
-      const center = height / 2;
-      return `M 0 ${center} L ${width} ${center}`;
-    }
-
-    const waveformScale = height * 0.4; // Smaller scale for mini view
-    const center = height / 2;
-    const step = Math.max(1, samples.length) / width;
-    const stride = Math.max(1, Math.floor(samples.length / 200)); // Reduce samples for efficiency
-    
-    let path = '';
-    let prevX: number | null = null;
-    let prevY: number | null = null;
-
-    for (let i = 0; i < width; i += 2) {
-      const sampleIndex = Math.floor(i * step);
-      if (sampleIndex >= samples.length) break;
-      
-      const sample = samples[sampleIndex] || 0;
-      const offset = sample * waveformScale;
-      const x = i;
-      const y = Math.max(0, Math.min(height, center + offset));
-      
-      if (prevX !== null && prevY !== null) {
-        if (path === '') {
-          path = `M ${prevX} ${prevY}`;
-        }
-        path += ` L ${x} ${y}`;
-      }
-      
-      prevX = x;
-      prevY = y;
-    }
-    
-    return path || `M 0 ${center} L ${width} ${center}`;
-  }, [samples, width, height]);
-
-  const formatDuration = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    return `${seconds}s`;
-  };
-
-  return (
-    <View style={styles.miniWaveformContainer}>
-      <Svg width={width} height={height}>
-        <Path
-          d={pathData}
-          stroke="#00ff00"
-          strokeWidth={1}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
-      <Text style={styles.miniWaveformDuration}>{formatDuration(duration)}</Text>
-    </View>
-  );
-};
 
 export default function Waveform({ 
   width = screenWidth, // Full screen width by default
@@ -124,7 +57,7 @@ export default function Waveform({
   const [isRecordingMode, setIsRecordingMode] = useState(false);
   const [isActivelyRecording, setIsActivelyRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
-  const [savedRecordings, setSavedRecordings] = useState<Array<{id: string, samples: number[], duration: number, timestamp: number}>>([]);
+
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -403,14 +336,7 @@ export default function Waveform({
       const recordingSamples = [...audioBufferRef.current]; // Copy current samples
       
       // Create new recording entry
-      const newRecording = {
-        id: Date.now().toString(),
-        samples: recordingSamples,
-        duration: recordingDuration,
-        timestamp: Date.now()
-      };
-      
-      setSavedRecordings(prev => [...prev, newRecording]);
+      // Recording completed successfully
       setIsRecordingMode(false);
       setIsActivelyRecording(false);
       setRecordingStartTime(null);
@@ -811,24 +737,7 @@ export default function Waveform({
           </Animated.View>
         </View>
 
-        {/* Recordings Container */}
-        {savedRecordings.length > 0 && (
-          <View style={[styles.recordingsContainer, { 
-            width: actualWidth,
-            marginLeft: isFullscreen ? 0 : insets.left,
-            marginRight: isFullscreen ? 0 : insets.right 
-          }]}>
-            {savedRecordings.map((recording, index) => (
-              <MiniWaveform 
-                key={recording.id}
-                samples={recording.samples}
-                duration={recording.duration}
-                width={actualWidth - 32}
-                height={40}
-              />
-            ))}
-          </View>
-        )}
+
       </View>
     </GestureDetector>
   );
@@ -840,8 +749,10 @@ const styles = StyleSheet.create({
   },
   waveformBoundary: {
     backgroundColor: '#121212',
-    borderRadius: 12,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
     borderWidth: 1,
+    borderBottomWidth: 0, // Remove bottom border to connect with recorder
     borderColor: 'rgba(0, 255, 0, 0.3)',
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1011,17 +922,24 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  // Record button container - matches waveform container style
+  // Record button container - connected to waveform container
   recordContainer: {
     height: 80,
     backgroundColor: '#121212',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 0, 0.3)',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftColor: 'rgba(0, 255, 0, 0.3)',
+    borderRightColor: 'rgba(0, 255, 0, 0.3)',
+    borderBottomColor: 'rgba(0, 255, 0, 0.3)',
+    borderTopColor: 'rgba(128, 128, 128, 0.4)', // Gray separator line
+    borderTopWidth: 1,
     marginHorizontal: 16,
-    marginTop: 8,
+    marginTop: 0, // Remove gap between containers
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1068,25 +986,5 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 12,
   },
-  recordingsContainer: {
-    backgroundColor: '#0a0a0a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxHeight: 200,
-  },
-  miniWaveformContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 0, 0.2)',
-  },
-  miniWaveformDuration: {
-    color: '#00ff00',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 4,
-    fontFamily: 'monospace',
-  },
+
 });
