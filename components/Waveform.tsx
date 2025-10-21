@@ -3,7 +3,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -48,6 +48,9 @@ export default function Waveform({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [originalOrientation, setOriginalOrientation] = useState(initialOrientation);
   const [isMuted, setIsMuted] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
+  const [isPushingToTalk, setIsPushingToTalk] = useState(false);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -57,6 +60,9 @@ export default function Waveform({
   const yZoom = useSharedValue(0.5); // Medium speed by default
   const hudOpacity = useSharedValue(0);
   const mutedSharedValue = useSharedValue(false);
+  const micButtonScale = useSharedValue(1);
+  const micButtonOpacity = useSharedValue(1);
+  const settingsOpacity = useSharedValue(0);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -201,6 +207,28 @@ export default function Waveform({
     setIsMuted(newMutedState);
     mutedSharedValue.value = newMutedState;
     // No need to clear the waveform immediately - let the buffer continue with silence
+  };
+
+  const handleMicPressIn = () => {
+    if (pushToTalkEnabled) {
+      setIsPushingToTalk(true);
+      mutedSharedValue.value = false; // Allow audio when pressing
+      micButtonScale.value = withTiming(1.5, { duration: 150 });
+    }
+  };
+
+  const handleMicPressOut = () => {
+    if (pushToTalkEnabled) {
+      setIsPushingToTalk(false);
+      mutedSharedValue.value = true; // Mute when releasing
+      micButtonScale.value = withTiming(1, { duration: 150 });
+    }
+  };
+
+  const toggleSettings = () => {
+    const newShowSettings = !showSettings;
+    setShowSettings(newShowSettings);
+    settingsOpacity.value = withTiming(newShowSettings ? 1 : 0, { duration: 300 });
   };
 
   const updateDisplayValues = () => {
@@ -395,6 +423,21 @@ export default function Waveform({
     pointerEvents: 'none',
   }));
 
+  // Animated styles for mic button
+  const micButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: micButtonScale.value }],
+    opacity: micButtonOpacity.value,
+    backgroundColor: isPushingToTalk 
+      ? 'rgba(0, 255, 0, 0.8)' 
+      : 'rgba(0, 0, 0, 0.7)',
+  }));
+
+  // Settings overlay animation
+  const settingsOverlayStyle = useAnimatedStyle(() => ({
+    opacity: settingsOpacity.value,
+    pointerEvents: settingsOpacity.value > 0 ? 'auto' : 'none',
+  }));
+
   const AnimatedText = Animated.createAnimatedComponent(Text);
   const AnimatedLine = Animated.createAnimatedComponent(Line);
 
@@ -474,24 +517,87 @@ export default function Waveform({
           </Animated.View>
         )}
         
+        {/* Settings Button - Top Left */}
+        <TouchableOpacity 
+          style={[styles.settingsButton, isFullscreen && styles.settingsButtonFullscreen]}
+          onPress={toggleSettings}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name="settings" 
+            size={isFullscreen ? 22 : 18} 
+            color="#00ff00" 
+          />
+        </TouchableOpacity>
+
+        {/* Settings Overlay */}
+        <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]}>
+          <View style={styles.settingsContent}>
+            <Text style={styles.settingsTitle}>Settings</Text>
+            
+            <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Push to Talk</Text>
+              <Switch
+                value={pushToTalkEnabled}
+                onValueChange={(value) => {
+                  setPushToTalkEnabled(value);
+                  if (value) {
+                    // When enabling push-to-talk, start in muted state
+                    setIsMuted(true);
+                    mutedSharedValue.value = true;
+                  } else {
+                    // When disabling push-to-talk, unmute
+                    setIsMuted(false);
+                    mutedSharedValue.value = false;
+                  }
+                }}
+                trackColor={{ false: '#767577', true: '#00ff0060' }}
+                thumbColor={pushToTalkEnabled ? '#00ff00' : '#f4f3f4'}
+                ios_backgroundColor="#3e3e3e"
+              />
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={toggleSettings}
+            >
+              <Text style={styles.closeButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
         {/* Control Overlay Bar */}
         <View style={styles.controlOverlay}>
-          {/* Mic Mute/Unmute Button - Bottom Left */}
-          <TouchableOpacity 
-            style={styles.controlButton}
-            onPress={toggleMute}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name={isMuted ? 'mic-off' : 'mic'} 
-              size={18} 
-              color="#00ff00" 
-            />
-          </TouchableOpacity>
+          {/* Mic Button - Bottom Left */}
+          <Animated.View style={[
+            styles.controlButton,
+            isFullscreen && styles.controlButtonFullscreen,
+            micButtonAnimatedStyle
+          ]}>
+            <TouchableOpacity 
+              style={styles.buttonTouchArea}
+              onPress={pushToTalkEnabled ? undefined : toggleMute}
+              onPressIn={pushToTalkEnabled ? handleMicPressIn : undefined}
+              onPressOut={pushToTalkEnabled ? handleMicPressOut : undefined}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={pushToTalkEnabled 
+                  ? (isPushingToTalk ? 'mic' : 'mic-off')
+                  : (isMuted ? 'mic-off' : 'mic')
+                } 
+                size={isFullscreen ? 22 : 18} 
+                color="#00ff00" 
+              />
+            </TouchableOpacity>
+          </Animated.View>
           
           {/* Fullscreen/Maximize Button - Bottom Right */}
           <TouchableOpacity 
-            style={styles.controlButton}
+            style={[
+              styles.controlButton,
+              isFullscreen && styles.controlButtonFullscreen
+            ]}
             onPress={() => {
               if (!isFullscreen) {
                 // Maximizing: save current orientation and switch to vertical
@@ -508,7 +614,7 @@ export default function Waveform({
           >
             <Ionicons 
               name={isFullscreen ? 'contract' : 'expand'} 
-              size={18} 
+              size={isFullscreen ? 22 : 18} 
               color="#00ff00" 
             />
           </TouchableOpacity>
@@ -603,6 +709,89 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  controlButtonFullscreen: {
+    width: 43, // 20% bigger than 36px
+    height: 43,
+    borderRadius: 21.5,
+  },
+  buttonTouchArea: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    zIndex: 100,
+  },
+  settingsButtonFullscreen: {
+    width: 43,
+    height: 43,
+    borderRadius: 21.5,
+  },
+  settingsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 200,
+  },
+  settingsContent: {
+    backgroundColor: '#121212',
+    borderRadius: 20,
+    padding: 30,
+    minWidth: 280,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  settingsTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#00ff00',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'monospace',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#00ff00',
+    fontFamily: 'monospace',
+  },
+  closeButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.2)',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.5)',
+    alignSelf: 'center',
+  },
+  closeButtonText: {
+    color: '#00ff00',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
   },
   fullscreenButton: {
     width: 48,
