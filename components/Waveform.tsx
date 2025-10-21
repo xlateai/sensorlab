@@ -56,6 +56,7 @@ export default function Waveform({
   const xZoom = useSharedValue(0.3); // Some amplitude by default
   const yZoom = useSharedValue(0.5); // Medium speed by default
   const hudOpacity = useSharedValue(0);
+  const mutedSharedValue = useSharedValue(false);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -161,7 +162,7 @@ export default function Waveform({
           }
           
           // Only update samples if not muted
-          if (!isMuted) {
+          if (!mutedSharedValue.value) {
             runOnJS(updateAudioSamples)([...audioBufferRef.current]);
           } else {
             // When muted, show a flat line
@@ -194,6 +195,17 @@ export default function Waveform({
 
   const updateAudioSamples = (samples: number[]) => {
     audioSamples.value = samples;
+  };
+
+  const toggleMute = () => {
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    mutedSharedValue.value = newMutedState;
+    
+    // If we're muting, immediately clear the waveform
+    if (newMutedState) {
+      audioSamples.value = [];
+    }
   };
 
   const updateDisplayValues = () => {
@@ -472,7 +484,7 @@ export default function Waveform({
           {/* Mic Mute/Unmute Button - Bottom Left */}
           <TouchableOpacity 
             style={styles.controlButton}
-            onPress={() => setIsMuted(!isMuted)}
+            onPress={toggleMute}
             activeOpacity={0.7}
           >
             <Ionicons 
