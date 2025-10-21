@@ -46,6 +46,7 @@ export default function Waveform({
   const [yZoomDisplay, setYZoomDisplay] = useState(50);
   const [orientation, setOrientation] = useState(initialOrientation);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [originalOrientation, setOriginalOrientation] = useState(initialOrientation);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -464,8 +465,16 @@ export default function Waveform({
           <TouchableOpacity 
             style={styles.fullscreenButton}
             onPress={() => {
-              setIsFullscreen(!isFullscreen);
-              setOrientation('vertical'); // Always set to vertical when maximizing
+              if (!isFullscreen) {
+                // Maximizing: save current orientation and switch to vertical
+                setOriginalOrientation(orientation);
+                setOrientation('vertical');
+                setIsFullscreen(true);
+              } else {
+                // Minimizing: restore original orientation
+                setOrientation(originalOrientation);
+                setIsFullscreen(false);
+              }
             }}
             activeOpacity={0.7}
           >
