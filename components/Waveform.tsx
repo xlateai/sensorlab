@@ -51,6 +51,7 @@ export default function Waveform({
   const [showSettings, setShowSettings] = useState(false);
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
   const [isPushingToTalk, setIsPushingToTalk] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
   
   const audioSamples = useSharedValue<number[]>([]);
   
@@ -63,6 +64,7 @@ export default function Waveform({
   const micButtonScale = useSharedValue(1);
   const micButtonOpacity = useSharedValue(1);
   const settingsOpacity = useSharedValue(0);
+  const zoomButtonScale = useSharedValue(1);
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
@@ -228,7 +230,7 @@ export default function Waveform({
   const toggleSettings = () => {
     const newShowSettings = !showSettings;
     setShowSettings(newShowSettings);
-    settingsOpacity.value = withTiming(newShowSettings ? 1 : 0, { duration: 300 });
+    settingsOpacity.value = withTiming(newShowSettings ? 1 : 0, { duration: 100 }); // 3x faster (300ms -> 100ms)
   };
 
   const updateDisplayValues = () => {
@@ -237,69 +239,41 @@ export default function Waveform({
     setYZoomDisplay(Math.round((1 - yZoom.value) * 100));
   };
 
-  // Touch and gesture handling
-  
-  // Combined touch detection for reliable HUD display
-  const touchGesture = Gesture.Manual()
-    .onTouchesDown((event) => {
-      runOnJS(setShowHUD)(true);
-      hudOpacity.value = withTiming(1, { duration: 200 });
-    })
-    .onTouchesMove((event) => {
-      const touch = event.allTouches[0];
-      if (touch) {
-        // Use actual dimensions for touch handling
-        const currentWidth = isFullscreen ? screenWidth : width;
-        const currentHeight = isFullscreen ? screenHeight : height;
-        
-        // Ensure coordinates are within bounds and valid
-        const touchX = Math.max(0, Math.min(currentWidth, touch.x));
-        const touchY = Math.max(0, Math.min(currentHeight, touch.y));
-        
-        if (orientation === 'horizontal') {
-          // Horizontal mode: X position controls speed, Y position controls amplitude
-          const xProgress = touchX / currentWidth;
-          yZoom.value = xProgress;
-          
-          const centerY = currentHeight / 2;
-          const maxDistance = currentHeight / 2;
-          const distanceFromCenter = Math.abs(touchY - centerY);
-          const yProgress = Math.min(1, distanceFromCenter / maxDistance);
-          xZoom.value = yProgress;
-        } else {
-          // Vertical mode: Y position controls speed, X position controls amplitude
-          const yProgress = touchY / currentHeight;
-          yZoom.value = yProgress;
-          
-          const centerX = currentWidth / 2;
-          const maxDistance = currentWidth / 2;
-          const distanceFromCenter = Math.abs(touchX - centerX);
-          const xProgress = Math.min(1, distanceFromCenter / maxDistance);
-          xZoom.value = xProgress;
-        }
-        
-        runOnJS(updateDisplayValues)();
-      }
-    })
-    .onTouchesUp(() => {
-      hudOpacity.value = withTiming(0, { duration: 500 });
-      setTimeout(() => runOnJS(setShowHUD)(false), 500);
-    });
+  // Zoom button handlers
+  const handleZoomPressIn = () => {
+    setIsZooming(true);
+    setShowHUD(true);
+    hudOpacity.value = withTiming(1, { duration: 200 });
+    zoomButtonScale.value = withTiming(1.3, { duration: 150 });
+  };
 
-  // Fallback pan gesture for additional reliability
-  const panGesture = Gesture.Pan()
+  const handleZoomPressOut = () => {
+    // Don't stop zooming on press out - let the gesture handle it
+    // This allows dragging away from the button while still zooming
+  };
+
+  const stopZooming = () => {
+    setIsZooming(false);
+    hudOpacity.value = withTiming(0, { duration: 500 });
+    setTimeout(() => setShowHUD(false), 500);
+    zoomButtonScale.value = withTiming(1, { duration: 150 });
+  };
+
+  // Zoom gesture - active across the entire waveform when zoom button is pressed
+  const zoomGesture = Gesture.Pan()
     .onBegin(() => {
-      runOnJS(setShowHUD)(true);
-      hudOpacity.value = withTiming(1, { duration: 200 });
+      // Only handle if we're in zoom mode
+      if (!isZooming) return;
     })
     .onUpdate((event) => {
-      // Use actual dimensions for pan gesture handling
+      if (!isZooming) return;
+      
       const currentWidth = isFullscreen ? screenWidth : width;
       const currentHeight = isFullscreen ? screenHeight : height;
       
-      // Ensure coordinates are within bounds
-      const touchX = Math.max(0, Math.min(currentWidth, event.x));
-      const touchY = Math.max(0, Math.min(currentHeight, event.y));
+      // Use absolute position for better tracking
+      const touchX = Math.max(0, Math.min(currentWidth, event.absoluteX));
+      const touchY = Math.max(0, Math.min(currentHeight, event.absoluteY));
       
       if (orientation === 'horizontal') {
         // Horizontal mode: X position controls speed, Y position controls amplitude
@@ -326,11 +300,9 @@ export default function Waveform({
       runOnJS(updateDisplayValues)();
     })
     .onEnd(() => {
-      hudOpacity.value = withTiming(0, { duration: 500 });
-      setTimeout(() => runOnJS(setShowHUD)(false), 500);
+      // Stop zooming when gesture ends
+      runOnJS(stopZooming)();
     });
-  
-  const composedGesture = Gesture.Race(touchGesture, panGesture);
 
   const animatedProps = useAnimatedProps(() => {
     const samples = audioSamples.value;
@@ -438,6 +410,12 @@ export default function Waveform({
     pointerEvents: settingsOpacity.value > 0 ? 'auto' : 'none',
   }));
 
+  // Zoom button animation
+  const zoomButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: zoomButtonScale.value }],
+    backgroundColor: isZooming ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)',
+  }));
+
   const AnimatedText = Animated.createAnimatedComponent(Text);
   const AnimatedLine = Animated.createAnimatedComponent(Line);
 
@@ -446,7 +424,7 @@ export default function Waveform({
   const actualHeight = isFullscreen ? screenHeight : height;
 
   return (
-    <GestureDetector gesture={composedGesture}>
+    <GestureDetector gesture={zoomGesture}>
       <View style={[
         styles.container, 
         isFullscreen ? styles.fullscreenContainer : styles.waveformBoundary, 
@@ -524,45 +502,54 @@ export default function Waveform({
           activeOpacity={0.7}
         >
           <Ionicons 
-            name="settings" 
+            name={showSettings ? "close" : "settings"} 
             size={isFullscreen ? 22 : 18} 
             color="#00ff00" 
           />
         </TouchableOpacity>
 
+        {/* Zoom Button - Top Right */}
+        <Animated.View style={[
+          styles.zoomButton,
+          isFullscreen && styles.zoomButtonFullscreen,
+          zoomButtonAnimatedStyle
+        ]}>
+          <TouchableOpacity 
+            style={styles.buttonTouchArea}
+            onPressIn={handleZoomPressIn}
+            onPressOut={handleZoomPressOut}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="search" 
+              size={isFullscreen ? 22 : 18} 
+              color="#00ff00" 
+            />
+          </TouchableOpacity>
+        </Animated.View>
+
         {/* Settings Overlay */}
-        <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]}>
-          <View style={styles.settingsContent}>
-            <Text style={styles.settingsTitle}>Settings</Text>
-            
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>Push to Talk</Text>
-              <Switch
-                value={pushToTalkEnabled}
-                onValueChange={(value) => {
-                  setPushToTalkEnabled(value);
-                  if (value) {
-                    // When enabling push-to-talk, start in muted state
-                    setIsMuted(true);
-                    mutedSharedValue.value = true;
-                  } else {
-                    // When disabling push-to-talk, unmute
-                    setIsMuted(false);
-                    mutedSharedValue.value = false;
-                  }
-                }}
-                trackColor={{ false: '#767577', true: '#00ff0060' }}
-                thumbColor={pushToTalkEnabled ? '#00ff00' : '#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-              />
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={toggleSettings}
-            >
-              <Text style={styles.closeButtonText}>Done</Text>
-            </TouchableOpacity>
+        <Animated.View style={[styles.settingsOverlay, settingsOverlayStyle]} pointerEvents="box-none">
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Push to Talk</Text>
+            <Switch
+              value={pushToTalkEnabled}
+              onValueChange={(value) => {
+                setPushToTalkEnabled(value);
+                if (value) {
+                  // When enabling push-to-talk, start in muted state
+                  setIsMuted(true);
+                  mutedSharedValue.value = true;
+                } else {
+                  // When disabling push-to-talk, unmute
+                  setIsMuted(false);
+                  mutedSharedValue.value = false;
+                }
+              }}
+              trackColor={{ false: '#767577', true: '#00ff0060' }}
+              thumbColor={pushToTalkEnabled ? '#00ff00' : '#f4f3f4'}
+              ios_backgroundColor="#3e3e3e"
+            />
           </View>
         </Animated.View>
 
@@ -733,9 +720,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 0, 0.3)',
-    zIndex: 100,
+    zIndex: 300, // Higher than settings overlay
   },
   settingsButtonFullscreen: {
+    width: 43,
+    height: 43,
+    borderRadius: 21.5,
+  },
+  zoomButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    zIndex: 100,
+  },
+  zoomButtonFullscreen: {
     width: 43,
     height: 43,
     borderRadius: 21.5,
@@ -746,53 +752,28 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(18, 18, 18, 0.85)', // Back to original glassy background
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center', // Perfectly centered
+    paddingHorizontal: 40,
+    paddingVertical: 80,
     zIndex: 200,
-  },
-  settingsContent: {
-    backgroundColor: '#121212',
-    borderRadius: 20,
-    padding: 30,
-    minWidth: 280,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 0, 0.3)',
-  },
-  settingsTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#00ff00',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontFamily: 'monospace',
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 30, // Margin around the sides
+    paddingVertical: 12,
+    minWidth: 250, // Ensure proper width for spacing
   },
   settingLabel: {
-    fontSize: 16,
-    color: '#00ff00',
-    fontFamily: 'monospace',
+    fontSize: 17, // System font size
+    color: '#ffffff', // System text color
+    fontWeight: '400', // System font weight
+    textAlign: 'left', // Left aligned text
   },
-  closeButton: {
-    backgroundColor: 'rgba(0, 255, 0, 0.2)',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 0, 0.5)',
-    alignSelf: 'center',
-  },
-  closeButtonText: {
-    color: '#00ff00',
-    fontSize: 16,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
+
   fullscreenButton: {
     width: 48,
     height: 48,
