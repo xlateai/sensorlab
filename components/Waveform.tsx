@@ -81,7 +81,6 @@ export default function Waveform({
   const micButtonOpacity = useSharedValue(1);
   const settingsOpacity = useSharedValue(0);
   const zoomButtonScale = useSharedValue(1);
-  const recordButtonScale = useSharedValue(1);
   const recordButtonOpacity = useSharedValue(1);
   const minimizeOpacity = useSharedValue(1);
   
@@ -373,7 +372,6 @@ export default function Waveform({
   
   const handleRecordPressIn = () => {
     recordPressStartTime.current = Date.now();
-    recordButtonScale.value = withTiming(1.3, { duration: 150 });
     
     // Start hold recording immediately
     if (!isActivelyRecording) {
@@ -386,7 +384,6 @@ export default function Waveform({
     
     if (pressDuration < 250) {
       // Quick tap - stop current recording and toggle to persistent mode
-      recordButtonScale.value = withTiming(1, { duration: 100 });
       if (isActivelyRecording && !isRecordingMode) {
         // Convert hold recording to persistent recording
         setIsRecordingMode(true);
@@ -396,7 +393,6 @@ export default function Waveform({
       }
     } else {
       // Long press - stop hold recording
-      recordButtonScale.value = withTiming(1, { duration: 150 });
       if (isActivelyRecording && !isRecordingMode) {
         finishRecording();
       }
@@ -425,8 +421,6 @@ export default function Waveform({
 
   const stopHoldRecording = () => {
     if (isActivelyRecording && !isRecordingMode) {
-      // Return to normal scale when stopping hold recording
-      recordButtonScale.value = withTiming(1, { duration: 150 });
       finishRecording();
     }
   };
@@ -651,33 +645,10 @@ export default function Waveform({
     backgroundColor: isZooming ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)',
   }));
 
-  // Record button animation
+  // Record button style (simplified, no animations)
   const recordButtonAnimatedStyle = useAnimatedStyle(() => {
-    const samples = audioSamples.value;
-    let volumeLevel = 0;
-    
-    if (isActivelyRecording && samples.length > 0) {
-      // Calculate current volume level from recent samples
-      const recentSamples = samples.slice(-50); // Last 50 samples
-      const avgVolume = recentSamples.reduce((sum, sample) => sum + Math.abs(sample), 0) / recentSamples.length;
-      volumeLevel = Math.min(1, avgVolume * 10); // Scale and clamp
-    }
-    
-    // Slight vibration effect when recording
-    const vibrationOffset = isActivelyRecording ? (Math.sin(Date.now() * 0.01) * volumeLevel * 2) : 0;
-    
     return {
-      transform: [
-        { scale: recordButtonScale.value },
-        { translateX: vibrationOffset },
-        { translateY: vibrationOffset * 0.7 }
-      ],
       backgroundColor: isActivelyRecording ? 'rgba(255, 0, 0, 1)' : 'rgba(0, 255, 0, 0.4)', // Solid red when recording
-      shadowColor: isActivelyRecording ? '#ff0000' : 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: isActivelyRecording ? 0.6 + (volumeLevel * 0.4) : 0, // Glow intensity based on volume
-      shadowRadius: isActivelyRecording ? 8 + (volumeLevel * 12) : 0, // Glow size based on volume
-      elevation: isActivelyRecording ? 8 + (volumeLevel * 8) : 0,
     };
   });
 

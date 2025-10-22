@@ -19,11 +19,13 @@ export default function HomeScreen() {
         onMutedStateChange={setIsMuted}
         onRecordingSamplesChange={setRecordingSamples}
       />
+      {/* Hidden for now - secondary waveform visualizer
       <RecordingsViewer 
         isRecording={recordingsState.currentRecording.isRecording}
         isMuted={isMuted}
         recordingSamples={recordingSamples}
       />
+      */}
     </View>
   );
 }
