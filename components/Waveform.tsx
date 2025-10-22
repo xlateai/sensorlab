@@ -960,7 +960,7 @@ const styles = StyleSheet.create({
   },
   recordingDot: {
     position: 'absolute',
-    top: 16,
+    top: 28, // Vertically centered with 36px buttons at top: 16 (16 + 18 - 6 = 28)
     left: '50%',
     marginLeft: 28, // To the right of minimize button (18 + 10 spacing)
     width: 12,
