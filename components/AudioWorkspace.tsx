@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import WaveEditor from './WaveEditor';
 import Waveform from './Waveform';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 interface AudioWorkspaceProps {
   // Allow customization if needed
@@ -16,12 +18,19 @@ export default function AudioWorkspace({
   // Shared state between components
   const [isMuted, setIsMuted] = useState(false);
   const [recordingSamples, setRecordingSamples] = useState<number[]>([]);
+  
+  // ScrollView reference for programmatic scrolling if needed
+  const scrollViewRef = useRef<ScrollView>(null);
 
   return (
     <ScrollView 
+      ref={scrollViewRef}
       style={styles.scrollContainer} 
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.contentContainer}
+      bounces={true}
+      alwaysBounceVertical={false}
+      keyboardShouldPersistTaps="handled" // Allows touches on controls while keyboard is open
     >
       {showRecorder && (
         <View style={styles.waveformSection}>
@@ -38,6 +47,9 @@ export default function AudioWorkspace({
           <WaveEditor />
         </View>
       )}
+      
+      {/* Add some extra space at the bottom for comfortable scrolling */}
+      <View style={styles.bottomSpacer} />
     </ScrollView>
   );
 }
@@ -56,5 +68,8 @@ const styles = StyleSheet.create({
   },
   editorSection: {
     // No margin needed since WaveEditor handles its own spacing
+  },
+  bottomSpacer: {
+    height: screenHeight * 0.1, // 10% of screen height for comfortable scrolling
   },
 });
