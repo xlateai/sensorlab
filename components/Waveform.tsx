@@ -97,11 +97,14 @@ export default function Waveform({
 
   // Notify parent of recording state changes
   useEffect(() => {
-    onRecordingStateChange?.(isActivelyRecording);
-  }, [isActivelyRecording, onRecordingStateChange]);
+    const isRecording = isActivelyRecording || isRecordingMode;
+    console.log('Waveform - Recording state changed:', isRecording, '(isActivelyRecording:', isActivelyRecording, 'isRecordingMode:', isRecordingMode, ')');
+    onRecordingStateChange?.(isRecording);
+  }, [isActivelyRecording, isRecordingMode, onRecordingStateChange]);
 
   // Notify parent of muted state changes
   useEffect(() => {
+    console.log('Waveform - Muted state changed:', isMuted);
     onMutedStateChange?.(isMuted);
   }, [isMuted, onMutedStateChange]);
 
@@ -240,8 +243,9 @@ export default function Waveform({
 
   const updateAudioSamples = (samples: number[]) => {
     audioSamples.value = samples;
-    // Notify parent of recording samples when actively recording and not muted
-    if (isActivelyRecording && !isMuted && samples.length > 0) {
+    // Notify parent of recording samples when recording (either mode) and not muted
+    if ((isActivelyRecording || isRecordingMode) && !isMuted && samples.length > 0) {
+      console.log('Waveform - Calling onRecordingSamplesChange with', samples.length, 'samples, isActivelyRecording:', isActivelyRecording, 'isRecordingMode:', isRecordingMode);
       onRecordingSamplesChange?.(samples);
     }
   };

@@ -1,17 +1,10 @@
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import React, { useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import React from 'react';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-    runOnJS,
     useAnimatedProps,
-    useAnimatedStyle,
     useSharedValue,
-    withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Line, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -27,7 +20,6 @@ interface RecordingsViewerProps {
 }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedLine = Animated.createAnimatedComponent(Line);
 
 export default function RecordingsViewer({ 
   width = screenWidth,
@@ -39,94 +31,38 @@ export default function RecordingsViewer({
   isMuted = false,
   recordingSamples = [],
 }: RecordingsViewerProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
   
-  const [showHUD, setShowHUD] = useState(false);
-  const [xZoomDisplay, setXZoomDisplay] = useState(50);
-  const [yZoomDisplay, setYZoomDisplay] = useState(50);
-  const [isZooming, setIsZooming] = useState(false);
-
-  // Shared values for zoom controls
+  // Simplified zoom values - fixed for consistent display
   const xZoom = useSharedValue(0.3); // Amplitude zoom
   const yZoom = useSharedValue(0.5); // Speed zoom
-  const hudOpacity = useSharedValue(0);
-  const zoomButtonScale = useSharedValue(1);
   
   // Recording buffer - this will be populated when recording
   const recordingBuffer = useSharedValue<number[]>([]);
   
   // Update recording buffer when samples change
   React.useEffect(() => {
+    console.log('RecordingsViewer - isRecording:', isRecording, 'isMuted:', isMuted, 'samples length:', recordingSamples.length);
     if (isRecording && !isMuted && recordingSamples.length > 0) {
       recordingBuffer.value = [...recordingSamples];
-    } else if (!isRecording) {
+      console.log('RecordingsViewer - Updated buffer with', recordingSamples.length, 'samples');
+    } else if (!isRecording && recordingBuffer.value.length > 0) {
       // Keep the buffer when recording stops to show the final recording
+      console.log('RecordingsViewer - Recording stopped, keeping buffer with', recordingBuffer.value.length, 'samples');
     }
   }, [isRecording, isMuted, recordingSamples]);
 
-  const updateDisplayValues = () => {
-    setXZoomDisplay(Math.round(xZoom.value * 100));
-    setYZoomDisplay(Math.round((1 - yZoom.value) * 100));
-  };
 
-  // Zoom button handlers
-  const handleZoomPressIn = () => {
-    setIsZooming(true);
-    setShowHUD(true);
-    hudOpacity.value = withTiming(1, { duration: 200 });
-    zoomButtonScale.value = withTiming(1.3, { duration: 150 });
-  };
-
-  const stopZooming = () => {
-    setIsZooming(false);
-    hudOpacity.value = withTiming(0, { duration: 500 });
-    setTimeout(() => setShowHUD(false), 500);
-    zoomButtonScale.value = withTiming(1, { duration: 150 });
-  };
-
-  // Zoom gesture
-  const zoomGesture = Gesture.Pan()
-    .onBegin(() => {
-      if (!isZooming) return;
-    })
-    .onUpdate((event) => {
-      if (!isZooming) return;
-      
-      const touchX = Math.max(0, Math.min(width, event.absoluteX));
-      const touchY = Math.max(0, Math.min(height, event.absoluteY));
-      
-      if (orientation === 'horizontal') {
-        // X position controls speed, Y position controls amplitude
-        const xProgress = touchX / width;
-        yZoom.value = xProgress;
-        
-        const centerY = height / 2;
-        const maxDistance = height / 2;
-        const distanceFromCenter = Math.abs(touchY - centerY);
-        const yProgress = Math.min(1, distanceFromCenter / maxDistance);
-        xZoom.value = yProgress;
-      } else {
-        // Y position controls speed, X position controls amplitude
-        const yProgress = touchY / height;
-        yZoom.value = yProgress;
-        
-        const centerX = width / 2;
-        const maxDistance = width / 2;
-        const distanceFromCenter = Math.abs(touchX - centerX);
-        const xProgress = Math.min(1, distanceFromCenter / maxDistance);
-        xZoom.value = xProgress;
-      }
-      
-      runOnJS(updateDisplayValues)();
-    })
-    .onEnd(() => {
-      runOnJS(stopZooming)();
-    });
 
   const animatedProps = useAnimatedProps(() => {
-    const samples = recordingBuffer.value;
+    let samples = recordingBuffer.value;
+    
+    // For testing: if no samples and we're recording, show test waveform
+    if (samples.length === 0 && isRecording) {
+      // Generate test waveform data
+      samples = Array.from({ length: 1000 }, (_, i) => 
+        Math.sin(i * 0.01) * 0.5 + Math.sin(i * 0.03) * 0.3
+      );
+    }
     
     if (samples.length === 0) {
       // Empty waveform - just a flat line
@@ -203,20 +139,7 @@ export default function RecordingsViewer({
     }
   });
 
-  // HUD animation style
-  const hudStyle = useAnimatedStyle(() => ({
-    opacity: hudOpacity.value,
-    pointerEvents: 'none',
-  }));
-
-  // Zoom button animation
-  const zoomButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: zoomButtonScale.value }],
-    backgroundColor: isZooming ? 'rgba(255, 165, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)', // Orange when zooming
-  }));
-
   return (
-    <GestureDetector gesture={zoomGesture}>
       <View style={[styles.container, { width, height }]}>
         <View style={[styles.waveformBoundary, { width, height }]}>
           <Svg width={width} height={height}>
@@ -238,57 +161,13 @@ export default function RecordingsViewer({
             </View>
           )}
           
-          {/* HUD Overlay */}
-          {showHUD && (
-            <Animated.View style={[styles.hudContainer, hudStyle]}>
-              <Svg width={width} height={height} style={styles.hudSvg}>
-                <AnimatedLine
-                  x1={0}
-                  y1={height / 2}
-                  x2={width}
-                  y2={height / 2}
-                  stroke="#ff8c00"
-                  strokeWidth={1}
-                  opacity={0.5}
-                />
-                <AnimatedLine
-                  x1={width / 2}
-                  y1={0}
-                  x2={width / 2}
-                  y2={height}
-                  stroke="#ff8c00"
-                  strokeWidth={1}
-                  opacity={0.5}
-                />
-              </Svg>
-              
-              {/* Control Labels */}
-              <View style={[styles.xLabel, { left: width / 2 + 10, top: height / 2 - 45 }]}>
-                <Text style={[styles.labelText, { color: '#ff8c00' }]}>
-                  {orientation === 'horizontal' ? 'Y' : 'X'}: {xZoomDisplay}%
-                </Text>
-                <Text style={[styles.subLabelText, { color: '#ff8c00' }]}>
-                  (amplitude)
-                </Text>
-              </View>
-              
-              <View style={[styles.yLabel, { left: width / 2 + 10, top: height / 2 + 5 }]}>
-                <Text style={[styles.labelText, { color: '#ff8c00' }]}>
-                  {orientation === 'horizontal' ? 'X' : 'Y'}: {yZoomDisplay}%
-                </Text>
-                <Text style={[styles.subLabelText, { color: '#ff8c00' }]}>
-                  (speed)
-                </Text>
-              </View>
-            </Animated.View>
-          )}
+
           
 
         </View>
       </View>
-    </GestureDetector>
-  );
-}
+    );
+  }
 
 const styles = StyleSheet.create({
   container: {
@@ -333,83 +212,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontFamily: 'monospace',
   },
-  hudContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    pointerEvents: 'none',
-  },
-  hudSvg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  xLabel: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  yLabel: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  labelText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
-  subLabelText: {
-    fontSize: 10,
-    fontWeight: 'normal',
-    fontFamily: 'monospace',
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-  zoomButton: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 140, 0, 0.3)',
-  },
-  buttonTouchArea: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 18,
-    color: '#ff8c00',
-  },
-  titleLabel: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 140, 0, 0.3)',
-  },
-  titleText: {
-    color: '#ff8c00',
-    fontSize: 12,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
+
 });
