@@ -42,25 +42,20 @@ export default function RecordingsViewer({
   
   // Update recording buffer when samples change
   React.useEffect(() => {
-    console.log('RecordingsViewer - isRecording:', isRecording, 'isMuted:', isMuted, 'samples length:', recordingSamples.length);
-    
     // When recording starts, clear the buffer and start fresh
     if (isRecording && !recordingStarted) {
-      console.log('RecordingsViewer - Recording started, clearing buffer');
       recordingBuffer.value = [];
       setRecordingStarted(true);
     }
     
     // When recording stops, keep the buffer and stop accumulating
     if (!isRecording && recordingStarted) {
-      console.log('RecordingsViewer - Recording stopped, final buffer has', recordingBuffer.value.length, 'samples');
       setRecordingStarted(false);
     }
     
     // While recording and not muted, copy all current samples from the main waveform
     if (isRecording && !isMuted && recordingSamples.length > 0) {
       recordingBuffer.value = [...recordingSamples];
-      console.log('RecordingsViewer - Updated recording buffer with', recordingSamples.length, 'samples');
     }
   }, [isRecording, isMuted, recordingSamples, recordingStarted]);
 

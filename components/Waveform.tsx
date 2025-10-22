@@ -98,13 +98,11 @@ export default function Waveform({
   // Notify parent of recording state changes
   useEffect(() => {
     const isRecording = isActivelyRecording || isRecordingMode;
-    console.log('Waveform - Recording state changed:', isRecording, '(isActivelyRecording:', isActivelyRecording, 'isRecordingMode:', isRecordingMode, ')');
     onRecordingStateChange?.(isRecording);
   }, [isActivelyRecording, isRecordingMode, onRecordingStateChange]);
 
   // Notify parent of muted state changes
   useEffect(() => {
-    console.log('Waveform - Muted state changed:', isMuted);
     onMutedStateChange?.(isMuted);
   }, [isMuted, onMutedStateChange]);
 
@@ -245,7 +243,6 @@ export default function Waveform({
     audioSamples.value = samples;
     // Always send the current audio buffer to RecordingsViewer - let it decide what to do
     if (samples.length > 0) {
-      console.log('Waveform - Sending', samples.length, 'samples to RecordingsViewer, isActivelyRecording:', isActivelyRecording, 'isRecordingMode:', isRecordingMode);
       onRecordingSamplesChange?.(samples);
     }
   };
