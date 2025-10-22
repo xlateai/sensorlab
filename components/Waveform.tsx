@@ -2,6 +2,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -58,6 +59,7 @@ export default function Waveform({
   const [isActivelyRecording, setIsActivelyRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isPushingToMic, setIsPushingToMic] = useState(false);
 
   
   const audioSamples = useSharedValue<number[]>([]);
@@ -230,18 +232,38 @@ export default function Waveform({
   };
 
   const handleMicPressIn = () => {
+    micPressStartTime.current = Date.now();
     if (pushToTalkEnabled) {
       setIsPushingToTalk(true);
       mutedSharedValue.value = false; // Allow audio when pressing
-      micButtonScale.value = withTiming(1.5, { duration: 150 });
+      micButtonScale.value = withTiming(1.3, { duration: 150 });
+    } else if (isMuted) {
+      // When muted and not in push-to-talk mode, start push-to-unmute
+      setIsPushingToMic(true);
+      mutedSharedValue.value = false; // Allow audio when pressing
+      micButtonScale.value = withTiming(1.3, { duration: 150 });
     }
   };
 
   const handleMicPressOut = () => {
+    const pressDuration = micPressStartTime.current ? Date.now() - micPressStartTime.current : 0;
+    
     if (pushToTalkEnabled) {
       setIsPushingToTalk(false);
       mutedSharedValue.value = true; // Mute when releasing
       micButtonScale.value = withTiming(1, { duration: 150 });
+    } else if (isMuted && isPushingToMic) {
+      if (pressDuration < 250) { // 0.25 second grace period
+        // Quick tap - toggle mute state permanently
+        setIsMuted(false);
+        mutedSharedValue.value = false;
+        micButtonScale.value = withTiming(1, { duration: 100 });
+      } else {
+        // Long press - return to muted state
+        mutedSharedValue.value = true;
+        micButtonScale.value = withTiming(1, { duration: 150 });
+      }
+      setIsPushingToMic(false);
     }
   };
 
@@ -286,6 +308,9 @@ export default function Waveform({
   // Record button handlers
   const recordPressStartTime = useRef<number | null>(null);
   
+  // Mic button handlers
+  const micPressStartTime = useRef<number | null>(null);
+  
   const handleRecordPressIn = () => {
     recordPressStartTime.current = Date.now();
     // Immediately start recording and scale up big (30% bigger)
@@ -296,7 +321,7 @@ export default function Waveform({
   const handleRecordPressOut = () => {
     const pressDuration = recordPressStartTime.current ? Date.now() - recordPressStartTime.current : 0;
     
-    if (pressDuration < 500) {
+    if (pressDuration < 250) {
       // Quick tap - toggle recording mode, return to normal scale
       recordButtonScale.value = withTiming(1, { duration: 100 });
       // Stop the hold recording that started on press in
@@ -317,6 +342,7 @@ export default function Waveform({
 
   const toggleRecordingMode = () => {
     if (!isRecordingMode) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setIsRecordingMode(true);
       setRecordingStartTime(Date.now());
       setIsActivelyRecording(true);
@@ -327,6 +353,7 @@ export default function Waveform({
 
   const startHoldRecording = () => {
     if (!isActivelyRecording) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setRecordingStartTime(Date.now());
       setIsActivelyRecording(true);
       // Button stays enlarged while holding to record
@@ -345,6 +372,9 @@ export default function Waveform({
     if (recordingStartTime && isActivelyRecording) {
       const recordingDuration = Date.now() - recordingStartTime;
       const recordingSamples = [...audioBufferRef.current]; // Copy current samples
+      
+      // Strong haptic feedback when recording ends
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       
       // Recording completed successfully
       setIsRecordingMode(false);
@@ -497,7 +527,7 @@ export default function Waveform({
   const micButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: micButtonScale.value }],
     opacity: micButtonOpacity.value,
-    backgroundColor: isPushingToTalk 
+    backgroundColor: (isPushingToTalk || isPushingToMic)
       ? 'rgba(0, 255, 0, 0.8)' 
       : 'rgba(0, 0, 0, 0.7)',
   }));
@@ -672,7 +702,9 @@ export default function Waveform({
             <View style={[
               styles.recordingDot,
               isFullscreen && {
-                top: Math.max(16, insets.top + 16),
+                top: Math.max(30, insets.top + 30), // Updated for larger 40px buttons
+                left: '50%',
+                marginLeft: -6, // Center the dot when fullscreen
               }
             ]}>
               <View style={styles.recordingDotInner} />
@@ -693,6 +725,7 @@ export default function Waveform({
                 style={styles.buttonTouchArea}
                 onPressIn={handleZoomPressIn}
                 onPressOut={handleZoomPressOut}
+                delayPressOut={0} // Allow immediate response when dragging off
                 activeOpacity={0.7}
               >
                 <Ionicons 
@@ -748,15 +781,16 @@ export default function Waveform({
               ]}>
                 <TouchableOpacity 
                   style={styles.buttonTouchArea}
-                  onPress={pushToTalkEnabled ? undefined : toggleMute}
-                  onPressIn={pushToTalkEnabled ? handleMicPressIn : undefined}
-                  onPressOut={pushToTalkEnabled ? handleMicPressOut : undefined}
+                  onPress={pushToTalkEnabled || isMuted ? undefined : toggleMute}
+                  onPressIn={pushToTalkEnabled || isMuted ? handleMicPressIn : undefined}
+                  onPressOut={pushToTalkEnabled || isMuted ? handleMicPressOut : undefined}
                   activeOpacity={0.7}
+                  delayPressOut={0} // Allow immediate response when dragging off
                 >
                   <Ionicons 
                     name={pushToTalkEnabled 
                       ? (isPushingToTalk ? 'mic' : 'mic-off')
-                      : (isMuted ? 'mic-off' : 'mic')
+                      : (isMuted ? (isPushingToMic ? 'mic' : 'mic-off') : 'mic')
                     } 
                     size={18} 
                     color="#00ff00" 
@@ -809,6 +843,7 @@ export default function Waveform({
                 onPressOut={handleRecordPressOut}
                 onLongPress={handleRecordLongPress}
                 delayLongPress={500}
+                delayPressOut={0} // Allow immediate response when dragging off
                 activeOpacity={0.9}
               />
             </Animated.View>
@@ -902,10 +937,10 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none', // Allow touches to pass through except for button
   },
   controlButton: {
-    width: 36, // 25% smaller than 48px
-    height: 36,
+    width: 40, // 10% larger than 36px (36 * 1.1 ≈ 40)
+    height: 40,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 18,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -930,10 +965,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     left: 16,
-    width: 36,
-    height: 36,
+    width: 40, // 10% larger
+    height: 40,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 18,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -944,11 +979,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     left: '50%',
-    marginLeft: -18, // Half of width to center
-    width: 36,
-    height: 36,
+    marginLeft: -20, // Half of width to center (40/2)
+    width: 40, // 10% larger
+    height: 40,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 18,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -957,9 +992,9 @@ const styles = StyleSheet.create({
   },
   recordingDot: {
     position: 'absolute',
-    top: 28, // Vertically centered with 36px buttons at top: 16 (16 + 18 - 6 = 28)
+    top: 30, // Vertically centered with 40px buttons at top: 16 (16 + 20 - 6 = 30)
     left: '50%',
-    marginLeft: 28, // To the right of minimize button (18 + 10 spacing)
+    marginLeft: 30, // To the right of minimize button (20 + 10 spacing)
     width: 12,
     height: 12,
     justifyContent: 'center',
@@ -981,10 +1016,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
-    width: 36,
-    height: 36,
+    width: 40, // 10% larger
+    height: 40,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 18,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -1065,9 +1100,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   recordButton: {
-    width: 45, // 25% smaller than 60
-    height: 45,
-    borderRadius: 22.5,
+    width: 50, // 10% larger than 45 (45 * 1.1 ≈ 50)
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },
