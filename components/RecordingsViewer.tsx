@@ -36,33 +36,38 @@ export default function RecordingsViewer({
   const xZoom = useSharedValue(0.3); // Amplitude zoom
   const yZoom = useSharedValue(0.5); // Speed zoom
   
-  // Recording buffer - this will be populated when recording
+  // Recording buffer - accumulates samples only when recording
   const recordingBuffer = useSharedValue<number[]>([]);
+  const [recordingStarted, setRecordingStarted] = React.useState(false);
   
   // Update recording buffer when samples change
   React.useEffect(() => {
     console.log('RecordingsViewer - isRecording:', isRecording, 'isMuted:', isMuted, 'samples length:', recordingSamples.length);
+    
+    // When recording starts, clear the buffer and start fresh
+    if (isRecording && !recordingStarted) {
+      console.log('RecordingsViewer - Recording started, clearing buffer');
+      recordingBuffer.value = [];
+      setRecordingStarted(true);
+    }
+    
+    // When recording stops, keep the buffer and stop accumulating
+    if (!isRecording && recordingStarted) {
+      console.log('RecordingsViewer - Recording stopped, final buffer has', recordingBuffer.value.length, 'samples');
+      setRecordingStarted(false);
+    }
+    
+    // While recording and not muted, copy all current samples from the main waveform
     if (isRecording && !isMuted && recordingSamples.length > 0) {
       recordingBuffer.value = [...recordingSamples];
-      console.log('RecordingsViewer - Updated buffer with', recordingSamples.length, 'samples');
-    } else if (!isRecording && recordingBuffer.value.length > 0) {
-      // Keep the buffer when recording stops to show the final recording
-      console.log('RecordingsViewer - Recording stopped, keeping buffer with', recordingBuffer.value.length, 'samples');
+      console.log('RecordingsViewer - Updated recording buffer with', recordingSamples.length, 'samples');
     }
-  }, [isRecording, isMuted, recordingSamples]);
+  }, [isRecording, isMuted, recordingSamples, recordingStarted]);
 
 
 
   const animatedProps = useAnimatedProps(() => {
-    let samples = recordingBuffer.value;
-    
-    // For testing: if no samples and we're recording, show test waveform
-    if (samples.length === 0 && isRecording) {
-      // Generate test waveform data
-      samples = Array.from({ length: 1000 }, (_, i) => 
-        Math.sin(i * 0.01) * 0.5 + Math.sin(i * 0.03) * 0.3
-      );
-    }
+    const samples = recordingBuffer.value;
     
     if (samples.length === 0) {
       // Empty waveform - just a flat line

@@ -243,9 +243,9 @@ export default function Waveform({
 
   const updateAudioSamples = (samples: number[]) => {
     audioSamples.value = samples;
-    // Notify parent of recording samples when recording (either mode) and not muted
-    if ((isActivelyRecording || isRecordingMode) && !isMuted && samples.length > 0) {
-      console.log('Waveform - Calling onRecordingSamplesChange with', samples.length, 'samples, isActivelyRecording:', isActivelyRecording, 'isRecordingMode:', isRecordingMode);
+    // Always send the current audio buffer to RecordingsViewer - let it decide what to do
+    if (samples.length > 0) {
+      console.log('Waveform - Sending', samples.length, 'samples to RecordingsViewer, isActivelyRecording:', isActivelyRecording, 'isRecordingMode:', isRecordingMode);
       onRecordingSamplesChange?.(samples);
     }
   };
