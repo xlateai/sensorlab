@@ -230,14 +230,13 @@ export default function WaveEditor({
   
   // Bookmark functions
   const saveCurrentWave = () => {
-    if (waveName.trim() === '') {
-      Alert.alert('Missing Name', 'Please enter a name for this wave!');
-      return;
-    }
+    const id = generateUUID();
+    // Use first 4 letters of UUID if no name is provided
+    const name = waveName.trim() === '' ? id.substring(0, 4) : waveName.trim();
     
     const newSavedWave: SavedWave = {
-      id: generateUUID(),
-      name: waveName.trim(),
+      id,
+      name,
       frequencies: [...frequencies],
       createdAt: new Date()
     };
@@ -392,25 +391,6 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
             />
           </TouchableOpacity>
           
-          {/* Bookmark Section */}
-          <View style={styles.bookmarkSection}>
-            <View style={styles.bookmarkInputRow}>
-              <TextInput
-                style={styles.nameInput}
-                placeholder="Wave name..."
-                placeholderTextColor="#666666"
-                value={waveName}
-                onChangeText={setWaveName}
-              />
-              <TouchableOpacity
-                style={styles.bookmarkButton}
-                onPress={saveCurrentWave}
-              >
-                <Ionicons name="bookmark" size={20} color="#ff8800" />
-              </TouchableOpacity>
-            </View>
-          </View>
-          
           {/* Frequency Controls */}
           <View style={styles.frequenciesSection}>
             <View style={styles.sectionHeader}>
@@ -452,6 +432,25 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
                 )}
               </View>
             ))}
+            
+            {/* Bookmark Section - moved to bottom of frequencies area */}
+            <View style={styles.bookmarkSection}>
+              <View style={styles.bookmarkInputRow}>
+                <TextInput
+                  style={styles.nameInput}
+                  placeholder="Wave name (optional)..."
+                  placeholderTextColor="#666666"
+                  value={waveName}
+                  onChangeText={setWaveName}
+                />
+                <TouchableOpacity
+                  style={styles.bookmarkButton}
+                  onPress={saveCurrentWave}
+                >
+                  <Ionicons name="bookmark" size={20} color="#536471" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
         
@@ -545,7 +544,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 0, 0, 0.3)',
   },
   bookmarkSection: {
-    marginBottom: 16,
+    marginTop: 16, // Add top margin since it's now at the bottom
+    marginBottom: 0, // Remove bottom margin since it's at the end
   },
   bookmarkInputRow: {
     flexDirection: 'row',
@@ -559,15 +559,15 @@ const styles = StyleSheet.create({
     padding: 12,
     color: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 136, 0, 0.3)',
+    borderColor: 'rgba(83, 100, 113, 0.3)', // Match the bookmark button color
     fontSize: 14,
   },
   bookmarkButton: {
-    backgroundColor: 'rgba(255, 136, 0, 0.1)',
+    backgroundColor: 'rgba(83, 100, 113, 0.1)', // Dark gray background like Twitter
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 136, 0, 0.3)',
+    borderColor: 'rgba(83, 100, 113, 0.3)', // Dark gray border like Twitter
   },
   frequenciesSection: {
     marginTop: 8,
