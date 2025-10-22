@@ -288,7 +288,7 @@ export default function WaveEditor({
           <Text style={styles.sliderLabel}>Frequency</Text>
           <Slider
             style={styles.slider}
-            minimumValue={100}
+            minimumValue={10}
             maximumValue={2000}
             value={frequency}
             onValueChange={setFrequency}
