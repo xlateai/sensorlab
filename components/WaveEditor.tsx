@@ -164,13 +164,25 @@ export default function WaveEditor({
   // Update frequencies during playback
   useEffect(() => {
     if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
-      // Stop current audio and restart with new frequencies
-      if (isPlaying) {
-        stopWave();
-        // Small delay before restarting
-        setTimeout(() => {
-          startWave();
-        }, 100);
+      // Update existing oscillators with new frequencies if lengths match
+      if (oscillatorsRef.current.length === frequencies.length) {
+        oscillatorsRef.current.forEach((oscillator, index) => {
+          if (oscillator && audioContextRef.current) {
+            oscillator.frequency.setValueAtTime(
+              frequencies[index], 
+              audioContextRef.current.currentTime
+            );
+          }
+        });
+      } else {
+        // Length changed - need to restart audio
+        if (isPlaying) {
+          stopWave();
+          // Small delay before restarting
+          setTimeout(() => {
+            startWave();
+          }, 100);
+        }
       }
     }
   }, [frequencies]);
@@ -196,11 +208,55 @@ export default function WaveEditor({
     setFrequencies(newFrequencies);
   };
   
-  // Generate multi-frequency sine wave visualization
+const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase }: {
+  freq: number;
+  index: number;
+  width: number;
+  height: number;
+  animationProgress: any;
+  wavePhase: any;
+}) => {
   const animatedProps = useAnimatedProps(() => {
     const points = 200;
     const amplitude = 40 + (animationProgress.value * 20);
-    const phaseOffset = wavePhase.value; // Use continuous phase animation
+    const phaseOffset = wavePhase.value;
+    const centerY = height / 2;
+    
+    let pathData = '';
+    for (let i = 0; i <= points; i++) {
+      const x = (i / points) * width;
+      const normalizedFreq = freq / 1000;
+      const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+      const y = centerY + (sineValue * amplitude);
+      
+      if (i === 0) {
+        pathData = `M ${x} ${y}`;
+      } else {
+        pathData += ` L ${x} ${y}`;
+      }
+    }
+    
+    return { d: pathData };
+  });
+
+  return (
+    <AnimatedPath
+      animatedProps={animatedProps}
+      stroke="#444444"
+      strokeWidth={1}
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      opacity={0.6}
+    />
+  );
+};
+
+  // Generate multi-frequency sine wave visualization (composite)
+  const animatedProps = useAnimatedProps(() => {
+    const points = 200;
+    const amplitude = 40 + (animationProgress.value * 20);
+    const phaseOffset = wavePhase.value;
     
     let pathData = '';
     const centerY = height / 2;
@@ -211,7 +267,7 @@ export default function WaveEditor({
       // Sum all frequencies for complex waveform
       let combinedValue = 0;
       frequencies.forEach((freq) => {
-        const normalizedFreq = freq / 1000; // Normalize frequency for visual
+        const normalizedFreq = freq / 1000;
         const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
         combinedValue += sineValue / frequencies.length; // Average the amplitudes
       });
@@ -233,6 +289,20 @@ export default function WaveEditor({
       {/* Waveform Display */}
       <View style={[styles.waveformContainer, { width, height }]}>
         <Svg width={width} height={height}>
+          {/* Individual sine waves in light gray */}
+          {frequencies.map((freq, index) => (
+            <IndividualWave
+              key={`wave-${index}-${freq}`}
+              freq={freq}
+              index={index}
+              width={width}
+              height={height}
+              animationProgress={animationProgress}
+              wavePhase={wavePhase}
+            />
+          ))}
+          
+          {/* Composite waveform in green */}
           <AnimatedPath
             animatedProps={animatedProps}
             stroke={isPlaying ? "#00ff00" : "#888888"}
