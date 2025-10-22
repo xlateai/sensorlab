@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
     useAnimatedProps,
     useSharedValue,
@@ -11,6 +11,13 @@ import Animated, {
 import Svg, { Path } from 'react-native-svg';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
+
+interface SavedWave {
+  id: string;
+  name: string;
+  frequencies: number[];
+  createdAt: Date;
+}
 
 interface WaveEditorProps {
   width?: number;
@@ -25,9 +32,13 @@ export default function WaveEditor({
 }: WaveEditorProps) {
   
   // Wave parameters
-  const [frequencies, setFrequencies] = useState([440]); // Array of frequencies
+  const [frequencies, setFrequencies] = useState([100]); // Start with 100Hz
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
+  
+  // Bookmark system
+  const [savedWaves, setSavedWaves] = useState<SavedWave[]>([]);
+  const [waveName, setWaveName] = useState('');
   
   // Audio context and oscillator refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -208,6 +219,43 @@ export default function WaveEditor({
     setFrequencies(newFrequencies);
   };
   
+  // UUID generation (simple version for demo)
+  const generateUUID = () => {
+    return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+  
+  // Bookmark functions
+  const saveCurrentWave = () => {
+    if (waveName.trim() === '') {
+      Alert.alert('Missing Name', 'Please enter a name for this wave!');
+      return;
+    }
+    
+    const newSavedWave: SavedWave = {
+      id: generateUUID(),
+      name: waveName.trim(),
+      frequencies: [...frequencies],
+      createdAt: new Date()
+    };
+    
+    setSavedWaves(prev => [...prev, newSavedWave]);
+    setWaveName(''); // Clear the input
+    Alert.alert('Saved!', `"${newSavedWave.name}" has been saved!`);
+  };
+  
+  const loadSavedWave = (savedWave: SavedWave) => {
+    setFrequencies([...savedWave.frequencies]);
+    setWaveName(savedWave.name); // Load name for potential editing
+  };
+  
+  const deleteSavedWave = (id: string) => {
+    setSavedWaves(prev => prev.filter(wave => wave.id !== id));
+  };
+  
 const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase }: {
   freq: number;
   index: number;
@@ -285,112 +333,168 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
   });
 
   return (
-    <View style={[styles.container, { width, height: height + 120 }]}>
-      {/* Waveform Display */}
-      <View style={[styles.waveformContainer, { width, height }]}>
-        <Svg width={width} height={height}>
-          {/* Individual sine waves in light gray */}
-          {frequencies.map((freq, index) => (
-            <IndividualWave
-              key={`wave-${index}-${freq}`}
-              freq={freq}
-              index={index}
-              width={width}
-              height={height}
-              animationProgress={animationProgress}
-              wavePhase={wavePhase}
+    <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <View style={[styles.container, { width, height: height + 160 }]}>
+        {/* Waveform Display */}
+        <View style={[styles.waveformContainer, { width, height }]}>
+          <Svg width={width} height={height}>
+            {/* Individual sine waves in light gray */}
+            {frequencies.map((freq, index) => (
+              <IndividualWave
+                key={`wave-${index}-${freq}`}
+                freq={freq}
+                index={index}
+                width={width}
+                height={height}
+                animationProgress={animationProgress}
+                wavePhase={wavePhase}
+              />
+            ))}
+            
+            {/* Composite waveform in green */}
+            <AnimatedPath
+              animatedProps={animatedProps}
+              stroke={isPlaying ? "#00ff00" : "#888888"}
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          ))}
+          </Svg>
           
-          {/* Composite waveform in green */}
-          <AnimatedPath
-            animatedProps={animatedProps}
-            stroke={isPlaying ? "#00ff00" : "#888888"}
-            strokeWidth={2}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
-        
-        {/* Wave info overlay */}
-        <View style={styles.infoOverlay}>
-          <Text style={styles.infoText}>
-            {frequencies.length === 1 
-              ? `${Math.round(frequencies[0])}Hz Sine Wave`
-              : `${frequencies.length} Frequency Mix`
-            }
-          </Text>
-          {frequencies.length > 1 && (
-            <Text style={styles.frequencyList}>
-              {frequencies.map(f => Math.round(f)).join('Hz, ')}Hz
+          {/* Wave info overlay */}
+          <View style={styles.infoOverlay}>
+            <Text style={styles.infoText}>
+              {frequencies.length === 1 
+                ? `${Math.round(frequencies[0])}Hz Sine Wave`
+                : `${frequencies.length} Frequency Mix`
+              }
             </Text>
-          )}
+            {frequencies.length > 1 && (
+              <Text style={styles.frequencyList}>
+                {frequencies.map(f => Math.round(f)).join('Hz, ')}Hz
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
-      
-      {/* Controls */}
-      <View style={styles.controlsContainer}>
-        {/* Play/Stop Button */}
-        <TouchableOpacity
-          style={[styles.playButton, isPlaying && styles.playButtonActive]}
-          onPress={togglePlayback}
-        >
-          <Ionicons 
-            name={isPlaying ? "stop" : "play"} 
-            size={24} 
-            color={isPlaying ? "#ff0000" : "#00ff00"} 
-          />
-        </TouchableOpacity>
         
-        {/* Frequency Controls */}
-        <View style={styles.frequenciesSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Frequencies</Text>
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={addFrequency}
-              disabled={frequencies.length >= 8}
-            >
-              <Ionicons name="add" size={20} color="#00ff00" />
-            </TouchableOpacity>
+        {/* Controls */}
+        <View style={styles.controlsContainer}>
+          {/* Play/Stop Button */}
+          <TouchableOpacity
+            style={[styles.playButton, isPlaying && styles.playButtonActive]}
+            onPress={togglePlayback}
+          >
+            <Ionicons 
+              name={isPlaying ? "stop" : "play"} 
+              size={24} 
+              color={isPlaying ? "#ff0000" : "#00ff00"} 
+            />
+          </TouchableOpacity>
+          
+          {/* Bookmark Section */}
+          <View style={styles.bookmarkSection}>
+            <View style={styles.bookmarkInputRow}>
+              <TextInput
+                style={styles.nameInput}
+                placeholder="Wave name..."
+                placeholderTextColor="#666666"
+                value={waveName}
+                onChangeText={setWaveName}
+              />
+              <TouchableOpacity
+                style={styles.bookmarkButton}
+                onPress={saveCurrentWave}
+              >
+                <Ionicons name="bookmark" size={20} color="#ff8800" />
+              </TouchableOpacity>
+            </View>
           </View>
           
-          {frequencies.map((freq, index) => (
-            <View key={index} style={styles.frequencyRow}>
-              <View style={styles.sliderContainer}>
-                <Text style={styles.sliderLabel}>
-                  Wave {index + 1}
-                </Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={10}
-                  maximumValue={2000}
-                  value={freq}
-                  onValueChange={(value) => updateFrequency(index, value)}
-                  minimumTrackTintColor="#00ff00"
-                  maximumTrackTintColor="#333333"
-                  thumbTintColor="#00ff00"
-                />
-                <Text style={styles.sliderValue}>{Math.round(freq)}Hz</Text>
-              </View>
-              {frequencies.length > 1 && (
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeFrequency(index)}
-                >
-                  <Ionicons name="remove" size={16} color="#ff0000" />
-                </TouchableOpacity>
-              )}
+          {/* Frequency Controls */}
+          <View style={styles.frequenciesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Frequencies</Text>
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={addFrequency}
+                disabled={frequencies.length >= 8}
+              >
+                <Ionicons name="add" size={20} color="#00ff00" />
+              </TouchableOpacity>
             </View>
-          ))}
+            
+            {frequencies.map((freq, index) => (
+              <View key={index} style={styles.frequencyRow}>
+                <View style={styles.sliderContainer}>
+                  <Text style={styles.sliderLabel}>
+                    Wave {index + 1}
+                  </Text>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={10}
+                    maximumValue={2000}
+                    value={freq}
+                    onValueChange={(value) => updateFrequency(index, value)}
+                    minimumTrackTintColor="#00ff00"
+                    maximumTrackTintColor="#333333"
+                    thumbTintColor="#00ff00"
+                  />
+                  <Text style={styles.sliderValue}>{Math.round(freq)}Hz</Text>
+                </View>
+                {frequencies.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => removeFrequency(index)}
+                  >
+                    <Ionicons name="remove" size={16} color="#ff0000" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
         </View>
+        
+        {/* Saved Waves */}
+        {savedWaves.length > 0 && (
+          <View style={styles.savedWavesContainer}>
+            <Text style={styles.savedWavesTitle}>Saved Waves</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedWavesScroll}>
+              {savedWaves.map((savedWave) => (
+                <TouchableOpacity
+                  key={savedWave.id}
+                  style={styles.savedWaveItem}
+                  onPress={() => loadSavedWave(savedWave)}
+                  onLongPress={() => {
+                    Alert.alert(
+                      'Delete Wave',
+                      `Delete "${savedWave.name}"?`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteSavedWave(savedWave.id) }
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="musical-note" size={24} color="#ff8800" />
+                  <Text style={styles.savedWaveName}>{savedWave.name}</Text>
+                  <Text style={styles.savedWaveFreqs}>
+                    {savedWave.frequencies.length} wave{savedWave.frequencies.length !== 1 ? 's' : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flex: 1,
+  },
   container: {
     marginTop: 8,
   },
@@ -439,6 +543,31 @@ const styles = StyleSheet.create({
   playButtonActive: {
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  bookmarkSection: {
+    marginBottom: 16,
+  },
+  bookmarkInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  nameInput: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
+    color: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 136, 0, 0.3)',
+    fontSize: 14,
+  },
+  bookmarkButton: {
+    backgroundColor: 'rgba(255, 136, 0, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 136, 0, 0.3)',
   },
   frequenciesSection: {
     marginTop: 8,
@@ -493,5 +622,43 @@ const styles = StyleSheet.create({
     padding: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  savedWavesContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 8,
+  },
+  savedWavesTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  savedWavesScroll: {
+    flexDirection: 'row',
+  },
+  savedWaveItem: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 136, 0, 0.3)',
+    minWidth: 80,
+  },
+  savedWaveName: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  savedWaveFreqs: {
+    color: '#888888',
+    fontSize: 10,
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
