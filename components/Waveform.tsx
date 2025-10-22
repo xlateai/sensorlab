@@ -1,3 +1,4 @@
+import { useRecordingsActions } from '@/components/RecordingsData';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,6 +87,10 @@ export default function Waveform({
   
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioBufferRef = useRef<number[]>([]);
+  const currentRecordingSessionId = useRef<string | null>(null);
+  
+  // Get recordings actions
+  const recordingsActions = useRecordingsActions();
 
   // Request permissions
   useEffect(() => {
@@ -241,6 +246,12 @@ export default function Waveform({
 
   const updateAudioSamples = (samples: number[]) => {
     audioSamples.value = samples;
+    
+    // If we're actively recording, update the current session in global state
+    if (isActivelyRecording && currentRecordingSessionId.current) {
+      recordingsActions.updateCurrentSessionSamples(samples);
+    }
+    
     // Always send the current audio buffer to RecordingsViewer - let it decide what to do
     if (samples.length > 0) {
       onRecordingSamplesChange?.(samples);
@@ -336,25 +347,33 @@ export default function Waveform({
   
   const handleRecordPressIn = () => {
     recordPressStartTime.current = Date.now();
-    // Immediately start recording and scale up big (30% bigger)
     recordButtonScale.value = withTiming(1.3, { duration: 150 });
-    startHoldRecording();
+    
+    // Start hold recording immediately
+    if (!isActivelyRecording) {
+      startHoldRecording();
+    }
   };
 
   const handleRecordPressOut = () => {
     const pressDuration = recordPressStartTime.current ? Date.now() - recordPressStartTime.current : 0;
     
     if (pressDuration < 250) {
-      // Quick tap - toggle recording mode, return to normal scale
+      // Quick tap - stop current recording and toggle to persistent mode
       recordButtonScale.value = withTiming(1, { duration: 100 });
-      // Stop the hold recording that started on press in
-      stopHoldRecording();
-      // Then toggle recording mode for persistent recording
-      toggleRecordingMode();
+      if (isActivelyRecording && !isRecordingMode) {
+        // Convert hold recording to persistent recording
+        setIsRecordingMode(true);
+      } else if (isRecordingMode) {
+        // Stop persistent recording
+        finishRecording();
+      }
     } else {
-      // Long press - stop hold-to-record and return to normal scale
+      // Long press - stop hold recording
       recordButtonScale.value = withTiming(1, { duration: 150 });
-      stopHoldRecording();
+      if (isActivelyRecording && !isRecordingMode) {
+        finishRecording();
+      }
     }
   };
 
@@ -363,22 +382,17 @@ export default function Waveform({
     // But keep it for compatibility
   };
 
-  const toggleRecordingMode = () => {
-    if (!isRecordingMode) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setIsRecordingMode(true);
-      setRecordingStartTime(Date.now());
-      setIsActivelyRecording(true);
-    } else {
-      finishRecording();
-    }
-  };
+  // Remove this function since we're handling recording logic in press handlers
 
   const startHoldRecording = () => {
     if (!isActivelyRecording) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setRecordingStartTime(Date.now());
       setIsActivelyRecording(true);
+      // Start a new recording session ONLY if we don't already have one
+      if (!currentRecordingSessionId.current) {
+        currentRecordingSessionId.current = recordingsActions.startNewRecordingSession();
+      }
       // Button stays enlarged while holding to record
     }
   };
@@ -398,6 +412,43 @@ export default function Waveform({
       
       // Strong haptic feedback when recording ends
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      
+      // Stop & unload the expo recording (if present) and capture URI
+      (async () => {
+        let uri: string | undefined = undefined;
+        try {
+          if (recording) {
+            await recording.stopAndUnloadAsync();
+            // @ts-ignore - some SDKs place uri on recording.getURI()
+            // prefer getURI if available
+            // recording.getURI() may be async in some versions; use property when present
+            // Fallback to recording.getURI?.() if available
+            // Try both options safely
+            // @ts-ignore
+            if (typeof recording.getURI === 'function') {
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+              // @ts-ignore
+              const maybeUri = recording.getURI();
+              if (typeof maybeUri === 'string') uri = maybeUri;
+              else if (maybeUri && typeof (maybeUri as any).then === 'function') {
+                // promise
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                uri = await (maybeUri as Promise<string>);
+              }
+            } else if ((recording as any).getURI) {
+              // @ts-ignore
+              uri = (recording as any).getURI();
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to stop recording cleanly:', err);
+        }
+
+        // End the recording session in our global state with URI
+        recordingsActions.endCurrentRecordingSession(uri);
+        currentRecordingSessionId.current = null;
+      })();
       
       // Recording completed successfully
       setIsRecordingMode(false);

@@ -1,10 +1,13 @@
+import { useRecordingsActions, useRecordingsState } from '@/components/RecordingsData';
+import { Audio } from 'expo-av';
 import React from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import Animated, {
     useAnimatedProps,
     useSharedValue,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -32,32 +35,86 @@ export default function RecordingsViewer({
   recordingSamples = [],
 }: RecordingsViewerProps) {
   
+  // Get recordings state and actions
+  const recordingsState = useRecordingsState();
+  const recordingsActions = useRecordingsActions();
+  
   // Simplified zoom values - fixed for consistent display
   const xZoom = useSharedValue(0.3); // Amplitude zoom
   const yZoom = useSharedValue(0.5); // Speed zoom
   
-  // Recording buffer - accumulates samples only when recording
+  // Use the global recordings state instead of local state
   const recordingBuffer = useSharedValue<number[]>([]);
-  const [recordingStarted, setRecordingStarted] = React.useState(false);
   
-  // Update recording buffer when samples change
+  // Update recording buffer from global state
   React.useEffect(() => {
-    // When recording starts, clear the buffer and start fresh
-    if (isRecording && !recordingStarted) {
-      recordingBuffer.value = [];
-      setRecordingStarted(true);
+    // Get the current recording with dividers between sessions
+    const samplesWithDividers = recordingsActions.getCurrentRecordingWithDividers();
+    recordingBuffer.value = samplesWithDividers;
+  }, [recordingsState.currentRecording, recordingsActions]);
+
+  // Completed recordings list for simple playback reference
+  const [completed, setCompleted] = React.useState(recordingsActions.getAllRecordings());
+  React.useEffect(() => {
+    setCompleted(recordingsActions.getAllRecordings());
+  }, [recordingsState.allRecordings, recordingsActions]);
+
+  // Playback state
+  const [playingIndex, setPlayingIndex] = React.useState<number | null>(null);
+  const soundRef = React.useRef<Audio.Sound | null>(null);
+
+  const playRecording = async (idx: number) => {
+    const rec = recordingsActions.getAllRecordings()[idx];
+    if (!rec) return;
+
+    // If already playing this index, stop
+    if (playingIndex === idx) {
+      try {
+        await soundRef.current?.stopAsync();
+        await soundRef.current?.unloadAsync();
+      } catch (e) {
+        // ignore
+      }
+      soundRef.current = null;
+      setPlayingIndex(null);
+      return;
     }
-    
-    // When recording stops, keep the buffer and stop accumulating
-    if (!isRecording && recordingStarted) {
-      setRecordingStarted(false);
+
+    // Stop previous sound
+    if (soundRef.current) {
+      try {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+      } catch (e) {}
+      soundRef.current = null;
+      setPlayingIndex(null);
     }
-    
-    // While recording and not muted, copy all current samples from the main waveform
-    if (isRecording && !isMuted && recordingSamples.length > 0) {
-      recordingBuffer.value = [...recordingSamples];
+
+    if (!rec.uri) {
+      // No file URI available
+      console.warn('No URI for recording', rec.id);
+      return;
     }
-  }, [isRecording, isMuted, recordingSamples, recordingStarted]);
+
+    try {
+      const { sound } = await Audio.Sound.createAsync({ uri: rec.uri });
+      soundRef.current = sound;
+      setPlayingIndex(idx);
+      await sound.playAsync();
+      // When finished, reset index
+      sound.setOnPlaybackStatusUpdate((status) => {
+        // Only act when loaded and finished
+        // @ts-ignore - status typing varies between SDKs
+        if (status && status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          soundRef.current = null;
+          setPlayingIndex(null);
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to play recording', err);
+    }
+  };
 
 
 
@@ -153,17 +210,30 @@ export default function RecordingsViewer({
             />
           </Svg>
           
-          {/* Recording indicator */}
-          {isRecording && (
-            <View style={styles.recordingIndicator}>
-              <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>RECORDING</Text>
-            </View>
-          )}
+
           
 
           
 
+        </View>
+        {/* Completed recordings as play buttons */}
+        <View style={styles.recordingsList}>
+          {completed.map((recording, i) => (
+            <TouchableOpacity
+              key={recording.id}
+              style={styles.recordingButton}
+              onPress={() => playRecording(i)}
+            >
+              <Ionicons 
+                name={playingIndex === i ? "stop" : "play"} 
+                size={16} 
+                color="#00ff00" 
+              />
+              <Text style={styles.recordingText}>
+                {Math.round((recording.duration || 0) / 1000 * 100) / 100}s
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
     );
@@ -188,29 +258,26 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  recordingIndicator: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
+  recordingsList: {
+    padding: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  recordingButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 0, 0, 0.8)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 4,
-    marginRight: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
   },
   recordingText: {
-    color: '#ffffff',
+    color: '#00ff00',
     fontSize: 12,
-    fontWeight: 'bold',
+    marginLeft: 6,
     fontFamily: 'monospace',
   },
-
 });
