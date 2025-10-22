@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     useAnimatedProps,
     useSharedValue,
-    withTiming,
+    withTiming
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
-import Slider from '@react-native-community/slider';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -28,6 +28,7 @@ export default function WaveEditor({
   const [frequency, setFrequency] = useState(440); // A4 note
   const [noiseLevel, setNoiseLevel] = useState(0); // 0-1
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   
   // Audio context and oscillator refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -38,6 +39,8 @@ export default function WaveEditor({
   
   // Animation values
   const animationProgress = useSharedValue(0);
+  const wavePhase = useSharedValue(0);
+  const animationRef = useRef<number | null>(null);
   
   // Initialize audio context
   useEffect(() => {
@@ -58,6 +61,9 @@ export default function WaveEditor({
     
     return () => {
       stopWave();
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+      }
     };
   }, []);
   
@@ -122,7 +128,21 @@ export default function WaveEditor({
       }
       
       setIsPlaying(true);
-      animationProgress.value = withTiming(1, { duration: 1000 });
+      isPlayingRef.current = true;
+      animationProgress.value = withTiming(1, { duration: 300 });
+      
+      // Start smooth modular wave animation
+      const startTime = Date.now();
+      const animateWave = () => {
+        if (!isPlayingRef.current) return;
+        
+        const elapsed = Date.now() - startTime;
+        // Create smooth, continuous phase using modulo to wrap around seamlessly
+        wavePhase.value = (elapsed * 0.003) % (Math.PI * 2);
+        
+        animationRef.current = setTimeout(animateWave, 16); // ~60fps
+      };
+      animateWave();
       
     } catch (error) {
       console.error('Error starting wave:', error);
@@ -150,7 +170,15 @@ export default function WaveEditor({
       noiseGainRef.current = null;
       
       setIsPlaying(false);
+      isPlayingRef.current = false;
       animationProgress.value = withTiming(0, { duration: 300 });
+      
+      // Stop wave animation
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+        animationRef.current = null;
+      }
+      wavePhase.value = 0;
     } catch (error) {
       console.warn('Error stopping wave:', error);
     }
@@ -188,7 +216,7 @@ export default function WaveEditor({
   const animatedProps = useAnimatedProps(() => {
     const points = 200;
     const amplitude = 40 + (animationProgress.value * 20);
-    const phaseOffset = animationProgress.value * Math.PI * 2;
+    const phaseOffset = wavePhase.value; // Use continuous phase animation
     
     let pathData = '';
     const centerY = height / 2;
@@ -198,8 +226,9 @@ export default function WaveEditor({
       const normalizedFreq = frequency / 1000; // Normalize frequency for visual
       const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
       
-      // Add noise visualization
-      const noise = noiseLevel > 0 ? (Math.random() - 0.5) * noiseLevel * 20 : 0;
+      // Add noise visualization (only when playing)
+      const noise = (noiseLevel > 0 && animationProgress.value > 0) ? 
+        (Math.random() - 0.5) * noiseLevel * 20 * animationProgress.value : 0;
       const y = centerY + (sineValue * amplitude) + noise;
       
       if (i === 0) {

@@ -1,6 +1,6 @@
 import { useRecordingsState } from '@/components/RecordingsData';
-import Waveform from '@/components/Waveform';
 import WaveEditor from '@/components/WaveEditor';
+import Waveform from '@/components/Waveform';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
