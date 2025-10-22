@@ -25,17 +25,14 @@ export default function WaveEditor({
 }: WaveEditorProps) {
   
   // Wave parameters
-  const [frequency, setFrequency] = useState(440); // A4 note
-  const [noiseLevel, setNoiseLevel] = useState(0); // 0-1
+  const [frequencies, setFrequencies] = useState([440]); // Array of frequencies
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
   
   // Audio context and oscillator refs
   const audioContextRef = useRef<AudioContext | null>(null);
-  const oscillatorRef = useRef<OscillatorNode | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
-  const noiseGainRef = useRef<GainNode | null>(null);
+  const oscillatorsRef = useRef<OscillatorNode[]>([]);
+  const gainNodesRef = useRef<GainNode[]>([]);
   
   // Animation values
   const animationProgress = useSharedValue(0);
@@ -67,65 +64,39 @@ export default function WaveEditor({
     };
   }, []);
   
-  // Generate noise buffer
-  const generateNoiseBuffer = (audioContext: AudioContext) => {
-    const bufferSize = audioContext.sampleRate * 2; // 2 seconds of noise
-    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-    const output = buffer.getChannelData(0);
-    
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
-    
-    return buffer;
-  };
-  
   const startWave = async () => {
     try {
       // Create audio context
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
-      // Create oscillator for sine wave
-      const oscillator = audioContext.createOscillator();
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+      // Clear previous oscillators
+      oscillatorsRef.current = [];
+      gainNodesRef.current = [];
       
-      // Create gain node for volume control
-      const gainNode = audioContext.createGain();
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      
-      // Create noise source if noise level > 0
-      let noiseSource: AudioBufferSourceNode | null = null;
-      let noiseGain: GainNode | null = null;
-      
-      if (noiseLevel > 0) {
-        noiseSource = audioContext.createBufferSource();
-        noiseSource.buffer = generateNoiseBuffer(audioContext);
-        noiseSource.loop = true;
+      // Create oscillators for each frequency
+      frequencies.forEach((freq) => {
+        // Create oscillator for sine wave
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
         
-        noiseGain = audioContext.createGain();
-        noiseGain.gain.setValueAtTime(noiseLevel * 0.1, audioContext.currentTime);
+        // Create gain node for volume control (split volume between oscillators)
+        const gainNode = audioContext.createGain();
+        const volumePerOscillator = 0.3 / frequencies.length; // Split volume evenly
+        gainNode.gain.setValueAtTime(volumePerOscillator, audioContext.currentTime);
         
-        noiseSource.connect(noiseGain);
-        noiseGain.connect(audioContext.destination);
-      }
-      
-      // Connect oscillator
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      // Store references
-      oscillatorRef.current = oscillator;
-      gainNodeRef.current = gainNode;
-      noiseNodeRef.current = noiseSource;
-      noiseGainRef.current = noiseGain;
-      
-      // Start playing
-      oscillator.start();
-      if (noiseSource) {
-        noiseSource.start();
-      }
+        // Connect oscillator
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Store references
+        oscillatorsRef.current.push(oscillator);
+        gainNodesRef.current.push(gainNode);
+        
+        // Start playing
+        oscillator.start();
+      });
       
       setIsPlaying(true);
       isPlayingRef.current = true;
@@ -151,23 +122,21 @@ export default function WaveEditor({
   
   const stopWave = () => {
     try {
-      if (oscillatorRef.current) {
-        oscillatorRef.current.stop();
-        oscillatorRef.current = null;
-      }
-      
-      if (noiseNodeRef.current) {
-        noiseNodeRef.current.stop();
-        noiseNodeRef.current = null;
-      }
+      // Stop all oscillators
+      oscillatorsRef.current.forEach(oscillator => {
+        if (oscillator) {
+          oscillator.stop();
+        }
+      });
       
       if (audioContextRef.current) {
         audioContextRef.current.close();
         audioContextRef.current = null;
       }
       
-      gainNodeRef.current = null;
-      noiseGainRef.current = null;
+      // Clear arrays
+      oscillatorsRef.current = [];
+      gainNodesRef.current = [];
       
       setIsPlaying(false);
       isPlayingRef.current = false;
@@ -192,27 +161,42 @@ export default function WaveEditor({
     }
   };
   
-  // Update frequency during playback
+  // Update frequencies during playback
   useEffect(() => {
-    if (oscillatorRef.current && audioContextRef.current) {
-      oscillatorRef.current.frequency.setValueAtTime(
-        frequency, 
-        audioContextRef.current.currentTime
-      );
+    if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
+      // Stop current audio and restart with new frequencies
+      if (isPlaying) {
+        stopWave();
+        // Small delay before restarting
+        setTimeout(() => {
+          startWave();
+        }, 100);
+      }
     }
-  }, [frequency]);
+  }, [frequencies]);
   
-  // Update noise level during playback
-  useEffect(() => {
-    if (noiseGainRef.current && audioContextRef.current) {
-      noiseGainRef.current.gain.setValueAtTime(
-        noiseLevel * 0.1, 
-        audioContextRef.current.currentTime
-      );
+  // Helper functions for managing frequencies
+  const addFrequency = () => {
+    if (frequencies.length < 8) { // Limit to 8 frequencies
+      const newFreq = frequencies[0] * 2; // Default to octave above first frequency
+      setFrequencies([...frequencies, newFreq]);
     }
-  }, [noiseLevel]);
+  };
   
-  // Generate sine wave visualization
+  const removeFrequency = (index: number) => {
+    if (frequencies.length > 1) { // Keep at least one frequency
+      const newFrequencies = frequencies.filter((_, i) => i !== index);
+      setFrequencies(newFrequencies);
+    }
+  };
+  
+  const updateFrequency = (index: number, newFreq: number) => {
+    const newFrequencies = [...frequencies];
+    newFrequencies[index] = newFreq;
+    setFrequencies(newFrequencies);
+  };
+  
+  // Generate multi-frequency sine wave visualization
   const animatedProps = useAnimatedProps(() => {
     const points = 200;
     const amplitude = 40 + (animationProgress.value * 20);
@@ -223,13 +207,16 @@ export default function WaveEditor({
     
     for (let i = 0; i <= points; i++) {
       const x = (i / points) * width;
-      const normalizedFreq = frequency / 1000; // Normalize frequency for visual
-      const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
       
-      // Add noise visualization (only when playing)
-      const noise = (noiseLevel > 0 && animationProgress.value > 0) ? 
-        (Math.random() - 0.5) * noiseLevel * 20 * animationProgress.value : 0;
-      const y = centerY + (sineValue * amplitude) + noise;
+      // Sum all frequencies for complex waveform
+      let combinedValue = 0;
+      frequencies.forEach((freq) => {
+        const normalizedFreq = freq / 1000; // Normalize frequency for visual
+        const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+        combinedValue += sineValue / frequencies.length; // Average the amplitudes
+      });
+      
+      const y = centerY + (combinedValue * amplitude);
       
       if (i === 0) {
         pathData = `M ${x} ${y}`;
@@ -259,11 +246,14 @@ export default function WaveEditor({
         {/* Wave info overlay */}
         <View style={styles.infoOverlay}>
           <Text style={styles.infoText}>
-            {frequency}Hz Sine Wave
+            {frequencies.length === 1 
+              ? `${Math.round(frequencies[0])}Hz Sine Wave`
+              : `${frequencies.length} Frequency Mix`
+            }
           </Text>
-          {noiseLevel > 0 && (
-            <Text style={styles.noiseText}>
-              +{Math.round(noiseLevel * 100)}% Noise
+          {frequencies.length > 1 && (
+            <Text style={styles.frequencyList}>
+              {frequencies.map(f => Math.round(f)).join('Hz, ')}Hz
             </Text>
           )}
         </View>
@@ -283,36 +273,47 @@ export default function WaveEditor({
           />
         </TouchableOpacity>
         
-        {/* Frequency Slider */}
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>Frequency</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={10}
-            maximumValue={2000}
-            value={frequency}
-            onValueChange={setFrequency}
-            minimumTrackTintColor="#00ff00"
-            maximumTrackTintColor="#333333"
-            thumbTintColor="#00ff00"
-          />
-          <Text style={styles.sliderValue}>{Math.round(frequency)}Hz</Text>
-        </View>
-        
-        {/* Noise Slider */}
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>Noise</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={1}
-            value={noiseLevel}
-            onValueChange={setNoiseLevel}
-            minimumTrackTintColor="#ff8800"
-            maximumTrackTintColor="#333333"
-            thumbTintColor="#ff8800"
-          />
-          <Text style={styles.sliderValue}>{Math.round(noiseLevel * 100)}%</Text>
+        {/* Frequency Controls */}
+        <View style={styles.frequenciesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Frequencies</Text>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={addFrequency}
+              disabled={frequencies.length >= 8}
+            >
+              <Ionicons name="add" size={20} color="#00ff00" />
+            </TouchableOpacity>
+          </View>
+          
+          {frequencies.map((freq, index) => (
+            <View key={index} style={styles.frequencyRow}>
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderLabel}>
+                  Wave {index + 1}
+                </Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={10}
+                  maximumValue={2000}
+                  value={freq}
+                  onValueChange={(value) => updateFrequency(index, value)}
+                  minimumTrackTintColor="#00ff00"
+                  maximumTrackTintColor="#333333"
+                  thumbTintColor="#00ff00"
+                />
+                <Text style={styles.sliderValue}>{Math.round(freq)}Hz</Text>
+              </View>
+              {frequencies.length > 1 && (
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeFrequency(index)}
+                >
+                  <Ionicons name="remove" size={16} color="#ff0000" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
         </View>
       </View>
     </View>
@@ -344,10 +345,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
   },
-  noiseText: {
-    color: '#ff8800',
+  frequencyList: {
+    color: '#888888',
     fontSize: 10,
     fontFamily: 'monospace',
+    marginTop: 2,
   },
   controlsContainer: {
     padding: 16,
@@ -368,8 +370,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderColor: 'rgba(255, 0, 0, 0.3)',
   },
+  frequenciesSection: {
+    marginTop: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  addButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  frequencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   sliderContainer: {
-    marginBottom: 16,
+    flex: 1,
+    marginRight: 8,
   },
   sliderLabel: {
     color: '#ffffff',
@@ -381,12 +410,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 20,
   },
-
   sliderValue: {
     color: '#888888',
     fontSize: 12,
     textAlign: 'right',
     marginTop: 4,
     fontFamily: 'monospace',
+  },
+  removeButton: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderRadius: 16,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 0, 0.3)',
   },
 });
