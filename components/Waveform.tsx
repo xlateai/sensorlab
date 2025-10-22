@@ -122,8 +122,24 @@ export default function Waveform({
     }
     
     return () => {
-      // Proper cleanup for hot reload
-      stopAudioMonitoring();
+      // Proper cleanup for hot reload and unmounting
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      // Clean up recording asynchronously to avoid blocking
+      if (recording) {
+        recording.stopAndUnloadAsync().catch(err => 
+          console.warn('Cleanup recording failed:', err)
+        );
+      }
+      
+      // Clear any active recording session
+      if (currentRecordingSessionId.current) {
+        recordingsActions.endCurrentRecordingSession();
+        currentRecordingSessionId.current = null;
+      }
     };
   }, [isActive, hasPermission]);
 
@@ -229,19 +245,29 @@ export default function Waveform({
   };
 
   const stopAudioMonitoring = async () => {
+    // Clear interval first
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    
+    // Update UI state immediately
+    setIsRecording(false);
+    
+    // Handle recording cleanup asynchronously
     if (recording) {
       try {
-        await recording.stopAndUnloadAsync();
+        const status = await recording.getStatusAsync();
+        if (status.isRecording) {
+          await recording.stopAndUnloadAsync();
+        }
+        // Note: Recording objects don't have unloadAsync separately - stopAndUnloadAsync handles both
       } catch (err) {
-        console.log('Stop failed:', err);
+        console.log('Stop monitoring failed:', err);
+      } finally {
+        setRecording(null);
       }
-      setRecording(null);
     }
-    setIsRecording(false);
   };
 
   const updateAudioSamples = (samples: number[]) => {
@@ -413,32 +439,39 @@ export default function Waveform({
       // Strong haptic feedback when recording ends
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       
-      // Stop & unload the expo recording (if present) and capture URI
-      (async () => {
+      // Update UI state immediately to prevent freezing
+      setIsRecordingMode(false);
+      setIsActivelyRecording(false);
+      setRecordingStartTime(null);
+      
+      // Handle async cleanup in background without blocking UI
+      const handleAsyncCleanup = async () => {
         let uri: string | undefined = undefined;
         try {
           if (recording) {
-            await recording.stopAndUnloadAsync();
-            // @ts-ignore - some SDKs place uri on recording.getURI()
-            // prefer getURI if available
-            // recording.getURI() may be async in some versions; use property when present
-            // Fallback to recording.getURI?.() if available
-            // Try both options safely
-            // @ts-ignore
-            if (typeof recording.getURI === 'function') {
-              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-              // @ts-ignore
-              const maybeUri = recording.getURI();
-              if (typeof maybeUri === 'string') uri = maybeUri;
-              else if (maybeUri && typeof (maybeUri as any).then === 'function') {
-                // promise
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            const status = await recording.getStatusAsync();
+            if (status.isRecording) {
+              await recording.stopAndUnloadAsync();
+            }
+            
+            // Get URI from recording
+            try {
+              // @ts-ignore - different SDK versions have different URI access patterns
+              if (typeof (recording as any).getURI === 'function') {
                 // @ts-ignore
-                uri = await (maybeUri as Promise<string>);
+                const maybeUri = (recording as any).getURI();
+                if (typeof maybeUri === 'string') {
+                  uri = maybeUri;
+                } else if (maybeUri && typeof (maybeUri as any).then === 'function') {
+                  // @ts-ignore
+                  uri = await (maybeUri as any);
+                }
+              } else if ((recording as any).getURI) {
+                // @ts-ignore
+                uri = (recording as any).getURI();
               }
-            } else if ((recording as any).getURI) {
-              // @ts-ignore
-              uri = (recording as any).getURI();
+            } catch (uriErr) {
+              console.warn('Failed to get recording URI:', uriErr);
             }
           }
         } catch (err) {
@@ -448,12 +481,12 @@ export default function Waveform({
         // End the recording session in our global state with URI
         recordingsActions.endCurrentRecordingSession(uri);
         currentRecordingSessionId.current = null;
-      })();
+      };
       
-      // Recording completed successfully
-      setIsRecordingMode(false);
-      setIsActivelyRecording(false);
-      setRecordingStartTime(null);
+      // Run cleanup in background
+      handleAsyncCleanup().catch(err => 
+        console.warn('Background cleanup failed:', err)
+      );
       
       // Don't reset the waveform - keep it showing the recorded audio
       // audioBufferRef.current = [];

@@ -1,13 +1,13 @@
 import { useRecordingsActions, useRecordingsState } from '@/components/RecordingsData';
+import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import React from 'react';
-import { Dimensions, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     useAnimatedProps,
     useSharedValue,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -63,17 +63,31 @@ export default function RecordingsViewer({
   const [playingIndex, setPlayingIndex] = React.useState<number | null>(null);
   const soundRef = React.useRef<Audio.Sound | null>(null);
 
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(console.warn);
+      }
+    };
+  }, []);
+
   const playRecording = async (idx: number) => {
     const rec = recordingsActions.getAllRecordings()[idx];
-    if (!rec) return;
+    if (!rec) {
+      console.warn('Recording not found at index', idx);
+      return;
+    }
 
     // If already playing this index, stop
     if (playingIndex === idx) {
       try {
-        await soundRef.current?.stopAsync();
-        await soundRef.current?.unloadAsync();
+        if (soundRef.current) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+        }
       } catch (e) {
-        // ignore
+        console.warn('Error stopping playback:', e);
       }
       soundRef.current = null;
       setPlayingIndex(null);
@@ -85,34 +99,73 @@ export default function RecordingsViewer({
       try {
         await soundRef.current.stopAsync();
         await soundRef.current.unloadAsync();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Error cleaning up previous sound:', e);
+      }
       soundRef.current = null;
-      setPlayingIndex(null);
     }
 
     if (!rec.uri) {
-      // No file URI available
-      console.warn('No URI for recording', rec.id);
+      console.warn('No URI available for recording', rec.id);
       return;
     }
 
     try {
-      const { sound } = await Audio.Sound.createAsync({ uri: rec.uri });
+      // Set audio mode for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+
+      console.log('Attempting to play recording with URI:', rec.uri);
+      
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: rec.uri },
+        { shouldPlay: false } // Don't auto-play, we'll control it
+      );
+      
       soundRef.current = sound;
       setPlayingIndex(idx);
-      await sound.playAsync();
-      // When finished, reset index
+
+      // Set up playback status listener before playing
       sound.setOnPlaybackStatusUpdate((status) => {
-        // Only act when loaded and finished
-        // @ts-ignore - status typing varies between SDKs
-        if (status && status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
-          soundRef.current = null;
-          setPlayingIndex(null);
+        if (status.isLoaded) {
+          // @ts-ignore - status properties may vary
+          if (status.didJustFinish) {
+            console.log('Playback finished');
+            sound.unloadAsync().catch(console.warn);
+            soundRef.current = null;
+            setPlayingIndex(null);
+          }
+          // @ts-ignore - status properties may vary
+          if (status.error) {
+            // @ts-ignore
+            console.warn('Playback error:', status.error);
+            sound.unloadAsync().catch(console.warn);
+            soundRef.current = null;
+            setPlayingIndex(null);
+          }
         }
       });
+
+      // Start playback
+      await sound.playAsync();
+      console.log('Playback started successfully');
+      
     } catch (err) {
-      console.warn('Failed to play recording', err);
+      console.warn('Failed to play recording:', err);
+      // Reset state on error
+      if (soundRef.current) {
+        try {
+          await soundRef.current.unloadAsync();
+        } catch (cleanupErr) {
+          console.warn('Error during cleanup:', cleanupErr);
+        }
+      }
+      soundRef.current = null;
+      setPlayingIndex(null);
     }
   };
 
