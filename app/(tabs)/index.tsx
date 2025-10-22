@@ -1,6 +1,6 @@
 import { useRecordingsState } from '@/components/RecordingsData';
-import RecordingsViewer from '@/components/RecordingsViewer';
 import Waveform from '@/components/Waveform';
+import WaveEditor from '@/components/WaveEditor';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -19,13 +19,7 @@ export default function HomeScreen() {
         onMutedStateChange={setIsMuted}
         onRecordingSamplesChange={setRecordingSamples}
       />
-      {/* Hidden for now - secondary waveform visualizer
-      <RecordingsViewer 
-        isRecording={recordingsState.currentRecording.isRecording}
-        isMuted={isMuted}
-        recordingSamples={recordingSamples}
-      />
-      */}
+      <WaveEditor />
     </View>
   );
 }
