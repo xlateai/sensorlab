@@ -24,6 +24,9 @@ interface WaveformProps {
   isActive?: boolean;
   scale?: number;
   orientation?: 'horizontal' | 'vertical';
+  onRecordingStateChange?: (isRecording: boolean) => void;
+  onMutedStateChange?: (isMuted: boolean) => void;
+  onRecordingSamplesChange?: (samples: number[]) => void;
 }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -36,6 +39,9 @@ export default function Waveform({
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
   orientation: initialOrientation = 'horizontal', // horizontal mode by default
+  onRecordingStateChange,
+  onMutedStateChange,
+  onRecordingSamplesChange,
 }: WaveformProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -88,6 +94,18 @@ export default function Waveform({
       setHasPermission(status === 'granted');
     })();
   }, []);
+
+  // Notify parent of recording state changes
+  useEffect(() => {
+    onRecordingStateChange?.(isActivelyRecording);
+  }, [isActivelyRecording, onRecordingStateChange]);
+
+  // Notify parent of muted state changes
+  useEffect(() => {
+    onMutedStateChange?.(isMuted);
+  }, [isMuted, onMutedStateChange]);
+
+
 
   // Start/stop monitoring
   useEffect(() => {
@@ -222,6 +240,10 @@ export default function Waveform({
 
   const updateAudioSamples = (samples: number[]) => {
     audioSamples.value = samples;
+    // Notify parent of recording samples when actively recording and not muted
+    if (isActivelyRecording && !isMuted && samples.length > 0) {
+      onRecordingSamplesChange?.(samples);
+    }
   };
 
   const toggleMute = () => {
