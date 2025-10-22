@@ -652,23 +652,20 @@ export default function Waveform({
             </TouchableOpacity>
           )}
 
-          {/* Minimize Button - Top Center */}
-          <TouchableOpacity 
-            style={[
-              styles.minimizeButton,
-              isFullscreen && {
-                top: Math.max(16, insets.top + 16),
-              }
-            ]}
-            onPress={toggleMinimize}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name={isMinimized ? "chevron-down" : "remove"} 
-              size={18} 
-              color="#00ff00" 
-            />
-          </TouchableOpacity>
+          {/* Minimize Button - Top Center (hidden when maximized) */}
+          {!isFullscreen && (
+            <TouchableOpacity 
+              style={styles.minimizeButton}
+              onPress={toggleMinimize}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={isMinimized ? "chevron-down" : "remove"} 
+                size={18} 
+                color="#00ff00" 
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Recording Dot - To the right of minimize button */}
           {isActivelyRecording && (
