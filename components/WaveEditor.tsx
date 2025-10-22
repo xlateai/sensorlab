@@ -2,11 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
-    useAnimatedProps,
-    useSharedValue,
-    withTiming
+  useAnimatedProps,
+  useSharedValue,
+  withTiming
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
@@ -332,168 +332,163 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
   });
 
   return (
-    <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      <View style={[styles.container, { width, height: height + 160 }]}>
-        {/* Waveform Display */}
-        <View style={[styles.waveformContainer, { width, height }]}>
-          <Svg width={width} height={height}>
-            {/* Individual sine waves in light gray */}
-            {frequencies.map((freq, index) => (
-              <IndividualWave
-                key={`wave-${index}-${freq}`}
-                freq={freq}
-                index={index}
-                width={width}
-                height={height}
-                animationProgress={animationProgress}
-                wavePhase={wavePhase}
-              />
-            ))}
-            
-            {/* Composite waveform in green */}
-            <AnimatedPath
-              animatedProps={animatedProps}
-              stroke={isPlaying ? "#00ff00" : "#888888"}
-              strokeWidth={2}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+    <View style={[styles.container, { width, height: height + 160 }]}>
+      {/* Waveform Display */}
+      <View style={[styles.waveformContainer, { width, height }]}>
+        <Svg width={width} height={height}>
+          {/* Individual sine waves in light gray */}
+          {frequencies.map((freq, index) => (
+            <IndividualWave
+              key={`wave-${index}-${freq}`}
+              freq={freq}
+              index={index}
+              width={width}
+              height={height}
+              animationProgress={animationProgress}
+              wavePhase={wavePhase}
             />
-          </Svg>
+          ))}
           
-          {/* Wave info overlay */}
-          <View style={styles.infoOverlay}>
-            <Text style={styles.infoText}>
-              {frequencies.length === 1 
-                ? `${Math.round(frequencies[0])}Hz Sine Wave`
-                : `${frequencies.length} Frequency Mix`
-              }
-            </Text>
-            {frequencies.length > 1 && (
-              <Text style={styles.frequencyList}>
-                {frequencies.map(f => Math.round(f)).join('Hz, ')}Hz
-              </Text>
-            )}
-          </View>
-        </View>
+          {/* Composite waveform in green */}
+          <AnimatedPath
+            animatedProps={animatedProps}
+            stroke={isPlaying ? "#00ff00" : "#888888"}
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
         
-        {/* Controls */}
-        <View style={styles.controlsContainer}>
-          {/* Play/Stop Button */}
-          <TouchableOpacity
-            style={[styles.playButton, isPlaying && styles.playButtonActive]}
-            onPress={togglePlayback}
-          >
-            <Ionicons 
-              name={isPlaying ? "stop" : "play"} 
-              size={24} 
-              color={isPlaying ? "#ff0000" : "#00ff00"} 
-            />
-          </TouchableOpacity>
+        {/* Wave info overlay */}
+        <View style={styles.infoOverlay}>
+          <Text style={styles.infoText}>
+            {frequencies.length === 1 
+              ? `${Math.round(frequencies[0])}Hz Sine Wave`
+              : `${frequencies.length} Frequency Mix`
+            }
+          </Text>
+          {frequencies.length > 1 && (
+            <Text style={styles.frequencyList}>
+              {frequencies.map(f => Math.round(f)).join('Hz, ')}Hz
+            </Text>
+          )}
+        </View>
+      </View>
+      
+      {/* Controls */}
+      <View style={styles.controlsContainer}>
+        {/* Play/Stop Button */}
+        <TouchableOpacity
+          style={[styles.playButton, isPlaying && styles.playButtonActive]}
+          onPress={togglePlayback}
+        >
+          <Ionicons 
+            name={isPlaying ? "stop" : "play"} 
+            size={24} 
+            color={isPlaying ? "#ff0000" : "#00ff00"} 
+          />
+        </TouchableOpacity>
+        
+        {/* Frequency Controls */}
+        <View style={styles.frequenciesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Frequencies</Text>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={addFrequency}
+              disabled={frequencies.length >= 8}
+            >
+              <Ionicons name="add" size={20} color="#00ff00" />
+            </TouchableOpacity>
+          </View>
           
-          {/* Frequency Controls */}
-          <View style={styles.frequenciesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Frequencies</Text>
-              <TouchableOpacity 
-                style={styles.addButton}
-                onPress={addFrequency}
-                disabled={frequencies.length >= 8}
+          {frequencies.map((freq, index) => (
+            <View key={index} style={styles.frequencyRow}>
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderLabel}>
+                  Wave {index + 1}
+                </Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={10}
+                  maximumValue={2000}
+                  value={freq}
+                  onValueChange={(value) => updateFrequency(index, value)}
+                  minimumTrackTintColor="#00ff00"
+                  maximumTrackTintColor="#333333"
+                  thumbTintColor="#00ff00"
+                />
+                <Text style={styles.sliderValue}>{Math.round(freq)}Hz</Text>
+              </View>
+              {frequencies.length > 1 && (
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeFrequency(index)}
+                >
+                  <Ionicons name="remove" size={16} color="#ff0000" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+          
+          {/* Bookmark Section - moved to bottom of frequencies area */}
+          <View style={styles.bookmarkSection}>
+            <View style={styles.bookmarkInputRow}>
+              <TextInput
+                style={styles.nameInput}
+                placeholder="Wave name (optional)..."
+                placeholderTextColor="#666666"
+                value={waveName}
+                onChangeText={setWaveName}
+              />
+              <TouchableOpacity
+                style={styles.bookmarkButton}
+                onPress={saveCurrentWave}
               >
-                <Ionicons name="add" size={20} color="#00ff00" />
+                <Ionicons name="bookmark" size={20} color="#536471" />
               </TouchableOpacity>
             </View>
-            
-            {frequencies.map((freq, index) => (
-              <View key={index} style={styles.frequencyRow}>
-                <View style={styles.sliderContainer}>
-                  <Text style={styles.sliderLabel}>
-                    Wave {index + 1}
-                  </Text>
-                  <Slider
-                    style={styles.slider}
-                    minimumValue={10}
-                    maximumValue={2000}
-                    value={freq}
-                    onValueChange={(value) => updateFrequency(index, value)}
-                    minimumTrackTintColor="#00ff00"
-                    maximumTrackTintColor="#333333"
-                    thumbTintColor="#00ff00"
-                  />
-                  <Text style={styles.sliderValue}>{Math.round(freq)}Hz</Text>
-                </View>
-                {frequencies.length > 1 && (
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeFrequency(index)}
-                  >
-                    <Ionicons name="remove" size={16} color="#ff0000" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-            
-            {/* Bookmark Section - moved to bottom of frequencies area */}
-            <View style={styles.bookmarkSection}>
-              <View style={styles.bookmarkInputRow}>
-                <TextInput
-                  style={styles.nameInput}
-                  placeholder="Wave name (optional)..."
-                  placeholderTextColor="#666666"
-                  value={waveName}
-                  onChangeText={setWaveName}
-                />
-                <TouchableOpacity
-                  style={styles.bookmarkButton}
-                  onPress={saveCurrentWave}
-                >
-                  <Ionicons name="bookmark" size={20} color="#536471" />
-                </TouchableOpacity>
-              </View>
-            </View>
           </View>
         </View>
-        
-        {/* Saved Waves */}
-        {savedWaves.length > 0 && (
-          <View style={styles.savedWavesContainer}>
-            <Text style={styles.savedWavesTitle}>Saved Waves</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedWavesScroll}>
-              {savedWaves.map((savedWave) => (
-                <TouchableOpacity
-                  key={savedWave.id}
-                  style={styles.savedWaveItem}
-                  onPress={() => loadSavedWave(savedWave)}
-                  onLongPress={() => {
-                    Alert.alert(
-                      'Delete Wave',
-                      `Delete "${savedWave.name}"?`,
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: () => deleteSavedWave(savedWave.id) }
-                      ]
-                    );
-                  }}
-                >
-                  <Ionicons name="musical-note" size={24} color="#ff8800" />
-                  <Text style={styles.savedWaveName}>{savedWave.name}</Text>
-                  <Text style={styles.savedWaveFreqs}>
-                    {savedWave.frequencies.length} wave{savedWave.frequencies.length !== 1 ? 's' : ''}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
       </View>
-    </ScrollView>
+      
+      {/* Saved Waves */}
+      {savedWaves.length > 0 && (
+        <View style={styles.savedWavesContainer}>
+          <Text style={styles.savedWavesTitle}>Saved Waves</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedWavesScroll}>
+            {savedWaves.map((savedWave) => (
+              <TouchableOpacity
+                key={savedWave.id}
+                style={styles.savedWaveItem}
+                onPress={() => loadSavedWave(savedWave)}
+                onLongPress={() => {
+                  Alert.alert(
+                    'Delete Wave',
+                    `Delete "${savedWave.name}"?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => deleteSavedWave(savedWave.id) }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="musical-note" size={24} color="#ff8800" />
+                <Text style={styles.savedWaveName}>{savedWave.name}</Text>
+                <Text style={styles.savedWaveFreqs}>
+                  {savedWave.frequencies.length} wave{savedWave.frequencies.length !== 1 ? 's' : ''}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    flex: 1,
-  },
   container: {
     marginTop: 8,
   },
