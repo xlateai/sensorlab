@@ -35,8 +35,8 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 
 export default function Waveform({ 
-  width = screenWidth, // Full screen width by default
-  height = screenHeight * 0.25, // 25% of screen height by default
+  width = screenWidth - 32, // Default with padding
+  height = 300, // Reasonable default height
   isActive = true,
   scale = 1.6, // 2x default horizontal zoom
   orientation: initialOrientation = 'horizontal', // horizontal mode by default
@@ -907,8 +907,10 @@ export default function Waveform({
         {!isMinimized && (
           <View style={[styles.recordContainer, { 
             width: actualWidth,
-            marginLeft: isFullscreen ? 0 : insets.left,
-            marginRight: isFullscreen ? 0 : insets.right 
+            ...(isFullscreen ? {
+              marginLeft: insets.left,
+              marginRight: insets.right 
+            } : {})
           }]}>
             <Animated.View style={[
               styles.recordButton, 
@@ -1166,7 +1168,6 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0, 255, 0, 0.3)',
     borderTopColor: 'rgba(128, 128, 128, 0.4)', // Gray separator line
     borderTopWidth: 1,
-    marginHorizontal: 16,
     marginTop: 0, // Remove gap between containers
     shadowColor: '#000',
     shadowOffset: {

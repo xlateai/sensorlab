@@ -27,8 +27,8 @@ interface WaveEditorProps {
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function WaveEditor({ 
-  width = screenWidth,
-  height = screenHeight * 0.25,
+  width = screenWidth - 32, // Default with padding
+  height = 300, // Reasonable default height
 }: WaveEditorProps) {
   
   // Wave parameters
@@ -332,7 +332,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
   });
 
   return (
-    <View style={[styles.container, { width, height: height + 160 }]}>
+    <View style={[styles.container, { width }]}>
       {/* Waveform Display */}
       <View style={[styles.waveformContainer, { width, height }]}>
         <Svg width={width} height={height}>
@@ -490,7 +490,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 8,
+    // No margin - parent controls layout
   },
   waveformContainer: {
     backgroundColor: '#1a1a1a',
