@@ -297,50 +297,44 @@ export default function WaveEditor({
     }
   };
   
-  // Update frequencies and shapes during playback
+  // Track previous wave shapes to detect shape changes
+  const previousWaveShapesRef = useRef<string>('');
+  
+  // Update frequencies during playback (for live frequency/multiplicity changes)
   useEffect(() => {
     if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
       const currentFrequencies = getCurrentFrequencies();
       
-      // Check if we can just update frequencies or need to restart due to shape/count changes
-      const currentWaveData = waves.flatMap(wave => {
-        if (wave.type === 'sine') {
-          return [{ frequency: wave.frequency, shape: wave.shape }];
-        } else {
-          if (wave.sweepK < 2) return [{ frequency: wave.startFreq, shape: wave.shape }];
-          
-          const waveData: { frequency: number; shape: string }[] = [];
-          const step = (wave.endFreq - wave.startFreq) / (wave.sweepK - 1);
-          
-          for (let i = 0; i < wave.sweepK; i++) {
-            waveData.push({ 
-              frequency: wave.startFreq + (step * i), 
-              shape: wave.shape 
-            });
-          }
-          
-          return waveData;
-        }
-      });
+      // Create a signature of current wave shapes and count
+      const currentShapeSignature = waves.map(w => `${w.type}-${w.shape}-${w.sweepK}`).join('|');
       
-      // If count changed or we have oscillators, restart audio to apply shape changes
-      if (oscillatorsRef.current.length !== currentWaveData.length) {
-        // Length changed - need to restart audio
-        if (isPlaying) {
-          stopWave();
-          setTimeout(() => {
-            startWave();
-          }, 100);
-        }
+      // Check if only frequencies changed (not shapes or count)
+      if (oscillatorsRef.current.length === currentFrequencies.length && 
+          currentShapeSignature === previousWaveShapesRef.current) {
+        // Only frequencies/multiplicity changed - update live without restart
+        oscillatorsRef.current.forEach((oscillator, index) => {
+          if (oscillator && audioContextRef.current) {
+            const multipliedFreq = currentFrequencies[index] * multiplicity;
+            oscillator.frequency.setValueAtTime(
+              multipliedFreq, 
+              audioContextRef.current.currentTime
+            );
+          }
+        });
       } else {
-        // Same count - just update frequencies (shapes require restart which we'll do)
+        // Shape or count changed - need to restart audio
+        previousWaveShapesRef.current = currentShapeSignature;
         if (isPlaying) {
           stopWave();
           setTimeout(() => {
             startWave();
-          }, 50); // Shorter delay for shape changes
+          }, 50);
         }
       }
+    } else {
+      // Update the signature even when not playing
+      const currentShapeSignature = waves.map(w => `${w.type}-${w.shape}-${w.sweepK}`).join('|');
+      previousWaveShapesRef.current = currentShapeSignature;
     }
   }, [waves, multiplicity]);
 
