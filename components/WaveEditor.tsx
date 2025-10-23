@@ -297,30 +297,48 @@ export default function WaveEditor({
     }
   };
   
-  // Update frequencies during playback
+  // Update frequencies and shapes during playback
   useEffect(() => {
     if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
       const currentFrequencies = getCurrentFrequencies();
       
-      // Update existing oscillators with new frequencies if lengths match
-      if (oscillatorsRef.current.length === currentFrequencies.length) {
-        oscillatorsRef.current.forEach((oscillator, index) => {
-          if (oscillator && audioContextRef.current) {
-            const multipliedFreq = currentFrequencies[index] * multiplicity;
-            oscillator.frequency.setValueAtTime(
-              multipliedFreq, 
-              audioContextRef.current.currentTime
-            );
+      // Check if we can just update frequencies or need to restart due to shape/count changes
+      const currentWaveData = waves.flatMap(wave => {
+        if (wave.type === 'sine') {
+          return [{ frequency: wave.frequency, shape: wave.shape }];
+        } else {
+          if (wave.sweepK < 2) return [{ frequency: wave.startFreq, shape: wave.shape }];
+          
+          const waveData: { frequency: number; shape: string }[] = [];
+          const step = (wave.endFreq - wave.startFreq) / (wave.sweepK - 1);
+          
+          for (let i = 0; i < wave.sweepK; i++) {
+            waveData.push({ 
+              frequency: wave.startFreq + (step * i), 
+              shape: wave.shape 
+            });
           }
-        });
-      } else {
+          
+          return waveData;
+        }
+      });
+      
+      // If count changed or we have oscillators, restart audio to apply shape changes
+      if (oscillatorsRef.current.length !== currentWaveData.length) {
         // Length changed - need to restart audio
         if (isPlaying) {
           stopWave();
-          // Small delay before restarting
           setTimeout(() => {
             startWave();
           }, 100);
+        }
+      } else {
+        // Same count - just update frequencies (shapes require restart which we'll do)
+        if (isPlaying) {
+          stopWave();
+          setTimeout(() => {
+            startWave();
+          }, 50); // Shorter delay for shape changes
         }
       }
     }
@@ -602,16 +620,9 @@ const IndividualWave = ({ freq, shape, index, width, height, animationProgress, 
     return { d: pathData };
   });
 
-  // Different colors for different shapes
+  // All individual waves should be gray
   const getShapeColor = (shape: string) => {
-    switch (shape) {
-      case 'sine': return '#00ff00';
-      case 'square': return '#ff8800';
-      case 'triangle': return '#8800ff';
-      case 'sawtooth': return '#ff0088';
-      case 'noise': return '#888888';
-      default: return '#444444';
-    }
+    return '#888888'; // Always gray for individual waves
   };
 
   return (
