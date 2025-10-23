@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import WaveEditor from './WaveEditor';
 import Waveform from './Waveform';
+import WebAudioTest from './WebAudioTest';
 
 interface AudioWorkspaceProps {
   // Allow customization if needed
@@ -16,6 +17,9 @@ export default function AudioWorkspace({
   // Shared state between components
   const [isMuted, setIsMuted] = useState(false);
   const [recordingSamples, setRecordingSamples] = useState<number[]>([]);
+  
+  // WebAudio test state (iOS only)
+  const [showWebAudioTest, setShowWebAudioTest] = useState(false);
   
   // Responsive state
   const [dimensions, setDimensions] = useState(() => Dimensions.get('window'));
@@ -59,6 +63,25 @@ export default function AudioWorkspace({
       alwaysBounceVertical={false}
       keyboardShouldPersistTaps="handled" // Allows touches on controls while keyboard is open
     >
+      {/* iOS WebAudio Test Button */}
+      {Platform.OS === 'ios' && (
+        <View style={styles.testButtonContainer}>
+          <TouchableOpacity
+            style={styles.testButton}
+            onPress={() => setShowWebAudioTest(!showWebAudioTest)}
+          >
+            <Text style={styles.testButtonText}>
+              {showWebAudioTest ? 'Hide' : 'Show'} WebAudio Test
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {/* WebAudio Test Component */}
+      {Platform.OS === 'ios' && showWebAudioTest && (
+        <WebAudioTest />
+      )}
+      
       <View style={[
         styles.componentsContainer,
         shouldUseTwoColumns && styles.twoColumnLayout
@@ -125,5 +148,23 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 60, // Fixed height for comfortable scrolling
+  },
+  testButtonContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  testButton: {
+    backgroundColor: 'rgba(255, 136, 0, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 136, 0, 0.3)',
+  },
+  testButtonText: {
+    color: '#ff8800',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

@@ -9,6 +9,7 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+import WebAudioBridge from './WebAudioBridge';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -44,6 +45,10 @@ export default function WaveEditor({
   // Platform detection
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
+  
+  // WebAudio bridge state for iOS
+  const [isWebAudioReady, setIsWebAudioReady] = useState(false);
+  const [webAudioError, setWebAudioError] = useState<string | null>(null);
   
   // Wave parameters
   const [waves, setWaves] = useState<WaveDefinition[]>([{
@@ -193,14 +198,19 @@ export default function WaveEditor({
   };
 
   const startWave = async () => {
-    // Skip audio playback on iOS to avoid crashes
+    // Use WebAudio bridge on iOS
     if (isIOS) {
-      console.log('Audio playback disabled on iOS (debugging mode)');
+      if (!isWebAudioReady) {
+        console.log('WebAudio bridge not ready yet');
+        return;
+      }
+      
+      console.log('Using WebAudio bridge for iOS audio playback');
       setIsPlaying(true);
       isPlayingRef.current = true;
       animationProgress.value = withTiming(1, { duration: 300 });
       
-      // Start wave animation only
+      // Start wave animation
       const startTime = Date.now();
       const animateWave = () => {
         if (!isPlayingRef.current) return;
@@ -211,6 +221,8 @@ export default function WaveEditor({
         animationRef.current = setTimeout(animateWave, 16);
       };
       animateWave();
+      
+      // The WebAudioBridge will handle actual audio playback via useEffect
       return;
     }
     
@@ -910,7 +922,12 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           </Text>
           {isIOS && (
             <Text style={styles.debugInfo}>
-              iOS Debug Mode (Audio Disabled)
+              {isWebAudioReady ? 'WebAudio Bridge Ready' : 'WebAudio Loading...'}
+            </Text>
+          )}
+          {webAudioError && (
+            <Text style={styles.errorInfo}>
+              Audio Error: {webAudioError}
             </Text>
           )}
           {multiplicity !== 1.0 && (
@@ -931,8 +948,13 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
         {/* Play/Stop and Negate Buttons */}
         <View style={styles.playButtonsContainer}>
           <TouchableOpacity
-            style={[styles.playButton, isPlaying && styles.playButtonActive]}
+            style={[
+              styles.playButton, 
+              isPlaying && styles.playButtonActive,
+              (isIOS && !isWebAudioReady) && styles.playButtonDisabled
+            ]}
             onPress={togglePlayback}
+            disabled={isIOS && !isWebAudioReady}
           >
             <Ionicons 
               name={isPlaying ? "stop" : "play"} 
@@ -1168,6 +1190,26 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           </ScrollView>
         </View>
       )}
+      
+      {/* WebAudio Bridge for iOS */}
+      {isIOS && (
+        <WebAudioBridge
+          waves={waves}
+          isPlaying={isPlaying}
+          volume={volume}
+          multiplicity={multiplicity}
+          isNegated={isNegated}
+          onAudioReady={() => {
+            setIsWebAudioReady(true);
+            setWebAudioError(null);
+            console.log('WebAudio bridge ready');
+          }}
+          onError={(error) => {
+            setWebAudioError(error);
+            console.error('WebAudio bridge error:', error);
+          }}
+        />
+      )}
     </TouchableOpacity>
   );
 }
@@ -1223,6 +1265,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: 'bold',
   },
+  errorInfo: {
+    color: '#ff4444',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginTop: 2,
+    fontWeight: 'bold',
+  },
   controlsContainer: {
     padding: 16,
     backgroundColor: '#0a0a0a',
@@ -1247,6 +1296,11 @@ const styles = StyleSheet.create({
   playButtonActive: {
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  playButtonDisabled: {
+    backgroundColor: 'rgba(136, 136, 136, 0.05)',
+    borderColor: 'rgba(136, 136, 136, 0.1)',
+    opacity: 0.5,
   },
   negateButton: {
     backgroundColor: 'rgba(136, 136, 136, 0.1)',
