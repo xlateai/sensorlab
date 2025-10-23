@@ -37,6 +37,7 @@ export default function WaveEditor({
   const isPlayingRef = useRef(false);
   const [volume, setVolume] = useState(0.3); // Volume from 0 to 1
   const [multiplicity, setMultiplicity] = useState(1.0); // Frequency multiplier from 0 to 1
+  const [isNegated, setIsNegated] = useState(false); // Negate waveform (invert phase)
   
   // Bookmark system
   const [savedWaves, setSavedWaves] = useState<SavedWave[]>([]);
@@ -98,7 +99,8 @@ export default function WaveEditor({
         // Create gain node for volume control (split volume between oscillators)
         const gainNode = audioContext.createGain();
         const volumePerOscillator = volume / frequencies.length; // Split volume evenly
-        gainNode.gain.setValueAtTime(volumePerOscillator, audioContext.currentTime);
+        const finalGain = isNegated ? -volumePerOscillator : volumePerOscillator;
+        gainNode.gain.setValueAtTime(finalGain, audioContext.currentTime);
         
         // Connect oscillator
         oscillator.connect(gainNode);
@@ -206,13 +208,14 @@ export default function WaveEditor({
   useEffect(() => {
     if (gainNodesRef.current.length > 0 && audioContextRef.current) {
       const volumePerOscillator = volume / frequencies.length;
+      const finalGain = isNegated ? -volumePerOscillator : volumePerOscillator;
       gainNodesRef.current.forEach((gainNode) => {
         if (gainNode && audioContextRef.current) {
-          gainNode.gain.setValueAtTime(volumePerOscillator, audioContextRef.current.currentTime);
+          gainNode.gain.setValueAtTime(finalGain, audioContextRef.current.currentTime);
         }
       });
     }
-  }, [volume, frequencies.length]);
+  }, [volume, frequencies.length, isNegated]);
   
   // Helper functions for managing frequencies
   const addFrequency = () => {
@@ -271,7 +274,7 @@ export default function WaveEditor({
     setSavedWaves(prev => prev.filter(wave => wave.id !== id));
   };
   
-const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase, multiplicity }: {
+const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase, multiplicity, isNegated }: {
   freq: number;
   index: number;
   width: number;
@@ -279,6 +282,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
   animationProgress: any;
   wavePhase: any;
   multiplicity: number;
+  isNegated: boolean;
 }) => {
   const animatedProps = useAnimatedProps(() => {
     const points = 200;
@@ -291,7 +295,13 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
       const x = (i / points) * width;
       const multipliedFreq = freq * multiplicity;
       const normalizedFreq = multipliedFreq / 1000;
-      const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+      let sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+      
+      // Apply negation if enabled
+      if (isNegated) {
+        sineValue = -sineValue;
+      }
+      
       const y = centerY + (sineValue * amplitude);
       
       if (i === 0) {
@@ -334,7 +344,13 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
       frequencies.forEach((freq) => {
         const multipliedFreq = freq * multiplicity;
         const normalizedFreq = multipliedFreq / 1000;
-        const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+        let sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+        
+        // Apply negation if enabled
+        if (isNegated) {
+          sineValue = -sineValue;
+        }
+        
         combinedValue += sineValue / frequencies.length; // Average the amplitudes
       });
       
@@ -366,6 +382,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
               animationProgress={animationProgress}
               wavePhase={wavePhase}
               multiplicity={multiplicity}
+              isNegated={isNegated}
             />
           ))}
           
@@ -398,22 +415,43 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
               Multiplicity: {Math.round(multiplicity * 100)}%
             </Text>
           )}
+          {isNegated && (
+            <Text style={styles.negationInfo}>
+              Phase: Inverted
+            </Text>
+          )}
         </View>
       </View>
       
       {/* Controls */}
       <View style={styles.controlsContainer}>
-        {/* Play/Stop Button */}
-        <TouchableOpacity
-          style={[styles.playButton, isPlaying && styles.playButtonActive]}
-          onPress={togglePlayback}
-        >
-          <Ionicons 
-            name={isPlaying ? "stop" : "play"} 
-            size={24} 
-            color={isPlaying ? "#ff0000" : "#00ff00"} 
-          />
-        </TouchableOpacity>
+        {/* Play/Stop and Negate Buttons */}
+        <View style={styles.playButtonsContainer}>
+          <TouchableOpacity
+            style={[styles.playButton, isPlaying && styles.playButtonActive]}
+            onPress={togglePlayback}
+          >
+            <Ionicons 
+              name={isPlaying ? "stop" : "play"} 
+              size={24} 
+              color={isPlaying ? "#ff0000" : "#00ff00"} 
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.negateButton, isNegated && styles.negateButtonActive]}
+            onPress={() => setIsNegated(!isNegated)}
+          >
+            <Ionicons 
+              name="remove" 
+              size={20} 
+              color={isNegated ? "#ff0000" : "#888888"} 
+            />
+            <Text style={[styles.negateButtonText, isNegated && styles.negateButtonTextActive]}>
+              Negate
+            </Text>
+          </TouchableOpacity>
+        </View>
         
         {/* Volume Control */}
         <View style={styles.volumeSection}>
@@ -588,24 +626,58 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     marginTop: 2,
   },
+  negationInfo: {
+    color: '#ff0000',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginTop: 2,
+  },
   controlsContainer: {
     padding: 16,
     backgroundColor: '#0a0a0a',
     borderRadius: 8,
     marginTop: 8,
   },
+  playButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
   playButton: {
-    alignSelf: 'center',
     backgroundColor: 'rgba(0, 255, 0, 0.1)',
     borderRadius: 30,
     padding: 15,
     borderWidth: 2,
     borderColor: 'rgba(0, 255, 0, 0.3)',
-    marginBottom: 16,
   },
   playButtonActive: {
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  negateButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  negateButtonActive: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  negateButtonText: {
+    color: '#888888',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  negateButtonTextActive: {
+    color: '#ff0000',
   },
   volumeSection: {
     marginBottom: 16,
