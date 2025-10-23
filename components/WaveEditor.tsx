@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedProps,
   useSharedValue,
@@ -41,6 +41,10 @@ export default function WaveEditor({
   height = 300, // Reasonable default height
 }: WaveEditorProps) {
   
+  // Platform detection
+  const isIOS = Platform.OS === 'ios';
+  const isWeb = Platform.OS === 'web';
+  
   // Wave parameters
   const [waves, setWaves] = useState<WaveDefinition[]>([{
     id: '1',
@@ -78,12 +82,17 @@ export default function WaveEditor({
   useEffect(() => {
     const initAudio = async () => {
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: false,
-          playThroughEarpieceAndroid: false,
-        });
+        // Only set audio mode on platforms that support it safely
+        if (!isIOS) {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            shouldDuckAndroid: false,
+            playThroughEarpieceAndroid: false,
+          });
+        } else {
+          console.log('Skipping audio mode setup on iOS (debugging mode)');
+        }
       } catch (error) {
         console.warn('Error setting audio mode:', error);
       }
@@ -92,7 +101,7 @@ export default function WaveEditor({
     initAudio();
     
     return () => {
-      stopWave();
+      // Cleanup function - don't call stopWave here to avoid reference issues
       if (animationRef.current) {
         clearTimeout(animationRef.current);
       }
@@ -101,6 +110,7 @@ export default function WaveEditor({
   
   // Visual wave shape generation for previews
   const generateShapeVisualization = (shape: string, points: number, width: number, amplitude: number): string => {
+    try {
     let pathData = '';
     const cycles = 2; // Show 2 complete cycles
     
@@ -139,6 +149,11 @@ export default function WaveEditor({
     }
     
     return pathData;
+    } catch (error) {
+      console.warn('Error generating shape visualization:', error);
+      // Return a simple line as fallback
+      return `M 0 ${amplitude} L ${width} ${amplitude}`;
+    }
   };
 
   // Wave shape functions for custom waveforms
@@ -178,8 +193,34 @@ export default function WaveEditor({
   };
 
   const startWave = async () => {
+    // Skip audio playback on iOS to avoid crashes
+    if (isIOS) {
+      console.log('Audio playback disabled on iOS (debugging mode)');
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+      animationProgress.value = withTiming(1, { duration: 300 });
+      
+      // Start wave animation only
+      const startTime = Date.now();
+      const animateWave = () => {
+        if (!isPlayingRef.current) return;
+        
+        const elapsed = Date.now() - startTime;
+        wavePhase.value = (elapsed * 0.003) % (Math.PI * 2);
+        
+        animationRef.current = setTimeout(animateWave, 16);
+      };
+      animateWave();
+      return;
+    }
+    
     try {
-      // Create audio context
+      // Create audio context (Web only for now)
+      if (!isWeb) {
+        console.log('Audio context not supported on this platform');
+        return;
+      }
+      
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
@@ -253,26 +294,31 @@ export default function WaveEditor({
       
     } catch (error) {
       console.error('Error starting wave:', error);
+      // On error, at least enable visual animation
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+      animationProgress.value = withTiming(1, { duration: 300 });
     }
   };
   
   const stopWave = () => {
     try {
-      // Stop all oscillators
-      oscillatorsRef.current.forEach(oscillator => {
-        if (oscillator) {
-          oscillator.stop();
-        }
-      });
-      
-      if (audioContextRef.current) {
+      // Only try to stop audio context on web platform
+      if (!isIOS && audioContextRef.current) {
+        // Stop all oscillators
+        oscillatorsRef.current.forEach(oscillator => {
+          if (oscillator) {
+            oscillator.stop();
+          }
+        });
+        
         audioContextRef.current.close();
         audioContextRef.current = null;
+        
+        // Clear arrays
+        oscillatorsRef.current = [];
+        gainNodesRef.current = [];
       }
-      
-      // Clear arrays
-      oscillatorsRef.current = [];
-      gainNodesRef.current = [];
       
       setIsPlaying(false);
       isPlayingRef.current = false;
@@ -302,7 +348,7 @@ export default function WaveEditor({
   
   // Update frequencies during playback (for live frequency/multiplicity changes)
   useEffect(() => {
-    if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
+    if (!isIOS && oscillatorsRef.current.length > 0 && audioContextRef.current) {
       const currentFrequencies = getCurrentFrequencies();
       
       // Create a signature of current wave shapes and count
@@ -340,7 +386,7 @@ export default function WaveEditor({
 
   // Update volume during playback
   useEffect(() => {
-    if (gainNodesRef.current.length > 0 && audioContextRef.current) {
+    if (!isIOS && gainNodesRef.current.length > 0 && audioContextRef.current) {
       const currentFrequencies = getCurrentFrequencies();
       const volumePerOscillator = volume / currentFrequencies.length;
       const finalGain = isNegated ? -volumePerOscillator : volumePerOscillator;
@@ -562,6 +608,8 @@ const IndividualWave = ({ freq, shape, index, width, height, animationProgress, 
   isNegated: boolean;
 }) => {
   const animatedProps = useAnimatedProps(() => {
+    // Prevent potential iOS crashes with complex math operations
+    try {
     const points = 200;
     const amplitude = 40 + (animationProgress.value * 20);
     const phaseOffset = wavePhase.value;
@@ -612,6 +660,12 @@ const IndividualWave = ({ freq, shape, index, width, height, animationProgress, 
     }
     
     return { d: pathData };
+    } catch (error) {
+      console.warn('Error in IndividualWave animation:', error);
+      // Return a simple line as fallback
+      const centerY = height / 2;
+      return { d: `M 0 ${centerY} L ${width} ${centerY}` };
+    }
   });
 
   // All individual waves should be gray
@@ -644,6 +698,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
   isNegated: boolean;
 }) => {
   const envelopeProps = useAnimatedProps(() => {
+    try {
     const points = 100;
     const amplitude = 40 + (animationProgress.value * 20);
     const phaseOffset = wavePhase.value;
@@ -690,6 +745,11 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
     const fillPath = `${topPath} ${reversedBottomPath} Z`;
     
     return { d: fillPath };
+    } catch (error) {
+      console.warn('Error in SweepWave animation:', error);
+      // Return a simple rectangle as fallback
+      return { d: `M 0 ${height/2-10} L ${width} ${height/2-10} L ${width} ${height/2+10} L 0 ${height/2+10} Z` };
+    }
   });
 
   return (
@@ -704,6 +764,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
 
   // Generate multi-frequency sine wave visualization (composite)
   const animatedProps = useAnimatedProps(() => {
+    try {
     const points = 200;
     const amplitude = 40 + (animationProgress.value * 20);
     const phaseOffset = wavePhase.value;
@@ -769,6 +830,12 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
     }
     
     return { d: pathData };
+    } catch (error) {
+      console.warn('Error in composite wave animation:', error);
+      // Return a simple line as fallback
+      const centerY = height / 2;
+      return { d: `M 0 ${centerY} L ${width} ${centerY}` };
+    }
   });
 
   return (
@@ -841,6 +908,11 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
               : `${waves.length} Wave${waves.length !== 1 ? 's' : ''}`
             }
           </Text>
+          {isIOS && (
+            <Text style={styles.debugInfo}>
+              iOS Debug Mode (Audio Disabled)
+            </Text>
+          )}
           {multiplicity !== 1.0 && (
             <Text style={styles.multiplicityInfo}>
               Multiplicity: {Math.round(multiplicity * 100)}%
@@ -1143,6 +1215,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'monospace',
     marginTop: 2,
+  },
+  debugInfo: {
+    color: '#ffaa00',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginTop: 2,
+    fontWeight: 'bold',
   },
   controlsContainer: {
     padding: 16,
