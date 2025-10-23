@@ -35,6 +35,7 @@ export default function WaveEditor({
   const [frequencies, setFrequencies] = useState([100]); // Start with 100Hz
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
+  const [volume, setVolume] = useState(0.3); // Volume from 0 to 1
   
   // Bookmark system
   const [savedWaves, setSavedWaves] = useState<SavedWave[]>([]);
@@ -94,7 +95,7 @@ export default function WaveEditor({
         
         // Create gain node for volume control (split volume between oscillators)
         const gainNode = audioContext.createGain();
-        const volumePerOscillator = 0.3 / frequencies.length; // Split volume evenly
+        const volumePerOscillator = volume / frequencies.length; // Split volume evenly
         gainNode.gain.setValueAtTime(volumePerOscillator, audioContext.currentTime);
         
         // Connect oscillator
@@ -197,6 +198,18 @@ export default function WaveEditor({
       }
     }
   }, [frequencies]);
+
+  // Update volume during playback
+  useEffect(() => {
+    if (gainNodesRef.current.length > 0 && audioContextRef.current) {
+      const volumePerOscillator = volume / frequencies.length;
+      gainNodesRef.current.forEach((gainNode) => {
+        if (gainNode && audioContextRef.current) {
+          gainNode.gain.setValueAtTime(volumePerOscillator, audioContextRef.current.currentTime);
+        }
+      });
+    }
+  }, [volume, frequencies.length]);
   
   // Helper functions for managing frequencies
   const addFrequency = () => {
@@ -390,6 +403,25 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
           />
         </TouchableOpacity>
         
+        {/* Volume Control */}
+        <View style={styles.volumeSection}>
+          <View style={styles.volumeHeader}>
+            <Ionicons name="volume-medium" size={20} color="#00ff00" />
+            <Text style={styles.volumeLabel}>Volume</Text>
+            <Text style={styles.volumeValue}>{Math.round(volume * 100)}%</Text>
+          </View>
+          <Slider
+            style={styles.volumeSlider}
+            minimumValue={0}
+            maximumValue={1}
+            value={volume}
+            onValueChange={setVolume}
+            minimumTrackTintColor="#00ff00"
+            maximumTrackTintColor="#333333"
+            thumbTintColor="#00ff00"
+          />
+        </View>
+        
         {/* Frequency Controls */}
         <View style={styles.frequenciesSection}>
           <View style={styles.sectionHeader}>
@@ -537,6 +569,36 @@ const styles = StyleSheet.create({
   playButtonActive: {
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  volumeSection: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: 'rgba(0, 255, 0, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.2)',
+  },
+  volumeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  volumeLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  volumeValue: {
+    color: '#00ff00',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+  },
+  volumeSlider: {
+    width: '100%',
+    height: 20,
   },
   bookmarkSection: {
     marginTop: 16, // Add top margin since it's now at the bottom
