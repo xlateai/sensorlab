@@ -61,6 +61,9 @@ export default function WaveEditor({
   const [savedWaves, setSavedWaves] = useState<SavedWave[]>([]);
   const [waveName, setWaveName] = useState('');
   
+  // Dropdown management - only one dropdown open at a time
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  
   // Audio context and oscillator refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
@@ -432,12 +435,13 @@ export default function WaveEditor({
   };
   
 // Wave Shape Dropdown Component
-const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId }: {
+const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId, isOpen, onToggle }: {
   selectedShape: string;
   onShapeChange: (shape: string) => void;
   waveId: string;
+  isOpen: boolean;
+  onToggle: () => void;
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const shapeOptions = [
     { id: 'sine', name: 'Sine', icon: '∿' },
     { id: 'square', name: 'Square', icon: '⌐' },
@@ -452,7 +456,7 @@ const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId }: {
     <View style={styles.dropdownContainer}>
       <TouchableOpacity
         style={styles.dropdownButton}
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={onToggle}
       >
         <View style={styles.dropdownButtonContent}>
           <Text style={styles.shapeIcon}>{selectedOption.icon}</Text>
@@ -476,7 +480,7 @@ const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId }: {
               ]}
               onPress={() => {
                 onShapeChange(option.id);
-                setIsOpen(false);
+                onToggle(); // Close dropdown after selection
               }}
             >
               <View style={styles.dropdownOptionContent}>
@@ -515,7 +519,7 @@ const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId }: {
             style={styles.dropdownOptionCustom}
             onPress={() => {
               // TODO: Open custom shape creator
-              setIsOpen(false);
+              onToggle(); // Close dropdown
             }}
           >
             <View style={styles.customOptionContent}>
@@ -734,7 +738,16 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
   });
 
   return (
-    <View style={[styles.container, { width }]}>
+    <TouchableOpacity 
+      style={[styles.container, { width }]}
+      activeOpacity={1}
+      onPress={() => {
+        // Close any open dropdown when clicking outside
+        if (openDropdownId) {
+          setOpenDropdownId(null);
+        }
+      }}
+    >
       {/* Waveform Display */}
       <View style={[styles.waveformContainer, { width, height }]}>
         <Svg width={width} height={height}>
@@ -967,6 +980,14 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                 selectedShape={wave.shape}
                 onShapeChange={(shape) => updateWave(index, { shape: shape as any })}
                 waveId={wave.id}
+                isOpen={openDropdownId === wave.id}
+                onToggle={() => {
+                  if (openDropdownId === wave.id) {
+                    setOpenDropdownId(null); // Close if already open
+                  } else {
+                    setOpenDropdownId(wave.id); // Open this dropdown and close others
+                  }
+                }}
               />
               
               <TouchableOpacity
@@ -1041,13 +1062,14 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           </ScrollView>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     // No margin - parent controls layout
+    overflow: 'visible', // Allow dropdowns to overflow the container
   },
   waveformContainer: {
     backgroundColor: '#1a1a1a',
@@ -1093,6 +1115,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     borderRadius: 8,
     marginTop: 8,
+    overflow: 'visible', // Allow dropdowns to overflow
   },
   playButtonsContainer: {
     flexDirection: 'row',
@@ -1223,6 +1246,8 @@ const styles = StyleSheet.create({
   },
   frequenciesSection: {
     marginTop: 8,
+    overflow: 'visible', // Allow dropdowns to overflow
+    zIndex: 1, // Ensure proper stacking context
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1251,6 +1276,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    overflow: 'visible', // Allow dropdown to be visible outside the row
+    zIndex: 1, // Ensure the row has proper stacking context
   },
   waveContainer: {
     flex: 1,
@@ -1463,8 +1490,9 @@ const styles = StyleSheet.create({
   // Dropdown styles
   dropdownContainer: {
     position: 'relative',
-    zIndex: 1000,
+    zIndex: 99999,
     marginRight: 8,
+    elevation: 99999, // For Android
   },
   dropdownButton: {
     backgroundColor: 'rgba(136, 136, 136, 0.1)',
@@ -1493,20 +1521,20 @@ const styles = StyleSheet.create({
   },
   dropdownMenu: {
     position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
+    bottom: '100%', // Position above the button instead of below
+    left: -150, // Move to the left to avoid overlap with other buttons
+    width: 200, // Fixed width
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(136, 136, 136, 0.3)',
-    marginTop: 4,
-    zIndex: 1001,
-    elevation: 5,
+    marginBottom: 4, // Margin above the button
+    zIndex: 100000,
+    elevation: 100000, // For Android
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: -4 }, // Shadow pointing upward
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
   },
   dropdownOption: {
     padding: 12,
