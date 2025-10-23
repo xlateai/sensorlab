@@ -36,6 +36,7 @@ export default function WaveEditor({
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
   const [volume, setVolume] = useState(0.3); // Volume from 0 to 1
+  const [multiplicity, setMultiplicity] = useState(1.0); // Frequency multiplier from 0 to 1
   
   // Bookmark system
   const [savedWaves, setSavedWaves] = useState<SavedWave[]>([]);
@@ -91,7 +92,8 @@ export default function WaveEditor({
         // Create oscillator for sine wave
         const oscillator = audioContext.createOscillator();
         oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+        const multipliedFreq = freq * multiplicity;
+        oscillator.frequency.setValueAtTime(multipliedFreq, audioContext.currentTime);
         
         // Create gain node for volume control (split volume between oscillators)
         const gainNode = audioContext.createGain();
@@ -180,8 +182,9 @@ export default function WaveEditor({
       if (oscillatorsRef.current.length === frequencies.length) {
         oscillatorsRef.current.forEach((oscillator, index) => {
           if (oscillator && audioContextRef.current) {
+            const multipliedFreq = frequencies[index] * multiplicity;
             oscillator.frequency.setValueAtTime(
-              frequencies[index], 
+              multipliedFreq, 
               audioContextRef.current.currentTime
             );
           }
@@ -197,7 +200,7 @@ export default function WaveEditor({
         }
       }
     }
-  }, [frequencies]);
+  }, [frequencies, multiplicity]);
 
   // Update volume during playback
   useEffect(() => {
@@ -268,13 +271,14 @@ export default function WaveEditor({
     setSavedWaves(prev => prev.filter(wave => wave.id !== id));
   };
   
-const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase }: {
+const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase, multiplicity }: {
   freq: number;
   index: number;
   width: number;
   height: number;
   animationProgress: any;
   wavePhase: any;
+  multiplicity: number;
 }) => {
   const animatedProps = useAnimatedProps(() => {
     const points = 200;
@@ -285,7 +289,8 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
     let pathData = '';
     for (let i = 0; i <= points; i++) {
       const x = (i / points) * width;
-      const normalizedFreq = freq / 1000;
+      const multipliedFreq = freq * multiplicity;
+      const normalizedFreq = multipliedFreq / 1000;
       const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
       const y = centerY + (sineValue * amplitude);
       
@@ -327,7 +332,8 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
       // Sum all frequencies for complex waveform
       let combinedValue = 0;
       frequencies.forEach((freq) => {
-        const normalizedFreq = freq / 1000;
+        const multipliedFreq = freq * multiplicity;
+        const normalizedFreq = multipliedFreq / 1000;
         const sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
         combinedValue += sineValue / frequencies.length; // Average the amplitudes
       });
@@ -359,6 +365,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
               height={height}
               animationProgress={animationProgress}
               wavePhase={wavePhase}
+              multiplicity={multiplicity}
             />
           ))}
           
@@ -377,13 +384,18 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
         <View style={styles.infoOverlay}>
           <Text style={styles.infoText}>
             {frequencies.length === 1 
-              ? `${Math.round(frequencies[0])}Hz Sine Wave`
+              ? `${Math.round(frequencies[0] * multiplicity)}Hz Sine Wave`
               : `${frequencies.length} Frequency Mix`
             }
           </Text>
           {frequencies.length > 1 && (
             <Text style={styles.frequencyList}>
-              {frequencies.map(f => Math.round(f)).join('Hz, ')}Hz
+              {frequencies.map(f => Math.round(f * multiplicity)).join('Hz, ')}Hz
+            </Text>
+          )}
+          {multiplicity !== 1.0 && (
+            <Text style={styles.multiplicityInfo}>
+              Multiplicity: {Math.round(multiplicity * 100)}%
             </Text>
           )}
         </View>
@@ -419,6 +431,25 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
             minimumTrackTintColor="#00ff00"
             maximumTrackTintColor="#333333"
             thumbTintColor="#00ff00"
+          />
+        </View>
+
+        {/* Multiplicity Control */}
+        <View style={styles.multiplicitySection}>
+          <View style={styles.multiplicityHeader}>
+            <Ionicons name="contract" size={20} color="#ff8800" />
+            <Text style={styles.multiplicityLabel}>Multiplicity</Text>
+            <Text style={styles.multiplicityValue}>{Math.round(multiplicity * 100)}%</Text>
+          </View>
+          <Slider
+            style={styles.multiplicitySlider}
+            minimumValue={0}
+            maximumValue={1}
+            value={multiplicity}
+            onValueChange={setMultiplicity}
+            minimumTrackTintColor="#ff8800"
+            maximumTrackTintColor="#333333"
+            thumbTintColor="#ff8800"
           />
         </View>
         
@@ -551,6 +582,12 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     marginTop: 2,
   },
+  multiplicityInfo: {
+    color: '#ff8800',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginTop: 2,
+  },
   controlsContainer: {
     padding: 16,
     backgroundColor: '#0a0a0a',
@@ -597,6 +634,36 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   volumeSlider: {
+    width: '100%',
+    height: 20,
+  },
+  multiplicitySection: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 136, 0, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 136, 0, 0.2)',
+  },
+  multiplicityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  multiplicityLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  multiplicityValue: {
+    color: '#ff8800',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+  },
+  multiplicitySlider: {
     width: '100%',
     height: 20,
   },
