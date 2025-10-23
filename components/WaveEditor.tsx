@@ -15,6 +15,7 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 interface WaveDefinition {
   id: string;
   type: 'sine' | 'sweep';
+  shape: 'sine' | 'square' | 'triangle' | 'sawtooth' | 'noise';
   frequency: number; // For sine waves
   startFreq: number; // For sweep waves
   endFreq: number; // For sweep waves
@@ -44,6 +45,7 @@ export default function WaveEditor({
   const [waves, setWaves] = useState<WaveDefinition[]>([{
     id: '1',
     type: 'sine',
+    shape: 'sine',
     frequency: 100,
     startFreq: 100,
     endFreq: 1000,
@@ -94,6 +96,84 @@ export default function WaveEditor({
     };
   }, []);
   
+  // Visual wave shape generation for previews
+  const generateShapeVisualization = (shape: string, points: number, width: number, amplitude: number): string => {
+    let pathData = '';
+    const cycles = 2; // Show 2 complete cycles
+    
+    for (let i = 0; i <= points; i++) {
+      const x = (i / points) * width;
+      const t = (i / points) * cycles * Math.PI * 2;
+      let y = 0;
+      
+      switch (shape) {
+        case 'sine':
+          y = Math.sin(t);
+          break;
+        case 'square':
+          y = Math.sin(t) >= 0 ? 1 : -1;
+          break;
+        case 'triangle':
+          y = (2 / Math.PI) * Math.asin(Math.sin(t));
+          break;
+        case 'sawtooth':
+          y = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+          break;
+        case 'noise':
+          y = Math.random() * 2 - 1;
+          break;
+        default:
+          y = Math.sin(t);
+      }
+      
+      const yPos = (y * amplitude) + (amplitude * 2); // Center the wave
+      
+      if (i === 0) {
+        pathData = `M ${x} ${yPos}`;
+      } else {
+        pathData += ` L ${x} ${yPos}`;
+      }
+    }
+    
+    return pathData;
+  };
+
+  // Wave shape functions for custom waveforms
+  const generateWaveShape = (shape: string, freq: number, audioContext: AudioContext): OscillatorNode => {
+    const oscillator = audioContext.createOscillator();
+    
+    switch (shape) {
+      case 'sine':
+        oscillator.type = 'sine';
+        break;
+      case 'square':
+        oscillator.type = 'square';
+        break;
+      case 'triangle':
+        oscillator.type = 'triangle';
+        break;
+      case 'sawtooth':
+        oscillator.type = 'sawtooth';
+        break;
+      case 'noise':
+        // For noise, we'll use a sawtooth with custom periodic wave
+        const real = new Float32Array(16);
+        const imag = new Float32Array(16);
+        for (let i = 0; i < 16; i++) {
+          real[i] = Math.random() * 2 - 1;
+          imag[i] = Math.random() * 2 - 1;
+        }
+        const customWave = audioContext.createPeriodicWave(real, imag);
+        oscillator.setPeriodicWave(customWave);
+        break;
+      default:
+        oscillator.type = 'sine';
+    }
+    
+    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+    return oscillator;
+  };
+
   const startWave = async () => {
     try {
       // Create audio context
@@ -104,20 +184,38 @@ export default function WaveEditor({
       oscillatorsRef.current = [];
       gainNodesRef.current = [];
       
-      // Get current frequencies based on wave type
-      const currentFrequencies = getCurrentFrequencies();
+      // Get current frequencies and shapes based on wave type
+      const currentWaves = waves.flatMap(wave => {
+        if (wave.type === 'sine') {
+          return [{ frequency: wave.frequency, shape: wave.shape }];
+        } else {
+          // sweep type
+          if (wave.sweepK < 2) return [{ frequency: wave.startFreq, shape: wave.shape }];
+          
+          const waveData: { frequency: number; shape: string }[] = [];
+          const step = (wave.endFreq - wave.startFreq) / (wave.sweepK - 1);
+          
+          for (let i = 0; i < wave.sweepK; i++) {
+            waveData.push({ 
+              frequency: wave.startFreq + (step * i), 
+              shape: wave.shape 
+            });
+          }
+          
+          return waveData;
+        }
+      });
       
-      // Create oscillators for each frequency
-      currentFrequencies.forEach((freq) => {
-        // Create oscillator for sine wave
-        const oscillator = audioContext.createOscillator();
-        oscillator.type = 'sine';
-        const multipliedFreq = freq * multiplicity;
+      // Create oscillators for each frequency and shape
+      currentWaves.forEach((waveData) => {
+        // Create oscillator with specific shape
+        const oscillator = generateWaveShape(waveData.shape, waveData.frequency, audioContext);
+        const multipliedFreq = waveData.frequency * multiplicity;
         oscillator.frequency.setValueAtTime(multipliedFreq, audioContext.currentTime);
         
         // Create gain node for volume control (split volume between oscillators)
         const gainNode = audioContext.createGain();
-        const volumePerOscillator = volume / currentFrequencies.length; // Split volume evenly
+        const volumePerOscillator = volume / currentWaves.length; // Split volume evenly
         const finalGain = isNegated ? -volumePerOscillator : volumePerOscillator;
         gainNode.gain.setValueAtTime(finalGain, audioContext.currentTime);
         
@@ -246,6 +344,7 @@ export default function WaveEditor({
       const newWave: WaveDefinition = {
         id: newId,
         type: 'sine',
+        shape: 'sine',
         frequency: waves[0].frequency * 2, // Default to octave above first wave
         startFreq: 100,
         endFreq: 1000,
@@ -332,8 +431,112 @@ export default function WaveEditor({
     setSavedWaves(prev => prev.filter(wave => wave.id !== id));
   };
   
-const IndividualWave = ({ freq, index, width, height, animationProgress, wavePhase, multiplicity, isNegated }: {
+// Wave Shape Dropdown Component
+const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId }: {
+  selectedShape: string;
+  onShapeChange: (shape: string) => void;
+  waveId: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const shapeOptions = [
+    { id: 'sine', name: 'Sine', icon: '∿' },
+    { id: 'square', name: 'Square', icon: '⌐' },
+    { id: 'triangle', name: 'Triangle', icon: '△' },
+    { id: 'sawtooth', name: 'Sawtooth', icon: '⟋' },
+    { id: 'noise', name: 'Noise', icon: '≈' },
+  ];
+
+  const selectedOption = shapeOptions.find(opt => opt.id === selectedShape) || shapeOptions[0];
+
+  return (
+    <View style={styles.dropdownContainer}>
+      <TouchableOpacity
+        style={styles.dropdownButton}
+        onPress={() => setIsOpen(!isOpen)}
+      >
+        <View style={styles.dropdownButtonContent}>
+          <Text style={styles.shapeIcon}>{selectedOption.icon}</Text>
+          <Text style={styles.shapeName}>{selectedOption.name}</Text>
+          <Ionicons 
+            name={isOpen ? "chevron-up" : "chevron-down"} 
+            size={16} 
+            color="#888888" 
+          />
+        </View>
+      </TouchableOpacity>
+      
+      {isOpen && (
+        <View style={styles.dropdownMenu}>
+          {shapeOptions.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[
+                styles.dropdownOption,
+                selectedShape === option.id && styles.dropdownOptionSelected
+              ]}
+              onPress={() => {
+                onShapeChange(option.id);
+                setIsOpen(false);
+              }}
+            >
+              <View style={styles.dropdownOptionContent}>
+                <View style={styles.shapePreview}>
+                  <Svg width={60} height={30}>
+                    <Path
+                      d={generateShapeVisualization(option.id, 50, 60, 8)}
+                      stroke={selectedShape === option.id ? "#00ff00" : "#888888"}
+                      strokeWidth={1.5}
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                </View>
+                <View style={styles.shapeInfo}>
+                  <Text style={[
+                    styles.shapeOptionIcon,
+                    selectedShape === option.id && styles.shapeOptionIconSelected
+                  ]}>
+                    {option.icon}
+                  </Text>
+                  <Text style={[
+                    styles.shapeOptionName,
+                    selectedShape === option.id && styles.shapeOptionNameSelected
+                  ]}>
+                    {option.name}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+          
+          {/* Custom Shape Option (Plus button) */}
+          <TouchableOpacity
+            style={styles.dropdownOptionCustom}
+            onPress={() => {
+              // TODO: Open custom shape creator
+              setIsOpen(false);
+            }}
+          >
+            <View style={styles.customOptionContent}>
+              <View style={styles.customPreview}>
+                <Ionicons name="add-circle-outline" size={24} color="#666666" />
+              </View>
+              <View style={styles.shapeInfo}>
+                <Text style={styles.customOptionText}>Custom</Text>
+                <Text style={styles.customOptionSubtext}>Create new</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const IndividualWave = ({ freq, shape, index, width, height, animationProgress, wavePhase, multiplicity, isNegated }: {
   freq: number;
+  shape: string;
   index: number;
   width: number;
   height: number;
@@ -353,14 +556,37 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
       const x = (i / points) * width;
       const multipliedFreq = freq * multiplicity;
       const normalizedFreq = multipliedFreq / 1000;
-      let sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+      const t = (i / points) * Math.PI * 8 * normalizedFreq + phaseOffset;
+      
+      let waveValue = 0;
+      
+      // Generate different wave shapes
+      switch (shape) {
+        case 'sine':
+          waveValue = Math.sin(t);
+          break;
+        case 'square':
+          waveValue = Math.sin(t) >= 0 ? 1 : -1;
+          break;
+        case 'triangle':
+          waveValue = (2 / Math.PI) * Math.asin(Math.sin(t));
+          break;
+        case 'sawtooth':
+          waveValue = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+          break;
+        case 'noise':
+          waveValue = (Math.random() - 0.5) * 2; // Random noise
+          break;
+        default:
+          waveValue = Math.sin(t);
+      }
       
       // Apply negation if enabled
       if (isNegated) {
-        sineValue = -sineValue;
+        waveValue = -waveValue;
       }
       
-      const y = centerY + (sineValue * amplitude);
+      const y = centerY + (waveValue * amplitude);
       
       if (i === 0) {
         pathData = `M ${x} ${y}`;
@@ -372,10 +598,22 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
     return { d: pathData };
   });
 
+  // Different colors for different shapes
+  const getShapeColor = (shape: string) => {
+    switch (shape) {
+      case 'sine': return '#00ff00';
+      case 'square': return '#ff8800';
+      case 'triangle': return '#8800ff';
+      case 'sawtooth': return '#ff0088';
+      case 'noise': return '#888888';
+      default: return '#444444';
+    }
+  };
+
   return (
     <AnimatedPath
       animatedProps={animatedProps}
-      stroke="#444444"
+      stroke={getShapeColor(shape)}
       strokeWidth={1}
       fill="none"
       strokeLinecap="round"
@@ -507,6 +745,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                 <IndividualWave
                   key={`wave-${wave.id}`}
                   freq={wave.frequency}
+                  shape={wave.shape}
                   index={waveIndex}
                   width={width}
                   height={height}
@@ -523,6 +762,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                 <IndividualWave
                   key={`sweep-${wave.id}-${freqIndex}`}
                   freq={freq}
+                  shape={wave.shape}
                   index={waveIndex * 100 + freqIndex} // Unique index
                   width={width}
                   height={height}
@@ -721,6 +961,13 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                   }
                 </Text>
               </View>
+              
+              {/* Wave Shape Dropdown */}
+              <WaveShapeDropdown
+                selectedShape={wave.shape}
+                onShapeChange={(shape) => updateWave(index, { shape: shape as any })}
+                waveId={wave.id}
+              />
               
               <TouchableOpacity
                 style={[styles.typeButton, wave.type === 'sweep' && styles.typeButtonActive]}
@@ -1212,5 +1459,122 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 4,
     fontFamily: 'monospace',
+  },
+  // Dropdown styles
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 1000,
+    marginRight: 8,
+  },
+  dropdownButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    minWidth: 90,
+  },
+  dropdownButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  shapeIcon: {
+    color: '#00ff00',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  shapeName: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    marginTop: 4,
+    zIndex: 1001,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  dropdownOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(136, 136, 136, 0.2)',
+  },
+  dropdownOptionSelected: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+  },
+  dropdownOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  shapePreview: {
+    width: 60,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shapeInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shapeOptionIcon: {
+    color: '#888888',
+    fontSize: 16,
+    fontWeight: 'bold',
+    width: 20,
+    textAlign: 'center',
+  },
+  shapeOptionIconSelected: {
+    color: '#00ff00',
+  },
+  shapeOptionName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  shapeOptionNameSelected: {
+    color: '#00ff00',
+  },
+  dropdownOptionCustom: {
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(136, 136, 136, 0.2)',
+  },
+  customOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  customPreview: {
+    width: 60,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customOptionText: {
+    color: '#666666',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  customOptionSubtext: {
+    color: '#444444',
+    fontSize: 11,
+    marginTop: 2,
   },
 });
