@@ -716,25 +716,54 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
     
     let pathData = '';
     const centerY = height / 2;
-    const currentFrequencies = getCurrentFrequencies();
     
     for (let i = 0; i <= points; i++) {
       const x = (i / points) * width;
       
-      // Sum all frequencies for complex waveform
+      // Sum all waves with their actual shapes for complex waveform
       let combinedValue = 0;
-      currentFrequencies.forEach((freq) => {
-        const multipliedFreq = freq * multiplicity;
-        const normalizedFreq = multipliedFreq / 1000;
-        let sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
-        
-        // Apply negation if enabled
-        if (isNegated) {
-          sineValue = -sineValue;
-        }
-        
-        combinedValue += sineValue / currentFrequencies.length; // Average the amplitudes
+      waves.forEach((wave) => {
+        const waveFreqs = generateWaveFrequencies(wave);
+        waveFreqs.forEach((freq) => {
+          const multipliedFreq = freq * multiplicity;
+          const normalizedFreq = multipliedFreq / 1000;
+          const t = (i / points) * Math.PI * 8 * normalizedFreq + phaseOffset;
+          
+          let waveValue = 0;
+          
+          // Generate different wave shapes - same logic as IndividualWave
+          switch (wave.shape) {
+            case 'sine':
+              waveValue = Math.sin(t);
+              break;
+            case 'square':
+              waveValue = Math.sin(t) >= 0 ? 1 : -1;
+              break;
+            case 'triangle':
+              waveValue = (2 / Math.PI) * Math.asin(Math.sin(t));
+              break;
+            case 'sawtooth':
+              waveValue = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+              break;
+            case 'noise':
+              waveValue = (Math.random() - 0.5) * 2; // Random noise
+              break;
+            default:
+              waveValue = Math.sin(t);
+          }
+          
+          // Apply negation if enabled
+          if (isNegated) {
+            waveValue = -waveValue;
+          }
+          
+          combinedValue += waveValue;
+        });
       });
+      
+      // Average the amplitudes
+      const totalWaveCount = waves.reduce((count, wave) => count + generateWaveFrequencies(wave).length, 0);
+      combinedValue = combinedValue / totalWaveCount;
       
       const y = centerY + (combinedValue * amplitude);
       
