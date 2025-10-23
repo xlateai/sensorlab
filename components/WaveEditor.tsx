@@ -12,10 +12,19 @@ import Svg, { Path } from 'react-native-svg';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
+interface WaveDefinition {
+  id: string;
+  type: 'sine' | 'sweep';
+  frequency: number; // For sine waves
+  startFreq: number; // For sweep waves
+  endFreq: number; // For sweep waves
+  sweepK: number; // For sweep waves
+}
+
 interface SavedWave {
   id: string;
   name: string;
-  frequencies: number[];
+  waves: WaveDefinition[];
   createdAt: Date;
 }
 
@@ -32,7 +41,14 @@ export default function WaveEditor({
 }: WaveEditorProps) {
   
   // Wave parameters
-  const [frequencies, setFrequencies] = useState([100]); // Start with 100Hz
+  const [waves, setWaves] = useState<WaveDefinition[]>([{
+    id: '1',
+    type: 'sine',
+    frequency: 100,
+    startFreq: 100,
+    endFreq: 1000,
+    sweepK: 10
+  }]);
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
   const [volume, setVolume] = useState(0.3); // Volume from 0 to 1
@@ -88,8 +104,11 @@ export default function WaveEditor({
       oscillatorsRef.current = [];
       gainNodesRef.current = [];
       
+      // Get current frequencies based on wave type
+      const currentFrequencies = getCurrentFrequencies();
+      
       // Create oscillators for each frequency
-      frequencies.forEach((freq) => {
+      currentFrequencies.forEach((freq) => {
         // Create oscillator for sine wave
         const oscillator = audioContext.createOscillator();
         oscillator.type = 'sine';
@@ -98,7 +117,7 @@ export default function WaveEditor({
         
         // Create gain node for volume control (split volume between oscillators)
         const gainNode = audioContext.createGain();
-        const volumePerOscillator = volume / frequencies.length; // Split volume evenly
+        const volumePerOscillator = volume / currentFrequencies.length; // Split volume evenly
         const finalGain = isNegated ? -volumePerOscillator : volumePerOscillator;
         gainNode.gain.setValueAtTime(finalGain, audioContext.currentTime);
         
@@ -180,11 +199,13 @@ export default function WaveEditor({
   // Update frequencies during playback
   useEffect(() => {
     if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
+      const currentFrequencies = getCurrentFrequencies();
+      
       // Update existing oscillators with new frequencies if lengths match
-      if (oscillatorsRef.current.length === frequencies.length) {
+      if (oscillatorsRef.current.length === currentFrequencies.length) {
         oscillatorsRef.current.forEach((oscillator, index) => {
           if (oscillator && audioContextRef.current) {
-            const multipliedFreq = frequencies[index] * multiplicity;
+            const multipliedFreq = currentFrequencies[index] * multiplicity;
             oscillator.frequency.setValueAtTime(
               multipliedFreq, 
               audioContextRef.current.currentTime
@@ -202,12 +223,13 @@ export default function WaveEditor({
         }
       }
     }
-  }, [frequencies, multiplicity]);
+  }, [waves, multiplicity]);
 
   // Update volume during playback
   useEffect(() => {
     if (gainNodesRef.current.length > 0 && audioContextRef.current) {
-      const volumePerOscillator = volume / frequencies.length;
+      const currentFrequencies = getCurrentFrequencies();
+      const volumePerOscillator = volume / currentFrequencies.length;
       const finalGain = isNegated ? -volumePerOscillator : volumePerOscillator;
       gainNodesRef.current.forEach((gainNode) => {
         if (gainNode && audioContextRef.current) {
@@ -215,27 +237,63 @@ export default function WaveEditor({
         }
       });
     }
-  }, [volume, frequencies.length, isNegated]);
+  }, [volume, waves.length, isNegated]);
   
-  // Helper functions for managing frequencies
-  const addFrequency = () => {
-    if (frequencies.length < 8) { // Limit to 8 frequencies
-      const newFreq = frequencies[0] * 2; // Default to octave above first frequency
-      setFrequencies([...frequencies, newFreq]);
+  // Helper functions for managing waves
+  const addWave = () => {
+    if (waves.length < 8) { // Limit to 8 waves
+      const newId = (parseInt(waves[waves.length - 1].id) + 1).toString();
+      const newWave: WaveDefinition = {
+        id: newId,
+        type: 'sine',
+        frequency: waves[0].frequency * 2, // Default to octave above first wave
+        startFreq: 100,
+        endFreq: 1000,
+        sweepK: 10
+      };
+      setWaves([...waves, newWave]);
     }
   };
   
-  const removeFrequency = (index: number) => {
-    if (frequencies.length > 1) { // Keep at least one frequency
-      const newFrequencies = frequencies.filter((_, i) => i !== index);
-      setFrequencies(newFrequencies);
+  const removeWave = (index: number) => {
+    if (waves.length > 1) { // Keep at least one wave
+      const newWaves = waves.filter((_, i) => i !== index);
+      setWaves(newWaves);
     }
   };
   
-  const updateFrequency = (index: number, newFreq: number) => {
-    const newFrequencies = [...frequencies];
-    newFrequencies[index] = newFreq;
-    setFrequencies(newFrequencies);
+  const updateWave = (index: number, updates: Partial<WaveDefinition>) => {
+    const newWaves = [...waves];
+    newWaves[index] = { ...newWaves[index], ...updates };
+    setWaves(newWaves);
+  };
+  
+  // Generate frequencies for a single wave definition
+  const generateWaveFrequencies = (wave: WaveDefinition): number[] => {
+    if (wave.type === 'sine') {
+      return [wave.frequency];
+    } else {
+      // sweep type
+      if (wave.sweepK < 2) return [wave.startFreq];
+      
+      const freqs: number[] = [];
+      const step = (wave.endFreq - wave.startFreq) / (wave.sweepK - 1);
+      
+      for (let i = 0; i < wave.sweepK; i++) {
+        freqs.push(wave.startFreq + (step * i));
+      }
+      
+      return freqs;
+    }
+  };
+  
+  // Get all current frequencies from all waves
+  const getCurrentFrequencies = () => {
+    const allFreqs: number[] = [];
+    waves.forEach(wave => {
+      allFreqs.push(...generateWaveFrequencies(wave));
+    });
+    return allFreqs;
   };
   
   // UUID generation (simple version for demo)
@@ -256,7 +314,7 @@ export default function WaveEditor({
     const newSavedWave: SavedWave = {
       id,
       name,
-      frequencies: [...frequencies],
+      waves: [...waves],
       createdAt: new Date()
     };
     
@@ -266,7 +324,7 @@ export default function WaveEditor({
   };
   
   const loadSavedWave = (savedWave: SavedWave) => {
-    setFrequencies([...savedWave.frequencies]);
+    setWaves([...savedWave.waves]);
     setWaveName(savedWave.name); // Load name for potential editing
   };
   
@@ -327,6 +385,76 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
   );
 };
 
+const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wavePhase, multiplicity, isNegated }: {
+  startFreq: number;
+  endFreq: number;
+  k: number;
+  width: number;
+  height: number;
+  animationProgress: any;
+  wavePhase: any;
+  multiplicity: number;
+  isNegated: boolean;
+}) => {
+  const envelopeProps = useAnimatedProps(() => {
+    const points = 100;
+    const amplitude = 40 + (animationProgress.value * 20);
+    const phaseOffset = wavePhase.value;
+    const centerY = height / 2;
+    
+    let topPath = '';
+    let bottomPath = '';
+    
+    for (let i = 0; i <= points; i++) {
+      const x = (i / points) * width;
+      
+      let maxValue = 0;
+      let minValue = 0;
+      
+      // Calculate envelope from all frequencies in the sweep
+      for (let j = 0; j < k; j++) {
+        const freq = startFreq + (endFreq - startFreq) * (j / (k - 1));
+        const multipliedFreq = freq * multiplicity;
+        const normalizedFreq = multipliedFreq / 1000;
+        let sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
+        
+        if (isNegated) {
+          sineValue = -sineValue;
+        }
+        
+        maxValue = Math.max(maxValue, sineValue);
+        minValue = Math.min(minValue, sineValue);
+      }
+      
+      const topY = centerY + (maxValue * amplitude);
+      const bottomY = centerY + (minValue * amplitude);
+      
+      if (i === 0) {
+        topPath = `M ${x} ${topY}`;
+        bottomPath = `M ${x} ${bottomY}`;
+      } else {
+        topPath += ` L ${x} ${topY}`;
+        bottomPath += ` L ${x} ${bottomY}`;
+      }
+    }
+    
+    // Create filled envelope
+    const reversedBottomPath = bottomPath.replace('M', 'L').split('L').reverse().join('L').replace('L', 'L');
+    const fillPath = `${topPath} ${reversedBottomPath} Z`;
+    
+    return { d: fillPath };
+  });
+
+  return (
+    <AnimatedPath
+      animatedProps={envelopeProps}
+      stroke="none"
+      fill="rgba(68, 68, 68, 0.15)"
+      opacity={0.8}
+    />
+  );
+};
+
   // Generate multi-frequency sine wave visualization (composite)
   const animatedProps = useAnimatedProps(() => {
     const points = 200;
@@ -335,13 +463,14 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
     
     let pathData = '';
     const centerY = height / 2;
+    const currentFrequencies = getCurrentFrequencies();
     
     for (let i = 0; i <= points; i++) {
       const x = (i / points) * width;
       
       // Sum all frequencies for complex waveform
       let combinedValue = 0;
-      frequencies.forEach((freq) => {
+      currentFrequencies.forEach((freq) => {
         const multipliedFreq = freq * multiplicity;
         const normalizedFreq = multipliedFreq / 1000;
         let sineValue = Math.sin((i / points) * Math.PI * 8 * normalizedFreq + phaseOffset);
@@ -351,7 +480,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
           sineValue = -sineValue;
         }
         
-        combinedValue += sineValue / frequencies.length; // Average the amplitudes
+        combinedValue += sineValue / currentFrequencies.length; // Average the amplitudes
       });
       
       const y = centerY + (combinedValue * amplitude);
@@ -371,22 +500,42 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
       {/* Waveform Display */}
       <View style={[styles.waveformContainer, { width, height }]}>
         <Svg width={width} height={height}>
-          {/* Individual sine waves in light gray */}
-          {frequencies.map((freq, index) => (
-            <IndividualWave
-              key={`wave-${index}-${freq}`}
-              freq={freq}
-              index={index}
-              width={width}
-              height={height}
-              animationProgress={animationProgress}
-              wavePhase={wavePhase}
-              multiplicity={multiplicity}
-              isNegated={isNegated}
-            />
-          ))}
+          {/* Individual waves - both sine and sweep */}
+          {waves.map((wave, waveIndex) => {
+            if (wave.type === 'sine') {
+              return (
+                <IndividualWave
+                  key={`wave-${wave.id}`}
+                  freq={wave.frequency}
+                  index={waveIndex}
+                  width={width}
+                  height={height}
+                  animationProgress={animationProgress}
+                  wavePhase={wavePhase}
+                  multiplicity={multiplicity}
+                  isNegated={isNegated}
+                />
+              );
+            } else {
+              // For sweep waves, render individual sine waves for each frequency
+              const sweepFreqs = generateWaveFrequencies(wave);
+              return sweepFreqs.map((freq, freqIndex) => (
+                <IndividualWave
+                  key={`sweep-${wave.id}-${freqIndex}`}
+                  freq={freq}
+                  index={waveIndex * 100 + freqIndex} // Unique index
+                  width={width}
+                  height={height}
+                  animationProgress={animationProgress}
+                  wavePhase={wavePhase}
+                  multiplicity={multiplicity}
+                  isNegated={isNegated}
+                />
+              ));
+            }
+          })}
           
-          {/* Composite waveform in green */}
+          {/* Composite waveform */}
           <AnimatedPath
             animatedProps={animatedProps}
             stroke={isPlaying ? "#00ff00" : "#888888"}
@@ -400,16 +549,11 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
         {/* Wave info overlay */}
         <View style={styles.infoOverlay}>
           <Text style={styles.infoText}>
-            {frequencies.length === 1 
-              ? `${Math.round(frequencies[0] * multiplicity)}Hz Sine Wave`
-              : `${frequencies.length} Frequency Mix`
+            {waves.length === 1 && waves[0].type === 'sine'
+              ? `${Math.round(waves[0].frequency * multiplicity)}Hz Sine Wave`
+              : `${waves.length} Wave${waves.length !== 1 ? 's' : ''}`
             }
           </Text>
-          {frequencies.length > 1 && (
-            <Text style={styles.frequencyList}>
-              {frequencies.map(f => Math.round(f * multiplicity)).join('Hz, ')}Hz
-            </Text>
-          )}
           {multiplicity !== 1.0 && (
             <Text style={styles.multiplicityInfo}>
               Multiplicity: {Math.round(multiplicity * 100)}%
@@ -490,42 +634,107 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
             thumbTintColor="#ff8800"
           />
         </View>
-        
-        {/* Frequency Controls */}
+
+        {/* Wave Controls */}
         <View style={styles.frequenciesSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Frequencies</Text>
+            <Text style={styles.sectionTitle}>Waves</Text>
             <TouchableOpacity 
               style={styles.addButton}
-              onPress={addFrequency}
-              disabled={frequencies.length >= 8}
+              onPress={addWave}
+              disabled={waves.length >= 8}
             >
               <Ionicons name="add" size={20} color="#00ff00" />
             </TouchableOpacity>
           </View>
           
-          {frequencies.map((freq, index) => (
-            <View key={index} style={styles.frequencyRow}>
-              <View style={styles.sliderContainer}>
-                <Text style={styles.sliderLabel}>
+          {waves.map((wave, index) => (
+            <View key={wave.id} style={styles.waveRow}>
+              <View style={styles.waveContainer}>
+                <Text style={styles.waveLabel}>
                   Wave {index + 1}
                 </Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={10}
-                  maximumValue={2000}
-                  value={freq}
-                  onValueChange={(value) => updateFrequency(index, value)}
-                  minimumTrackTintColor="#00ff00"
-                  maximumTrackTintColor="#333333"
-                  thumbTintColor="#00ff00"
-                />
-                <Text style={styles.sliderValue}>{Math.round(freq)}Hz</Text>
+                
+                {wave.type === 'sine' ? (
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={10}
+                    maximumValue={2000}
+                    value={wave.frequency}
+                    onValueChange={(value) => updateWave(index, { frequency: value })}
+                    minimumTrackTintColor="#00ff00"
+                    maximumTrackTintColor="#333333"
+                    thumbTintColor="#00ff00"
+                  />
+                ) : (
+                  <View style={styles.sweepControlsContainer}>
+                    <View style={styles.sweepControlRow}>
+                      <Text style={styles.sweepControlLabel}>Start:</Text>
+                      <Slider
+                        style={styles.sweepControlSlider}
+                        minimumValue={10}
+                        maximumValue={2000}
+                        value={wave.startFreq}
+                        onValueChange={(value) => updateWave(index, { startFreq: value })}
+                        minimumTrackTintColor="#888888"
+                        maximumTrackTintColor="#333333"
+                        thumbTintColor="#888888"
+                      />
+                      <Text style={styles.sweepControlValue}>{Math.round(wave.startFreq)}</Text>
+                    </View>
+                    <View style={styles.sweepControlRow}>
+                      <Text style={styles.sweepControlLabel}>End:</Text>
+                      <Slider
+                        style={styles.sweepControlSlider}
+                        minimumValue={10}
+                        maximumValue={2000}
+                        value={wave.endFreq}
+                        onValueChange={(value) => updateWave(index, { endFreq: value })}
+                        minimumTrackTintColor="#888888"
+                        maximumTrackTintColor="#333333"
+                        thumbTintColor="#888888"
+                      />
+                      <Text style={styles.sweepControlValue}>{Math.round(wave.endFreq)}</Text>
+                    </View>
+                    <View style={styles.sweepControlRow}>
+                      <Text style={styles.sweepControlLabel}>Count:</Text>
+                      <Slider
+                        style={styles.sweepControlSlider}
+                        minimumValue={2}
+                        maximumValue={50}
+                        step={1}
+                        value={wave.sweepK}
+                        onValueChange={(value) => updateWave(index, { sweepK: value })}
+                        minimumTrackTintColor="#888888"
+                        maximumTrackTintColor="#333333"
+                        thumbTintColor="#888888"
+                      />
+                      <Text style={styles.sweepControlValue}>{wave.sweepK}</Text>
+                    </View>
+                  </View>
+                )}
+                
+                <Text style={styles.waveValue}>
+                  {wave.type === 'sine' 
+                    ? `${Math.round(wave.frequency)}Hz`
+                    : `${Math.round(wave.startFreq)}-${Math.round(wave.endFreq)}Hz`
+                  }
+                </Text>
               </View>
-              {frequencies.length > 1 && (
+              
+              <TouchableOpacity
+                style={[styles.typeButton, wave.type === 'sweep' && styles.typeButtonActive]}
+                onPress={() => updateWave(index, { type: wave.type === 'sine' ? 'sweep' : 'sine' })}
+              >
+                <Text style={[styles.typeButtonText, wave.type === 'sweep' && styles.typeButtonTextActive]}>
+                  {wave.type === 'sine' ? 'S' : 'Sw'}
+                </Text>
+              </TouchableOpacity>
+              
+              {waves.length > 1 && (
                 <TouchableOpacity
                   style={styles.removeButton}
-                  onPress={() => removeFrequency(index)}
+                  onPress={() => removeWave(index)}
                 >
                   <Ionicons name="remove" size={16} color="#ff0000" />
                 </TouchableOpacity>
@@ -578,7 +787,7 @@ const IndividualWave = ({ freq, index, width, height, animationProgress, wavePha
                 <Ionicons name="musical-note" size={24} color="#ff8800" />
                 <Text style={styles.savedWaveName}>{savedWave.name}</Text>
                 <Text style={styles.savedWaveFreqs}>
-                  {savedWave.frequencies.length} wave{savedWave.frequencies.length !== 1 ? 's' : ''}
+                  {savedWave.waves.length} wave{savedWave.waves.length !== 1 ? 's' : ''}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -791,6 +1000,92 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  waveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  waveContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  waveLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  waveValue: {
+    color: '#888888',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 4,
+    fontFamily: 'monospace',
+  },
+  sweepSliderContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    padding: 8,
+    marginVertical: 4,
+  },
+  sweepRangeText: {
+    color: '#888888',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+  },
+  sweepControlsContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    padding: 8,
+    marginVertical: 4,
+  },
+  sweepControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sweepControlLabel: {
+    color: '#888888',
+    fontSize: 10,
+    width: 40,
+    fontWeight: '500',
+  },
+  sweepControlSlider: {
+    flex: 1,
+    height: 20,
+    marginHorizontal: 8,
+  },
+  sweepControlValue: {
+    color: '#888888',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    width: 40,
+    textAlign: 'right',
+  },
+  typeButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    minWidth: 32,
+  },
+  typeButtonActive: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  typeButtonText: {
+    color: '#888888',
+    fontSize: 10,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  typeButtonTextActive: {
+    color: '#00ff00',
+  },
   sliderContainer: {
     flex: 1,
     marginRight: 8,
@@ -856,5 +1151,66 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
     textAlign: 'center',
+  },
+  waveTypeSection: {
+    marginBottom: 16,
+  },
+  waveTypeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  waveTypeButton: {
+    flex: 1,
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  waveTypeButtonActive: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  waveTypeButtonText: {
+    color: '#888888',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  waveTypeButtonTextActive: {
+    color: '#00ff00',
+  },
+  sweepControlsSection: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 136, 0, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 136, 0, 0.2)',
+  },
+  sweepRow: {
+    marginBottom: 12,
+  },
+  sweepControl: {
+    flex: 1,
+  },
+  sweepLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  sweepSlider: {
+    width: '100%',
+    height: 20,
+  },
+  sweepValue: {
+    color: '#ff8800',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 4,
+    fontFamily: 'monospace',
   },
 });
