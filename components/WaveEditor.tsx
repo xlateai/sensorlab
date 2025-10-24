@@ -73,6 +73,10 @@ export default function WaveEditor({
   // Dropdown management - only one dropdown open at a time
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   
+  // Custom curve editor state
+  const [showCurveEditor, setShowCurveEditor] = useState(false);
+  const [customCurves, setCustomCurves] = useState<Array<{id: string, name: string, points: {x: number, y: number}[]}>>([]);
+  
   // Audio context and oscillator refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
@@ -165,32 +169,60 @@ export default function WaveEditor({
   const generateWaveShape = (shape: string, freq: number, audioContext: AudioContext): OscillatorNode => {
     const oscillator = audioContext.createOscillator();
     
-    switch (shape) {
-      case 'sine':
-        oscillator.type = 'sine';
-        break;
-      case 'square':
-        oscillator.type = 'square';
-        break;
-      case 'triangle':
-        oscillator.type = 'triangle';
-        break;
-      case 'sawtooth':
-        oscillator.type = 'sawtooth';
-        break;
-      case 'noise':
-        // For noise, we'll use a sawtooth with custom periodic wave
-        const real = new Float32Array(16);
-        const imag = new Float32Array(16);
-        for (let i = 0; i < 16; i++) {
-          real[i] = Math.random() * 2 - 1;
-          imag[i] = Math.random() * 2 - 1;
+    // Check if it's a custom curve
+    const customCurve = customCurves.find(curve => curve.id === shape);
+    
+    if (customCurve) {
+      // Generate custom periodic wave from Bezier curve points
+      const real = new Float32Array(256);
+      const imag = new Float32Array(256);
+      
+      // Convert curve points to harmonic series
+      for (let i = 1; i < 128; i++) {
+        const harmonic = i / 128;
+        let amplitude = 0;
+        
+        // Sample the curve at this harmonic frequency
+        for (const point of customCurve.points) {
+          const phase = point.x * Math.PI * 2;
+          amplitude += point.y * Math.sin(phase * harmonic) / customCurve.points.length;
         }
-        const customWave = audioContext.createPeriodicWave(real, imag);
-        oscillator.setPeriodicWave(customWave);
-        break;
-      default:
-        oscillator.type = 'sine';
+        
+        real[i] = amplitude;
+        imag[i] = 0; // Keep imaginary part 0 for simplicity
+      }
+      
+      const customWave = audioContext.createPeriodicWave(real, imag);
+      oscillator.setPeriodicWave(customWave);
+    } else {
+      // Standard wave shapes
+      switch (shape) {
+        case 'sine':
+          oscillator.type = 'sine';
+          break;
+        case 'square':
+          oscillator.type = 'square';
+          break;
+        case 'triangle':
+          oscillator.type = 'triangle';
+          break;
+        case 'sawtooth':
+          oscillator.type = 'sawtooth';
+          break;
+        case 'noise':
+          // For noise, we'll use a sawtooth with custom periodic wave
+          const real = new Float32Array(16);
+          const imag = new Float32Array(16);
+          for (let i = 0; i < 16; i++) {
+            real[i] = Math.random() * 2 - 1;
+            imag[i] = Math.random() * 2 - 1;
+          }
+          const customWave = audioContext.createPeriodicWave(real, imag);
+          oscillator.setPeriodicWave(customWave);
+          break;
+        default:
+          oscillator.type = 'sine';
+      }
     }
     
     oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
@@ -504,13 +536,226 @@ export default function WaveEditor({
     setSavedWaves(prev => prev.filter(wave => wave.id !== id));
   };
   
+  // Custom curve functions
+  const handleSaveCustomCurve = (name: string, points: {x: number, y: number}[]) => {
+    const id = generateUUID();
+    const newCurve = { id, name, points };
+    setCustomCurves(prev => [...prev, newCurve]);
+    Alert.alert('Success', `Custom curve "${name}" has been saved!`);
+  };
+
+// Bezier Curve Editor Component
+const BezierCurveEditor = ({ 
+  isVisible, 
+  onClose, 
+  onSave 
+}: {
+  isVisible: boolean;
+  onClose: () => void;
+  onSave: (name: string, points: {x: number, y: number}[]) => void;
+}) => {
+  const [curveName, setCurveName] = useState('');
+  const [controlPoints, setControlPoints] = useState([
+    { x: 0, y: 0.5 },    // Start point
+    { x: 0.33, y: 0.8 }, // Control point 1
+    { x: 0.67, y: 0.2 }, // Control point 2
+    { x: 1, y: 0.5 }     // End point
+  ]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  const editorSize = 280;
+  const pointRadius = 8;
+
+  // Generate curve points from Bezier control points
+  const generateCurvePoints = () => {
+    const points: {x: number, y: number}[] = [];
+    const steps = 100;
+    
+    for (let t = 0; t <= steps; t++) {
+      const u = t / steps;
+      const x = Math.pow(1-u, 3) * controlPoints[0].x + 
+                3 * Math.pow(1-u, 2) * u * controlPoints[1].x + 
+                3 * (1-u) * Math.pow(u, 2) * controlPoints[2].x + 
+                Math.pow(u, 3) * controlPoints[3].x;
+      const y = Math.pow(1-u, 3) * controlPoints[0].y + 
+                3 * Math.pow(1-u, 2) * u * controlPoints[1].y + 
+                3 * (1-u) * Math.pow(u, 2) * controlPoints[2].y + 
+                Math.pow(u, 3) * controlPoints[3].y;
+      points.push({ x, y });
+    }
+    return points;
+  };
+
+  // Create SVG path for the Bezier curve
+  const createBezierPath = () => {
+    const p0 = controlPoints[0];
+    const p1 = controlPoints[1];
+    const p2 = controlPoints[2];
+    const p3 = controlPoints[3];
+    
+    const x0 = p0.x * editorSize;
+    const y0 = (1 - p0.y) * editorSize;
+    const x1 = p1.x * editorSize;
+    const y1 = (1 - p1.y) * editorSize;
+    const x2 = p2.x * editorSize;
+    const y2 = (1 - p2.y) * editorSize;
+    const x3 = p3.x * editorSize;
+    const y3 = (1 - p3.y) * editorSize;
+    
+    return `M ${x0} ${y0} C ${x1} ${y1}, ${x2} ${y2}, ${x3} ${y3}`;
+  };
+
+  // Handle touch/mouse events on control points
+  const handlePointMove = (index: number, clientX: number, clientY: number, svgRect: DOMRect) => {
+    const x = Math.max(0, Math.min(1, (clientX - svgRect.left) / editorSize));
+    const y = Math.max(0, Math.min(1, 1 - (clientY - svgRect.top) / editorSize));
+    
+    // Constrain start and end points to x positions
+    if (index === 0) {
+      setControlPoints(prev => prev.map((p, i) => i === index ? { x: 0, y } : p));
+    } else if (index === 3) {
+      setControlPoints(prev => prev.map((p, i) => i === index ? { x: 1, y } : p));
+    } else {
+      setControlPoints(prev => prev.map((p, i) => i === index ? { x, y } : p));
+    }
+  };
+
+  const handleSave = () => {
+    if (curveName.trim() === '') {
+      Alert.alert('Error', 'Please enter a name for your custom curve.');
+      return;
+    }
+    
+    const curvePoints = generateCurvePoints();
+    onSave(curveName.trim(), curvePoints);
+    setCurveName('');
+    setControlPoints([
+      { x: 0, y: 0.5 },
+      { x: 0.33, y: 0.8 },
+      { x: 0.67, y: 0.2 },
+      { x: 1, y: 0.5 }
+    ]);
+    onClose();
+  };
+
+  if (!isVisible) return null;
+
+  return (
+    <View style={styles.curveEditorOverlay}>
+      <TouchableOpacity 
+        style={styles.curveEditorBackdrop} 
+        onPress={onClose}
+        activeOpacity={1}
+      />
+      
+      <View style={styles.curveEditorContainer}>
+        <View style={styles.curveEditorHeader}>
+          <Text style={styles.curveEditorTitle}>Custom Curve Editor</Text>
+          <TouchableOpacity onPress={onClose} style={styles.curveEditorCloseButton}>
+            <Ionicons name="close" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+        
+        <TextInput
+          style={styles.curveNameInput}
+          placeholder="Curve name..."
+          placeholderTextColor="#666666"
+          value={curveName}
+          onChangeText={setCurveName}
+        />
+        
+        <View style={styles.curveEditorCanvas}>
+          <Svg width={editorSize} height={editorSize} style={styles.curveEditorSvg}>
+            {/* Grid lines */}
+            <Path
+              d={`M 0 ${editorSize/4} L ${editorSize} ${editorSize/4} M 0 ${editorSize/2} L ${editorSize} ${editorSize/2} M 0 ${3*editorSize/4} L ${editorSize} ${3*editorSize/4}`}
+              stroke="rgba(136, 136, 136, 0.3)"
+              strokeWidth={1}
+            />
+            <Path
+              d={`M ${editorSize/4} 0 L ${editorSize/4} ${editorSize} M ${editorSize/2} 0 L ${editorSize/2} ${editorSize} M ${3*editorSize/4} 0 L ${3*editorSize/4} ${editorSize}`}
+              stroke="rgba(136, 136, 136, 0.3)"
+              strokeWidth={1}
+            />
+            
+            {/* Control lines */}
+            <Path
+              d={`M ${controlPoints[0].x * editorSize} ${(1-controlPoints[0].y) * editorSize} L ${controlPoints[1].x * editorSize} ${(1-controlPoints[1].y) * editorSize}`}
+              stroke="rgba(255, 136, 0, 0.5)"
+              strokeWidth={2}
+              strokeDasharray="5,5"
+            />
+            <Path
+              d={`M ${controlPoints[2].x * editorSize} ${(1-controlPoints[2].y) * editorSize} L ${controlPoints[3].x * editorSize} ${(1-controlPoints[3].y) * editorSize}`}
+              stroke="rgba(255, 136, 0, 0.5)"
+              strokeWidth={2}
+              strokeDasharray="5,5"
+            />
+            
+            {/* Bezier curve */}
+            <Path
+              d={createBezierPath()}
+              stroke="#00ff00"
+              strokeWidth={3}
+              fill="none"
+            />
+            
+            {/* Control points */}
+            {controlPoints.map((point, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.controlPoint,
+                  {
+                    left: point.x * editorSize - pointRadius,
+                    top: (1 - point.y) * editorSize - pointRadius,
+                    backgroundColor: index === 0 || index === 3 ? '#00ff00' : '#ff8800'
+                  }
+                ]}
+              />
+            ))}
+          </Svg>
+          
+          {/* Touch handler overlay */}
+          <View 
+            style={styles.touchOverlay}
+            onTouchMove={(event) => {
+              if (dragIndex !== null) {
+                const touch = event.nativeEvent.touches[0];
+                const svgRect = { 
+                  left: 0, 
+                  top: 0, 
+                  width: editorSize, 
+                  height: editorSize 
+                } as DOMRect;
+                handlePointMove(dragIndex, touch.locationX, touch.locationY, svgRect);
+              }
+            }}
+          />
+        </View>
+        
+        <View style={styles.curveEditorFooter}>
+          <TouchableOpacity style={styles.curveEditorCancelButton} onPress={onClose}>
+            <Text style={styles.curveEditorCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.curveEditorSaveButton} onPress={handleSave}>
+            <Text style={styles.curveEditorSaveText}>Save Curve</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+  
 // Wave Shape Dropdown Component
-const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId, isOpen, onToggle }: {
+const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId, isOpen, onToggle, customCurves, onOpenCurveEditor }: {
   selectedShape: string;
   onShapeChange: (shape: string) => void;
   waveId: string;
   isOpen: boolean;
   onToggle: () => void;
+  customCurves: Array<{id: string, name: string, points: {x: number, y: number}[]}>;
+  onOpenCurveEditor: () => void;
 }) => {
   const shapeOptions = [
     { id: 'sine', name: 'Sine', icon: '∿' },
@@ -520,7 +765,11 @@ const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId, isOpen, onTog
     { id: 'noise', name: 'Noise', icon: '≈' },
   ];
 
-  const selectedOption = shapeOptions.find(opt => opt.id === selectedShape) || shapeOptions[0];
+  // Check if selected shape is a custom curve
+  const customCurve = customCurves.find(curve => curve.id === selectedShape);
+  const selectedOption = customCurve 
+    ? { id: customCurve.id, name: customCurve.name, icon: '◦' }
+    : shapeOptions.find(opt => opt.id === selectedShape) || shapeOptions[0];
 
   return (
     <View style={styles.dropdownContainer}>
@@ -584,11 +833,55 @@ const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId, isOpen, onTog
             </TouchableOpacity>
           ))}
           
+          {/* Custom Curves */}
+          {customCurves.map((curve) => (
+            <TouchableOpacity
+              key={curve.id}
+              style={[
+                styles.dropdownOption,
+                selectedShape === curve.id && styles.dropdownOptionSelected
+              ]}
+              onPress={() => {
+                onShapeChange(curve.id);
+                onToggle();
+              }}
+            >
+              <View style={styles.dropdownOptionContent}>
+                <View style={styles.shapePreview}>
+                  <Svg width={60} height={30}>
+                    <Path
+                      d={`M 0 15 ${curve.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * 60} ${(1-p.y) * 30}`).join(' ')}`}
+                      stroke={selectedShape === curve.id ? "#00ff00" : "#888888"}
+                      strokeWidth={1.5}
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                </View>
+                <View style={styles.shapeInfo}>
+                  <Text style={[
+                    styles.shapeOptionIcon,
+                    selectedShape === curve.id && styles.shapeOptionIconSelected
+                  ]}>
+                    ◦
+                  </Text>
+                  <Text style={[
+                    styles.shapeOptionName,
+                    selectedShape === curve.id && styles.shapeOptionNameSelected
+                  ]}>
+                    {curve.name}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+          
           {/* Custom Shape Option (Plus button) */}
           <TouchableOpacity
             style={styles.dropdownOptionCustom}
             onPress={() => {
-              // TODO: Open custom shape creator
+              onOpenCurveEditor();
               onToggle(); // Close dropdown
             }}
           >
@@ -1133,6 +1426,8 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                     setOpenDropdownId(wave.id); // Open this dropdown and close others
                   }
                 }}
+                customCurves={customCurves}
+                onOpenCurveEditor={() => setShowCurveEditor(true)}
               />
               
               <TouchableOpacity
@@ -1219,14 +1514,19 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           onAudioReady={() => {
             setIsWebAudioReady(true);
             setWebAudioError(null);
-            console.log('WebAudio bridge ready');
           }}
           onError={(error) => {
             setWebAudioError(error);
-            console.error('WebAudio bridge error:', error);
           }}
         />
       )}
+      
+      {/* Bezier Curve Editor */}
+      <BezierCurveEditor
+        isVisible={showCurveEditor}
+        onClose={() => setShowCurveEditor(false)}
+        onSave={handleSaveCustomCurve}
+      />
     </TouchableOpacity>
   );
 }
@@ -1788,5 +2088,127 @@ const styles = StyleSheet.create({
     color: '#444444',
     fontSize: 11,
     marginTop: 2,
+  },
+  
+  // Bezier Curve Editor Styles
+  curveEditorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  curveEditorBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  curveEditorContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    width: 320,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  curveEditorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  curveEditorTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  curveEditorCloseButton: {
+    padding: 4,
+  },
+  curveNameInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 12,
+    margin: 16,
+    color: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    fontSize: 16,
+  },
+  curveEditorCanvas: {
+    position: 'relative',
+    margin: 16,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  curveEditorSvg: {
+    backgroundColor: 'transparent',
+  },
+  controlPoint: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    zIndex: 100,
+  },
+  touchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+  },
+  curveEditorFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  curveEditorCancelButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  curveEditorCancelText: {
+    color: '#888888',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  curveEditorSaveButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  curveEditorSaveText: {
+    color: '#00ff00',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
