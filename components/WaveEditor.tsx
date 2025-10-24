@@ -3,12 +3,12 @@ import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedProps,
   useSharedValue,
   withTiming
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import WebAudioBridge from './WebAudioBridge';
 
