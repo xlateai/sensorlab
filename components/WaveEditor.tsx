@@ -8,6 +8,7 @@ import Animated, {
   useSharedValue,
   withTiming
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import WebAudioBridge from './WebAudioBridge';
 
@@ -561,6 +562,9 @@ const BezierCurveEditor = ({
     { x: 0.67, y: 0.2 }, // Control point 2
     { x: 1, y: 0.5 }     // End point
   ]);
+  
+  // Store starting positions for gestures
+  const startPositions = useRef<{x: number, y: number}[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const editorSize = 280;
@@ -605,19 +609,49 @@ const BezierCurveEditor = ({
     return `M ${x0} ${y0} C ${x1} ${y1}, ${x2} ${y2}, ${x3} ${y3}`;
   };
 
-  // Handle touch/mouse events on control points
-  const handlePointMove = (index: number, clientX: number, clientY: number, svgRect: DOMRect) => {
-    const x = Math.max(0, Math.min(1, (clientX - svgRect.left) / editorSize));
-    const y = Math.max(0, Math.min(1, 1 - (clientY - svgRect.top) / editorSize));
+  // Handle point movement with gesture
+  const updateControlPoint = (index: number, x: number, y: number) => {
+    // Constrain values to 0-1 range
+    const constrainedX = Math.max(0, Math.min(1, x));
+    const constrainedY = Math.max(0, Math.min(1, y));
     
-    // Constrain start and end points to x positions
+    // Constrain start and end points to their x positions
     if (index === 0) {
-      setControlPoints(prev => prev.map((p, i) => i === index ? { x: 0, y } : p));
+      setControlPoints(prev => prev.map((p, i) => i === index ? { x: 0, y: constrainedY } : p));
     } else if (index === 3) {
-      setControlPoints(prev => prev.map((p, i) => i === index ? { x: 1, y } : p));
+      setControlPoints(prev => prev.map((p, i) => i === index ? { x: 1, y: constrainedY } : p));
     } else {
-      setControlPoints(prev => prev.map((p, i) => i === index ? { x, y } : p));
+      setControlPoints(prev => prev.map((p, i) => i === index ? { x: constrainedX, y: constrainedY } : p));
     }
+  };
+
+  // Create pan gestures for each control point
+  const createPanGesture = (index: number) => {
+    return Gesture.Pan()
+      .onBegin(() => {
+        setDragIndex(index);
+        // Store the current position as starting point
+        startPositions.current[index] = { 
+          x: controlPoints[index].x, 
+          y: controlPoints[index].y 
+        };
+      })
+      .onUpdate((event) => {
+        const startPoint = startPositions.current[index];
+        if (!startPoint) return;
+        
+        // Use translation from the starting point
+        const deltaX = event.translationX / editorSize;
+        const deltaY = -event.translationY / editorSize; // Negative because Y is flipped in SVG
+        
+        const newX = startPoint.x + deltaX;
+        const newY = startPoint.y + deltaY;
+        
+        updateControlPoint(index, newX, newY);
+      })
+      .onEnd(() => {
+        setDragIndex(null);
+      });
   };
 
   const handleSave = () => {
@@ -664,7 +698,20 @@ const BezierCurveEditor = ({
           onChangeText={setCurveName}
         />
         
-        <View style={styles.curveEditorCanvas}>
+        <View 
+          style={styles.curveEditorCanvas}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => dragIndex !== null}
+          onResponderMove={(event) => {
+            if (dragIndex !== null) {
+              const touch = event.nativeEvent.touches[0];
+              const x = touch.locationX / editorSize;
+              const y = 1 - (touch.locationY / editorSize);
+              updateControlPoint(dragIndex, x, y);
+            }
+          }}
+          onResponderRelease={() => setDragIndex(null)}
+        >
           <Svg width={editorSize} height={editorSize} style={styles.curveEditorSvg}>
             {/* Grid lines */}
             <Path
@@ -700,38 +747,26 @@ const BezierCurveEditor = ({
               fill="none"
             />
             
-            {/* Control points */}
-            {controlPoints.map((point, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.controlPoint,
-                  {
-                    left: point.x * editorSize - pointRadius,
-                    top: (1 - point.y) * editorSize - pointRadius,
-                    backgroundColor: index === 0 || index === 3 ? '#00ff00' : '#ff8800'
-                  }
-                ]}
-              />
-            ))}
           </Svg>
           
-          {/* Touch handler overlay */}
-          <View 
-            style={styles.touchOverlay}
-            onTouchMove={(event) => {
-              if (dragIndex !== null) {
-                const touch = event.nativeEvent.touches[0];
-                const svgRect = { 
-                  left: 0, 
-                  top: 0, 
-                  width: editorSize, 
-                  height: editorSize 
-                } as DOMRect;
-                handlePointMove(dragIndex, touch.locationX, touch.locationY, svgRect);
-              }
-            }}
-          />
+          {/* Control points */}
+          {controlPoints.map((point, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.controlPoint,
+                {
+                  left: point.x * editorSize - pointRadius,
+                  top: (1 - point.y) * editorSize - pointRadius,
+                  backgroundColor: index === 0 || index === 3 ? '#00ff00' : '#ff8800',
+                  borderColor: dragIndex === index ? '#ffffff' : 'transparent',
+                  borderWidth: 2,
+                }
+              ]}
+              onPressIn={() => setDragIndex(index)}
+              activeOpacity={0.8}
+            />
+          ))}
         </View>
         
         <View style={styles.curveEditorFooter}>
@@ -2164,18 +2199,14 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#ffffff',
     zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  touchOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 50,
-  },
+
   curveEditorFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
