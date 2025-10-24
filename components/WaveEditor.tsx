@@ -124,37 +124,71 @@ export default function WaveEditor({
     let pathData = '';
     const cycles = 2; // Show 2 complete cycles
     
-    for (let i = 0; i <= points; i++) {
-      const x = (i / points) * width;
-      const t = (i / points) * cycles * Math.PI * 2;
-      let y = 0;
-      
-      switch (shape) {
-        case 'sine':
-          y = Math.sin(t);
-          break;
-        case 'square':
-          y = Math.sin(t) >= 0 ? 1 : -1;
-          break;
-        case 'triangle':
-          y = (2 / Math.PI) * Math.asin(Math.sin(t));
-          break;
-        case 'sawtooth':
-          y = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
-          break;
-        case 'noise':
-          y = Math.random() * 2 - 1;
-          break;
-        default:
-          y = Math.sin(t);
+    // Check if it's a custom curve
+    const customCurve = customCurves.find(curve => curve.id === shape);
+    
+    if (customCurve) {
+      // Use the custom curve points for visualization
+      for (let i = 0; i <= points; i++) {
+        const x = (i / points) * width;
+        const t = (i / points) * cycles; // 2 cycles
+        
+        // Sample the custom curve (repeat the pattern for cycles)
+        const curveProgress = (t % 1); // Get fractional part for repeating
+        const curveIndex = Math.floor(curveProgress * (customCurve.points.length - 1));
+        const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+        const localT = (curveProgress * (customCurve.points.length - 1)) - curveIndex;
+        
+        // Linear interpolation between curve points
+        const p1 = customCurve.points[curveIndex];
+        const p2 = customCurve.points[nextIndex];
+        const y = p1.y + (p2.y - p1.y) * localT;
+        
+        // Convert from 0-1 range to -1 to 1 range
+        const normalizedY = (y - 0.5) * 2;
+        
+        const yPos = (normalizedY * amplitude) + (amplitude * 2); // Center the wave
+        
+        if (i === 0) {
+          pathData = `M ${x} ${yPos}`;
+        } else {
+          pathData += ` L ${x} ${yPos}`;
+        }
       }
-      
-      const yPos = (y * amplitude) + (amplitude * 2); // Center the wave
-      
-      if (i === 0) {
-        pathData = `M ${x} ${yPos}`;
-      } else {
-        pathData += ` L ${x} ${yPos}`;
+    } else {
+      // Standard wave shapes
+      for (let i = 0; i <= points; i++) {
+        const x = (i / points) * width;
+        const t = (i / points) * cycles * Math.PI * 2;
+        let y = 0;
+        
+        switch (shape) {
+          case 'sine':
+            y = Math.sin(t);
+            break;
+          case 'square':
+            y = Math.sin(t) >= 0 ? 1 : -1;
+            break;
+          case 'triangle':
+            y = (2 / Math.PI) * Math.asin(Math.sin(t));
+            break;
+          case 'sawtooth':
+            y = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+            break;
+          case 'noise':
+            y = Math.random() * 2 - 1;
+            break;
+          default:
+            y = Math.sin(t);
+        }
+        
+        const yPos = (y * amplitude) + (amplitude * 2); // Center the wave
+        
+        if (i === 0) {
+          pathData = `M ${x} ${yPos}`;
+        } else {
+          pathData += ` L ${x} ${yPos}`;
+        }
       }
     }
     
@@ -173,27 +207,52 @@ export default function WaveEditor({
     // Check if it's a custom curve
     const customCurve = customCurves.find(curve => curve.id === shape);
     
-    if (customCurve) {
+    if (customCurve && customCurve.points && customCurve.points.length > 1) {
       // Generate custom periodic wave from Bezier curve points
-      const real = new Float32Array(256);
-      const imag = new Float32Array(256);
+      const harmonics = 128; // Number of harmonics to use
+      const real = new Float32Array(harmonics);
+      const imag = new Float32Array(harmonics);
       
-      // Convert curve points to harmonic series
-      for (let i = 1; i < 128; i++) {
-        const harmonic = i / 128;
-        let amplitude = 0;
+      // Sample the custom curve at regular intervals to create a wavetable
+      const samples = 512; // Number of samples for the wavetable
+      const wavetable: number[] = [];
+      
+      for (let i = 0; i < samples; i++) {
+        const t = i / samples;
         
-        // Sample the curve at this harmonic frequency
-        for (const point of customCurve.points) {
-          const phase = point.x * Math.PI * 2;
-          amplitude += point.y * Math.sin(phase * harmonic) / customCurve.points.length;
-        }
+        // Find the appropriate curve segment and interpolate
+        const curveIndex = Math.floor(t * (customCurve.points.length - 1));
+        const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+        const localT = (t * (customCurve.points.length - 1)) - curveIndex;
         
-        real[i] = amplitude;
-        imag[i] = 0; // Keep imaginary part 0 for simplicity
+        const p1 = customCurve.points[curveIndex];
+        const p2 = customCurve.points[nextIndex];
+        const y = p1.y + (p2.y - p1.y) * localT;
+        
+        // Convert from 0-1 range to -1 to 1 range
+        wavetable[i] = (y - 0.5) * 2;
       }
       
-      const customWave = audioContext.createPeriodicWave(real, imag);
+      // Convert wavetable to frequency domain using DFT
+      // This is a simplified approach - we'll create harmonic content based on the curve
+      for (let h = 1; h < harmonics && h < 64; h++) {
+        let realSum = 0;
+        let imagSum = 0;
+        
+        // Calculate Fourier coefficients for this harmonic
+        for (let i = 0; i < samples; i++) {
+          const angle = (2 * Math.PI * h * i) / samples;
+          realSum += wavetable[i] * Math.cos(angle);
+          imagSum -= wavetable[i] * Math.sin(angle);
+        }
+        
+        // Normalize and apply
+        real[h] = realSum / samples;
+        imag[h] = imagSum / samples;
+      }
+      
+      // Create and apply the custom periodic wave
+      const customWave = audioContext.createPeriodicWave(real, imag, { disableNormalization: false });
       oscillator.setPeriodicWave(customWave);
     } else {
       // Standard wave shapes
@@ -936,7 +995,7 @@ const WaveShapeDropdown = ({ selectedShape, onShapeChange, waveId, isOpen, onTog
   );
 };
 
-const IndividualWave = ({ freq, shape, index, width, height, animationProgress, wavePhase, multiplicity, isNegated }: {
+const IndividualWave = ({ freq, shape, index, width, height, animationProgress, wavePhase, multiplicity, isNegated, customCurves }: {
   freq: number;
   shape: string;
   index: number;
@@ -946,6 +1005,7 @@ const IndividualWave = ({ freq, shape, index, width, height, animationProgress, 
   wavePhase: any;
   multiplicity: number;
   isNegated: boolean;
+  customCurves: Array<{id: string, name: string, points: {x: number, y: number}[]}>;
 }) => {
   const animatedProps = useAnimatedProps(() => {
     // Prevent potential iOS crashes with complex math operations
@@ -954,6 +1014,9 @@ const IndividualWave = ({ freq, shape, index, width, height, animationProgress, 
     const amplitude = 40 + (animationProgress.value * 20);
     const phaseOffset = wavePhase.value;
     const centerY = height / 2;
+    
+    // Check if it's a custom curve
+    const customCurve = customCurves.find(curve => curve.id === shape);
     
     let pathData = '';
     for (let i = 0; i <= points; i++) {
@@ -964,25 +1027,42 @@ const IndividualWave = ({ freq, shape, index, width, height, animationProgress, 
       
       let waveValue = 0;
       
-      // Generate different wave shapes
-      switch (shape) {
-        case 'sine':
-          waveValue = Math.sin(t);
-          break;
-        case 'square':
-          waveValue = Math.sin(t) >= 0 ? 1 : -1;
-          break;
-        case 'triangle':
-          waveValue = (2 / Math.PI) * Math.asin(Math.sin(t));
-          break;
-        case 'sawtooth':
-          waveValue = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
-          break;
-        case 'noise':
-          waveValue = (Math.random() - 0.5) * 2; // Random noise
-          break;
-        default:
-          waveValue = Math.sin(t);
+      if (customCurve && customCurve.points && customCurve.points.length > 1) {
+        // Generate waveform from custom curve points
+        const cycles = t / (Math.PI * 2);
+        const curveProgress = (cycles % 1 + 1) % 1; // Ensure positive and between 0-1
+        const curveIndex = Math.floor(curveProgress * (customCurve.points.length - 1));
+        const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+        const localT = (curveProgress * (customCurve.points.length - 1)) - curveIndex;
+        
+        // Linear interpolation between curve points
+        const p1 = customCurve.points[curveIndex] || { x: 0, y: 0.5 };
+        const p2 = customCurve.points[nextIndex] || { x: 1, y: 0.5 };
+        const y = p1.y + (p2.y - p1.y) * localT;
+        
+        // Convert from 0-1 range to -1 to 1 range
+        waveValue = (y - 0.5) * 2;
+      } else {
+        // Generate standard wave shapes
+        switch (shape) {
+          case 'sine':
+            waveValue = Math.sin(t);
+            break;
+          case 'square':
+            waveValue = Math.sin(t) >= 0 ? 1 : -1;
+            break;
+          case 'triangle':
+            waveValue = (2 / Math.PI) * Math.asin(Math.sin(t));
+            break;
+          case 'sawtooth':
+            waveValue = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+            break;
+          case 'noise':
+            waveValue = (Math.random() - 0.5) * 2; // Random noise
+            break;
+          default:
+            waveValue = Math.sin(t);
+        }
       }
       
       // Apply negation if enabled
@@ -1125,7 +1205,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
       let combinedValue = 0;
       let waveCount = 0;
       
-      waves.forEach((wave) => {
+        waves.forEach((wave) => {
         const waveFreqs = generateWaveFrequencies(wave);
         waveFreqs.forEach((freq) => {
           const multipliedFreq = freq * multiplicity;
@@ -1134,25 +1214,45 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           
           let waveValue = 0;
           
-          // Generate different wave shapes - same logic as IndividualWave
-          switch (wave.shape) {
-            case 'sine':
-              waveValue = Math.sin(t);
-              break;
-            case 'square':
-              waveValue = Math.sin(t) >= 0 ? 1 : -1;
-              break;
-            case 'triangle':
-              waveValue = (2 / Math.PI) * Math.asin(Math.sin(t));
-              break;
-            case 'sawtooth':
-              waveValue = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
-              break;
-            case 'noise':
-              waveValue = (Math.random() - 0.5) * 2; // Random noise
-              break;
-            default:
-              waveValue = Math.sin(t);
+          // Check if it's a custom curve
+          const customCurve = customCurves.find(curve => curve.id === wave.shape);
+          
+          if (customCurve && customCurve.points && customCurve.points.length > 1) {
+            // Generate waveform from custom curve points
+            const cycles = t / (Math.PI * 2);
+            const curveProgress = (cycles % 1 + 1) % 1; // Ensure positive and between 0-1
+            const curveIndex = Math.floor(curveProgress * (customCurve.points.length - 1));
+            const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+            const localT = (curveProgress * (customCurve.points.length - 1)) - curveIndex;
+            
+            // Linear interpolation between curve points
+            const p1 = customCurve.points[curveIndex] || { x: 0, y: 0.5 };
+            const p2 = customCurve.points[nextIndex] || { x: 1, y: 0.5 };
+            const y = p1.y + (p2.y - p1.y) * localT;
+            
+            // Convert from 0-1 range to -1 to 1 range
+            waveValue = (y - 0.5) * 2;
+          } else {
+            // Generate different wave shapes - same logic as IndividualWave
+            switch (wave.shape) {
+              case 'sine':
+                waveValue = Math.sin(t);
+                break;
+              case 'square':
+                waveValue = Math.sin(t) >= 0 ? 1 : -1;
+                break;
+              case 'triangle':
+                waveValue = (2 / Math.PI) * Math.asin(Math.sin(t));
+                break;
+              case 'sawtooth':
+                waveValue = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+                break;
+              case 'noise':
+                waveValue = (Math.random() - 0.5) * 2; // Random noise
+                break;
+              default:
+                waveValue = Math.sin(t);
+            }
           }
           
           // Apply negation if enabled
@@ -1163,9 +1263,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           combinedValue += waveValue;
           waveCount++;
         });
-      });
-      
-      // Normalize but ensure visibility - don't over-reduce the amplitude
+      });      // Normalize but ensure visibility - don't over-reduce the amplitude
       if (waveCount > 0) {
         // Use a gentler normalization that keeps the composite wave visible
         const normalizationFactor = Math.max(1, waveCount * 0.7); // Gentler scaling
@@ -1224,6 +1322,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                   wavePhase={wavePhase}
                   multiplicity={multiplicity}
                   isNegated={isNegated}
+                  customCurves={customCurves}
                 />
               );
             } else {
@@ -1241,6 +1340,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
                   wavePhase={wavePhase}
                   multiplicity={multiplicity}
                   isNegated={isNegated}
+                  customCurves={customCurves}
                 />
               ));
             }
@@ -1546,6 +1646,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           volume={volume}
           multiplicity={multiplicity}
           isNegated={isNegated}
+          customCurves={customCurves}
           onAudioReady={() => {
             setIsWebAudioReady(true);
             setWebAudioError(null);
