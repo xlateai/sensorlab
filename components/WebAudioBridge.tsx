@@ -306,6 +306,7 @@ export default function WebAudioBridge({
             }
 
             updateWaves(data) {
+                const oldWaves = JSON.stringify(this.currentWaves);
                 this.currentWaves = data.waves || [];
                 this.volume = data.volume || 0.3;
                 this.multiplicity = data.multiplicity || 1.0;
@@ -319,11 +320,51 @@ export default function WebAudioBridge({
                     this.masterGain.gain.setValueAtTime(masterVolume, this.audioContext.currentTime);
                 }
                 
-                // Update individual oscillator frequencies if playing
+                // Update individual oscillator frequencies and gains if playing
                 if (this.oscillators.length > 0 && this.audioContext) {
-                    // For simplicity, restart audio when parameters change
-                    // In a more advanced implementation, we could update frequencies live
-                    this.log('Parameters changed while playing - will restart on next play');
+                    const newWaves = JSON.stringify(this.currentWaves);
+                    
+                    // Check if wave structure changed (different shapes, counts, etc)
+                    const currentFreqs = [];
+                    this.currentWaves.forEach(wave => {
+                        const frequencies = this.generateWaveFrequencies(wave);
+                        frequencies.forEach(freq => {
+                            currentFreqs.push({ frequency: freq, shape: wave.shape });
+                        });
+                    });
+                    
+                    // If oscillator count matches, update frequencies live
+                    if (this.oscillators.length === currentFreqs.length) {
+                        this.log('Live updating frequencies and gains');
+                        
+                        // Update each oscillator's frequency and gain
+                        this.oscillators.forEach((oscillator, index) => {
+                            if (oscillator && currentFreqs[index]) {
+                                const multipliedFreq = currentFreqs[index].frequency * this.multiplicity;
+                                oscillator.frequency.setValueAtTime(multipliedFreq, this.audioContext.currentTime);
+                            }
+                        });
+                        
+                        // Update gain nodes
+                        this.gainNodes.forEach((gainNode, index) => {
+                            if (gainNode) {
+                                const volumePerOscillator = this.volume / currentFreqs.length;
+                                const finalGain = this.isNegated ? -volumePerOscillator : volumePerOscillator;
+                                gainNode.gain.setValueAtTime(finalGain, this.audioContext.currentTime);
+                            }
+                        });
+                    } else {
+                        // Structure changed, need to restart
+                        this.log('Wave structure changed - restarting audio');
+                        const wasPlaying = this.oscillators.length > 0;
+                        this.stopAudio();
+                        if (wasPlaying) {
+                            // Small delay to ensure clean restart
+                            setTimeout(() => {
+                                this.startAudio();
+                            }, 10);
+                        }
+                    }
                 }
             }
         }

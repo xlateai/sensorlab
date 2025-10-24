@@ -778,17 +778,25 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
   const animatedProps = useAnimatedProps(() => {
     try {
     const points = 200;
-    const amplitude = 40 + (animationProgress.value * 20);
+    // Increase base amplitude and animation effect for better visibility
+    const amplitude = 60 + (animationProgress.value * 40);
     const phaseOffset = wavePhase.value;
     
     let pathData = '';
     const centerY = height / 2;
+    
+    // If no waves, return a flat line
+    if (waves.length === 0) {
+      return { d: `M 0 ${centerY} L ${width} ${centerY}` };
+    }
     
     for (let i = 0; i <= points; i++) {
       const x = (i / points) * width;
       
       // Sum all waves with their actual shapes for complex waveform
       let combinedValue = 0;
+      let waveCount = 0;
+      
       waves.forEach((wave) => {
         const waveFreqs = generateWaveFrequencies(wave);
         waveFreqs.forEach((freq) => {
@@ -825,12 +833,16 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
           }
           
           combinedValue += waveValue;
+          waveCount++;
         });
       });
       
-      // Average the amplitudes
-      const totalWaveCount = waves.reduce((count, wave) => count + generateWaveFrequencies(wave).length, 0);
-      combinedValue = combinedValue / totalWaveCount;
+      // Normalize but ensure visibility - don't over-reduce the amplitude
+      if (waveCount > 0) {
+        // Use a gentler normalization that keeps the composite wave visible
+        const normalizationFactor = Math.max(1, waveCount * 0.7); // Gentler scaling
+        combinedValue = combinedValue / normalizationFactor;
+      }
       
       const y = centerY + (combinedValue * amplitude);
       
@@ -839,6 +851,11 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
       } else {
         pathData += ` L ${x} ${y}`;
       }
+    }
+    
+    // Ensure we have a valid path
+    if (!pathData) {
+      pathData = `M 0 ${centerY} L ${width} ${centerY}`;
     }
     
     return { d: pathData };
