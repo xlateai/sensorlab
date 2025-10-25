@@ -18,6 +18,7 @@ interface WebAudioBridgeProps {
   volume: number;
   multiplicity: number;
   isNegated: boolean;
+  customCurves?: Array<{id: string, name: string, points: {x: number, y: number}[]}>;
   onAudioReady?: () => void;
   onError?: (error: string) => void;
 }
@@ -28,6 +29,7 @@ export default function WebAudioBridge({
   volume,
   multiplicity,
   isNegated,
+  customCurves = [],
   onAudioReady,
   onError,
 }: WebAudioBridgeProps) {
@@ -45,9 +47,9 @@ export default function WebAudioBridge({
   // Update audio parameters when they change
   useEffect(() => {
     if (isWebViewReady) {
-      sendToWebView('updateWaves', { waves, volume, multiplicity, isNegated });
+      sendToWebView('updateWaves', { waves, volume, multiplicity, isNegated, customCurves });
     }
-  }, [waves, volume, multiplicity, isNegated, isWebViewReady]);
+  }, [waves, volume, multiplicity, isNegated, customCurves, isWebViewReady]);
 
   // Control playback
   useEffect(() => {
@@ -124,6 +126,7 @@ export default function WebAudioBridge({
                 this.masterGain = null;
                 this.isInitialized = false;
                 this.currentWaves = [];
+                this.customCurves = [];
                 this.volume = 0.3;
                 this.multiplicity = 1.0;
                 this.isNegated = false;
@@ -176,32 +179,85 @@ export default function WebAudioBridge({
             generateWaveShape(shape, audioContext) {
                 const oscillator = audioContext.createOscillator();
                 
-                switch (shape) {
-                    case 'sine':
-                        oscillator.type = 'sine';
-                        break;
-                    case 'square':
-                        oscillator.type = 'square';
-                        break;
-                    case 'triangle':
-                        oscillator.type = 'triangle';
-                        break;
-                    case 'sawtooth':
-                        oscillator.type = 'sawtooth';
-                        break;
-                    case 'noise':
-                        // For noise, create custom periodic wave
-                        const real = new Float32Array(16);
-                        const imag = new Float32Array(16);
-                        for (let i = 0; i < 16; i++) {
-                            real[i] = Math.random() * 2 - 1;
-                            imag[i] = Math.random() * 2 - 1;
+                // Check if it's a custom curve
+                const customCurve = this.customCurves.find(curve => curve.id === shape);
+                
+                if (customCurve && customCurve.points && customCurve.points.length > 1) {
+                    // Generate custom periodic wave from Bezier curve points
+                    const harmonics = 128; // Number of harmonics to use
+                    const real = new Float32Array(harmonics);
+                    const imag = new Float32Array(harmonics);
+                    
+                    // Sample the custom curve at regular intervals to create a wavetable
+                    const samples = 512; // Number of samples for the wavetable
+                    const wavetable = new Array(samples);
+                    
+                    for (let i = 0; i < samples; i++) {
+                        const t = i / samples;
+                        
+                        // Find the appropriate curve segment and interpolate
+                        const curveIndex = Math.floor(t * (customCurve.points.length - 1));
+                        const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+                        const localT = (t * (customCurve.points.length - 1)) - curveIndex;
+                        
+                        const p1 = customCurve.points[curveIndex];
+                        const p2 = customCurve.points[nextIndex];
+                        const y = p1.y + (p2.y - p1.y) * localT;
+                        
+                        // Convert from 0-1 range to -1 to 1 range
+                        wavetable[i] = (y - 0.5) * 2;
+                    }
+                    
+                    // Convert wavetable to frequency domain using DFT
+                    // This is a simplified approach - we'll create harmonic content based on the curve
+                    for (let h = 1; h < harmonics && h < 64; h++) {
+                        let realSum = 0;
+                        let imagSum = 0;
+                        
+                        // Calculate Fourier coefficients for this harmonic
+                        for (let i = 0; i < samples; i++) {
+                            const angle = (2 * Math.PI * h * i) / samples;
+                            realSum += wavetable[i] * Math.cos(angle);
+                            imagSum -= wavetable[i] * Math.sin(angle);
                         }
-                        const customWave = audioContext.createPeriodicWave(real, imag);
-                        oscillator.setPeriodicWave(customWave);
-                        break;
-                    default:
-                        oscillator.type = 'sine';
+                        
+                        // Normalize and apply
+                        real[h] = realSum / samples;
+                        imag[h] = imagSum / samples;
+                    }
+                    
+                    // Create and apply the custom periodic wave
+                    const customWave = audioContext.createPeriodicWave(real, imag, { disableNormalization: false });
+                    oscillator.setPeriodicWave(customWave);
+                } else {
+                    // Standard wave shapes
+                    switch (shape) {
+                        case 'sine':
+                            oscillator.type = 'sine';
+                            break;
+                        case 'square':
+                            oscillator.type = 'square';
+                            break;
+                        case 'triangle':
+                            oscillator.type = 'triangle';
+                            break;
+                        case 'sawtooth':
+                            oscillator.type = 'sawtooth';
+                            break;
+                        case 'noise':
+                            // For noise, create custom periodic wave
+                            const real = new Float32Array(16);
+                            const imag = new Float32Array(16);
+                            for (let i = 0; i < 16; i++) {
+                                real[i] = Math.random() * 2 - 1;
+                                imag[i] = Math.random() * 2 - 1;
+                            }
+                            const customWave = audioContext.createPeriodicWave(real, imag);
+                            oscillator.setPeriodicWave(customWave);
+                            break;
+                        default:
+                            oscillator.type = 'sine';
+                    }
                 }
                 
                 return oscillator;
@@ -308,6 +364,7 @@ export default function WebAudioBridge({
             updateWaves(data) {
                 const oldWaves = JSON.stringify(this.currentWaves);
                 this.currentWaves = data.waves || [];
+                this.customCurves = data.customCurves || [];
                 this.volume = data.volume || 0.3;
                 this.multiplicity = data.multiplicity || 1.0;
                 this.isNegated = data.isNegated || false;
