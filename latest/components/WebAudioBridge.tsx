@@ -76,7 +76,7 @@ export default function WebAudioBridge({
           onError?.(message.error);
           break;
         case 'log':
-          console.log('[WebAudio]', message.message);
+        //   console.log('[WebAudio]', message.message);
           break;
       }
     } catch (error) {
@@ -392,7 +392,7 @@ export default function WebAudioBridge({
                     
                     // If oscillator count matches, update frequencies live
                     if (this.oscillators.length === currentFreqs.length) {
-                        this.log('Live updating frequencies and gains');
+                        // this.log('Live updating frequencies and gains');
                         
                         // Update each oscillator's frequency and gain
                         this.oscillators.forEach((oscillator, index) => {

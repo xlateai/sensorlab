@@ -1286,7 +1286,7 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
     
     return { d: pathData };
     } catch (error) {
-      console.warn('Error in composite wave animation:', error);
+      // console.warn('Error in composite wave animation:', error);
       // Return a simple line as fallback
       const centerY = height / 2;
       return { d: `M 0 ${centerY} L ${width} ${centerY}` };
