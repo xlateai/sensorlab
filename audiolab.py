@@ -32,18 +32,18 @@ class AudioVisualizer:
         
         # Audio parameters
         self.time_offset = 0
-        self.frequency_base = 110  # Lower base frequency for synth-wave
-        self.frequency_mod = 0.3   # Slower modulation for smoother feel
-        self.amplitude = 0.4
+        self.frequency_base = 130  # Cleaner frequency range
+        self.frequency_mod = 0.25   # Slower, smoother modulation
+        self.amplitude = 0.5  # Increased for clarity
         self.phase_continuity = 0  # Track phase for smooth transitions
         
         # Synth-wave parameters
-        self.lfo_rate = 0.2  # Low frequency oscillator for filter sweep
+        self.lfo_rate = 0.15  # Slower LFO for subtler movement
         self.filter_cutoff = 0.5
         
         # Audio smoothing
         self.previous_chunk = None
-        self.fade_samples = 512  # Number of samples for crossfade
+        self.fade_samples = 256  # Shorter fades for less artifacts
         
         # Visualization parameters
         self.waveform_points = []
@@ -59,49 +59,69 @@ class AudioVisualizer:
         t_global = t + self.time_offset
         
         # Synth-wave style oscillators with smooth frequency modulation
-        base_freq = self.frequency_base + 15 * np.sin(self.time_offset * self.frequency_mod)
+        base_freq = self.frequency_base + 12 * np.sin(self.time_offset * self.frequency_mod)
         
-        # Main synth lead with detuned oscillators
+        # Main synth lead - clean sine wave
         osc1 = np.sin(2 * np.pi * base_freq * t_global + self.phase_continuity)
-        osc2 = np.sin(2 * np.pi * base_freq * 1.01 * t_global + self.phase_continuity * 1.1)  # Slight detune
-        osc3 = np.sin(2 * np.pi * base_freq * 0.5 * t_global + self.phase_continuity * 0.7)   # Sub oscillator
         
-        # Synth-wave style sawtooth wave
-        saw_wave = 2 * ((base_freq * t_global + self.phase_continuity / (2 * np.pi)) % 1) - 1
-        saw_wave = np.clip(saw_wave, -1, 1)  # Hard clip for digital feel
+        # Slightly detuned oscillator for chorus effect (much subtler)
+        osc2 = 0.3 * np.sin(2 * np.pi * base_freq * 1.005 * t_global + self.phase_continuity * 1.1)
         
-        # Low-frequency oscillator for filter movement
+        # Sub oscillator (one octave down) for depth
+        sub_osc = 0.15 * np.sin(2 * np.pi * base_freq * 0.5 * t_global + self.phase_continuity * 0.5)
+        
+        # Clean sawtooth wave (less harsh than before)
+        saw_freq = base_freq * t_global + self.phase_continuity / (2 * np.pi)
+        saw_wave = 2 * (saw_freq % 1) - 1
+        # Soften the sawtooth with a simple filter
+        saw_wave = 0.2 * np.tanh(saw_wave * 2)  # Soft clipping instead of hard clip
+        
+        # Low-frequency oscillator for subtle filter movement
         lfo = np.sin(2 * np.pi * self.lfo_rate * t_global)
-        filter_mod = 0.5 + 0.3 * lfo
+        filter_mod = 0.7 + 0.3 * lfo
         
-        # Mix oscillators with synth-wave character
-        main_wave = (0.4 * osc1 + 0.3 * osc2 + 0.2 * osc3 + 0.3 * saw_wave * filter_mod)
+        # Mix oscillators with much cleaner balance
+        main_wave = osc1 + osc2 + sub_osc + (saw_wave * filter_mod)
         
-        # Add some harmonic content for richness
-        harmonic1 = 0.15 * np.sin(2 * np.pi * base_freq * 2 * t_global + self.phase_continuity * 2)
-        harmonic2 = 0.1 * np.sin(2 * np.pi * base_freq * 3 * t_global + self.phase_continuity * 3)
+        # Add just a touch of harmonic content (much less than before)
+        harmonic = 0.08 * np.sin(2 * np.pi * base_freq * 2 * t_global + self.phase_continuity * 2)
         
-        # Combine all elements
-        combined_wave = (main_wave + harmonic1 + harmonic2) * self.amplitude
+        # Combine with proper gain staging to prevent clipping
+        combined_wave = (main_wave + harmonic) * self.amplitude * 0.6  # Reduced gain
         
-        # Apply smooth envelope to prevent clicks (attack/sustain/release style)
+        # Soft limiting to prevent any harsh clipping
+        combined_wave = np.tanh(combined_wave)
+        
+        # Apply smooth envelope to prevent clicks
         envelope = np.ones_like(combined_wave)
-        fade_in_samples = min(self.fade_samples, len(combined_wave) // 4)
-        fade_out_samples = min(self.fade_samples, len(combined_wave) // 4)
+        fade_in_samples = min(self.fade_samples, len(combined_wave) // 8)
+        fade_out_samples = min(self.fade_samples, len(combined_wave) // 8)
         
-        # Fade in at the beginning
-        envelope[:fade_in_samples] = np.linspace(0, 1, fade_in_samples)
-        # Fade out at the end
-        envelope[-fade_out_samples:] = np.linspace(1, 0, fade_out_samples)
+        # Gentler fades
+        if fade_in_samples > 0:
+            envelope[:fade_in_samples] = np.sin(np.linspace(0, np.pi/2, fade_in_samples))**2
+        if fade_out_samples > 0:
+            envelope[-fade_out_samples:] = np.cos(np.linspace(0, np.pi/2, fade_out_samples))**2
         
         combined_wave *= envelope
         
         # Convert to stereo and ensure C-contiguous array
         stereo_wave = np.column_stack((combined_wave, combined_wave))
         
-        # Convert to 16-bit integers and ensure C-contiguous
-        audio_data = (stereo_wave * 32767).astype(np.int16)
+        # Convert to 16-bit integers with proper scaling
+        audio_data = (stereo_wave * 16383).astype(np.int16)  # Leave headroom
         audio_data = np.ascontiguousarray(audio_data)
+        
+        # Debug: Print audio data information
+        print(f"Audio data shape: {audio_data.shape} (samples: {audio_data.shape[0]}, channels: {audio_data.shape[1]})")
+        print(f"Audio data dtype: {audio_data.dtype}")
+        print(f"Audio data range: [{np.min(audio_data)}, {np.max(audio_data)}] (16-bit max: ±32767)")
+        print(f"Volume percentage: {(np.max(np.abs(audio_data)) / 32767) * 100:.1f}% of max volume")
+        print(f"Combined wave range before scaling: [{np.min(combined_wave):.4f}, {np.max(combined_wave):.4f}]")
+        print(f"Buffer duration: {BUFFER_SIZE / SAMPLE_RATE * 1000:.1f}ms")
+        print(f"First 10 samples (left channel): {audio_data[:10, 0]}")
+        print(f"Is C-contiguous: {audio_data.flags['C_CONTIGUOUS']}")
+        print("---")
         
         # Update phase continuity for smooth transitions
         self.phase_continuity += 2 * np.pi * base_freq * (BUFFER_SIZE / SAMPLE_RATE)
