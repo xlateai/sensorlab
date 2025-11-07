@@ -32,14 +32,17 @@ class AudioVisualizer:
         
         # Audio parameters
         self.time_offset = 0
-        self.frequency_base = 130  # Cleaner frequency range
-        self.frequency_mod = 0.25   # Slower, smoother modulation
-        self.amplitude = 0.5  # Increased for clarity
+        self.frequency_base = 85  # Much lower frequency for ambient feel
+        self.frequency_mod = 0.15   # Very slow modulation
+        self.amplitude = 0.6  # Slightly higher for presence
         self.phase_continuity = 0  # Track phase for smooth transitions
         
-        # Synth-wave parameters
-        self.lfo_rate = 0.15  # Slower LFO for subtler movement
+        # Ambient parameters
+        self.lfo_rate = 0.08  # Very slow LFO for gentle movement
         self.filter_cutoff = 0.5
+        self.echo_delay = 0.3  # Seconds of echo delay
+        self.echo_samples = int(self.echo_delay * SAMPLE_RATE)
+        self.echo_buffer = np.zeros(self.echo_samples)
         
         # Audio smoothing
         self.previous_chunk = None
@@ -47,61 +50,63 @@ class AudioVisualizer:
         
         # Visualization parameters
         self.waveform_points = []
-        self.num_points = 720  # Higher resolution - 2 points per degree for smoother curve
+        self.num_points = 1440  # Much higher resolution - 4 points per degree
         
         # Generate initial audio buffer
         self.current_audio_data = self.generate_audio_chunk()
         self.play_audio()
     
     def generate_audio_chunk(self):
-        """Generate a chunk of smooth synth-wave audio data"""
+        """Generate a chunk of ambient, echo-y audio data"""
         t = np.linspace(0, BUFFER_SIZE / SAMPLE_RATE, BUFFER_SIZE)
         t_global = t + self.time_offset
         
-        # Synth-wave style oscillators with smooth frequency modulation
-        base_freq = self.frequency_base + 12 * np.sin(self.time_offset * self.frequency_mod)
+        # Ambient style oscillators with very gentle modulation
+        base_freq = self.frequency_base + 8 * np.sin(self.time_offset * self.frequency_mod)
         
-        # Main synth lead - clean sine wave
+        # Main ambient pad - warm sine wave
         osc1 = np.sin(2 * np.pi * base_freq * t_global + self.phase_continuity)
         
-        # Slightly detuned oscillator for chorus effect (much subtler)
-        osc2 = 0.3 * np.sin(2 * np.pi * base_freq * 1.005 * t_global + self.phase_continuity * 1.1)
+        # Slightly detuned oscillator for warmth
+        osc2 = 0.4 * np.sin(2 * np.pi * base_freq * 1.003 * t_global + self.phase_continuity * 1.07)
         
-        # Sub oscillator (one octave down) for depth
-        sub_osc = 0.15 * np.sin(2 * np.pi * base_freq * 0.5 * t_global + self.phase_continuity * 0.5)
+        # Sub-bass for depth (two octaves down)
+        sub_osc = 0.2 * np.sin(2 * np.pi * base_freq * 0.25 * t_global + self.phase_continuity * 0.25)
         
-        # Clean sawtooth wave (less harsh than before)
-        saw_freq = base_freq * t_global + self.phase_continuity / (2 * np.pi)
-        saw_wave = 2 * (saw_freq % 1) - 1
-        # Soften the sawtooth with a simple filter
-        saw_wave = 0.2 * np.tanh(saw_wave * 2)  # Soft clipping instead of hard clip
+        # Higher harmonic for gentle brightness
+        harmonic = 0.15 * np.sin(2 * np.pi * base_freq * 1.5 * t_global + self.phase_continuity * 1.5)
         
-        # Low-frequency oscillator for subtle filter movement
+        # Very slow LFO for gentle movement
         lfo = np.sin(2 * np.pi * self.lfo_rate * t_global)
-        filter_mod = 0.7 + 0.3 * lfo
+        amplitude_mod = 0.8 + 0.2 * lfo
         
-        # Mix oscillators with much cleaner balance
-        main_wave = osc1 + osc2 + sub_osc + (saw_wave * filter_mod)
+        # Mix oscillators for ambient character
+        main_wave = (osc1 + osc2 + sub_osc + harmonic) * amplitude_mod
         
-        # Add just a touch of harmonic content (much less than before)
-        harmonic = 0.08 * np.sin(2 * np.pi * base_freq * 2 * t_global + self.phase_continuity * 2)
+        # Apply echo effect
+        echo_wave = np.zeros_like(main_wave)
+        for i in range(len(main_wave)):
+            if i < len(self.echo_buffer):
+                echo_wave[i] = self.echo_buffer[i] * 0.4  # Echo at 40% volume
         
-        # Combine with proper gain staging to prevent clipping
-        combined_wave = (main_wave + harmonic) * self.amplitude * 0.6  # Reduced gain
+        # Update echo buffer (shift and add new samples)
+        self.echo_buffer = np.roll(self.echo_buffer, -len(main_wave))
+        if len(main_wave) <= len(self.echo_buffer):
+            self.echo_buffer[-len(main_wave):] = main_wave
         
-        # Soft limiting to prevent any harsh clipping
-        combined_wave = np.tanh(combined_wave)
+        # Combine main signal with echo
+        combined_wave = (main_wave + echo_wave) * self.amplitude * 0.5
         
-        # Apply smooth envelope to prevent clicks
+        # Gentle soft limiting for warmth
+        combined_wave = np.tanh(combined_wave * 0.8)
+        
+        # Apply very gentle envelope
         envelope = np.ones_like(combined_wave)
-        fade_in_samples = min(self.fade_samples, len(combined_wave) // 8)
-        fade_out_samples = min(self.fade_samples, len(combined_wave) // 8)
+        fade_samples = min(128, len(combined_wave) // 16)  # Very short fades
         
-        # Gentler fades
-        if fade_in_samples > 0:
-            envelope[:fade_in_samples] = np.sin(np.linspace(0, np.pi/2, fade_in_samples))**2
-        if fade_out_samples > 0:
-            envelope[-fade_out_samples:] = np.cos(np.linspace(0, np.pi/2, fade_out_samples))**2
+        if fade_samples > 0:
+            envelope[:fade_samples] = np.sin(np.linspace(0, np.pi/2, fade_samples))**2
+            envelope[-fade_samples:] = np.cos(np.linspace(0, np.pi/2, fade_samples))**2
         
         combined_wave *= envelope
         
@@ -109,7 +114,7 @@ class AudioVisualizer:
         stereo_wave = np.column_stack((combined_wave, combined_wave))
         
         # Convert to 16-bit integers with proper scaling
-        audio_data = (stereo_wave * 16383).astype(np.int16)  # Leave headroom
+        audio_data = (stereo_wave * 12000).astype(np.int16)  # Conservative scaling for warmth
         audio_data = np.ascontiguousarray(audio_data)
         
         # Debug: Print audio data information
@@ -167,14 +172,24 @@ class AudioVisualizer:
             self.waveform_points.append((x, y))
     
     def draw(self):
-        """Draw clean waveform visualization"""
+        """Draw smooth antialiased waveform visualization"""
         # Plain black background
         self.screen.fill(BLACK)
         
-        # Draw only the waveform - clean white line
+        # Draw the waveform as connected antialiased lines
         if len(self.waveform_points) > 2:
-            # Draw the waveform as a smooth white polygon outline
-            pygame.draw.polygon(self.screen, WHITE, self.waveform_points, 2)
+            # Draw multiple passes for a softer, slightly blurred effect
+            for thickness in [4, 3, 2, 1]:
+                alpha = 80 if thickness > 1 else 255  # Outer lines are more transparent
+                color = (alpha, alpha, alpha) if thickness > 1 else WHITE
+                
+                # Draw connected line segments with antialiasing
+                for i in range(len(self.waveform_points)):
+                    start_point = self.waveform_points[i]
+                    end_point = self.waveform_points[(i + 1) % len(self.waveform_points)]
+                    
+                    # Use aaline for antialiasing
+                    pygame.draw.aaline(self.screen, color, start_point, end_point, thickness)
         
         # Minimal UI - just controls at bottom
         small_font = pygame.font.Font(None, 20)
@@ -195,11 +210,11 @@ class AudioVisualizer:
                 if event.key == pygame.K_ESCAPE:
                     return False
                 elif event.key == pygame.K_SPACE:
-                    # Regenerate audio with synth-wave variations
-                    self.frequency_base += np.random.uniform(-30, 30)
-                    self.frequency_base = max(80, min(300, self.frequency_base))
-                    self.frequency_mod = np.random.uniform(0.1, 0.8)
-                    self.lfo_rate = np.random.uniform(0.1, 0.5)
+                    # Regenerate audio with ambient variations
+                    self.frequency_base += np.random.uniform(-15, 15)
+                    self.frequency_base = max(60, min(120, self.frequency_base))
+                    self.frequency_mod = np.random.uniform(0.05, 0.3)
+                    self.lfo_rate = np.random.uniform(0.05, 0.15)
         return True
     
     def run(self):
