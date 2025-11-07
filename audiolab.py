@@ -18,9 +18,11 @@ BUFFER_SIZE = 4096
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-GREEN = (0, 255, 100)
-BLUE = (100, 150, 255)
-PURPLE = (200, 100, 255)
+NEON_PINK = (255, 20, 147)
+NEON_CYAN = (0, 255, 255)
+NEON_PURPLE = (186, 85, 211)
+ELECTRIC_BLUE = (30, 144, 255)
+DARK_PURPLE = (25, 25, 50)
 
 class AudioVisualizer:
     def __init__(self):
@@ -30,9 +32,18 @@ class AudioVisualizer:
         
         # Audio parameters
         self.time_offset = 0
-        self.frequency_base = 220  # Base frequency (A3)
-        self.frequency_mod = 0.5   # Frequency modulation rate
-        self.amplitude = 0.3
+        self.frequency_base = 110  # Lower base frequency for synth-wave
+        self.frequency_mod = 0.3   # Slower modulation for smoother feel
+        self.amplitude = 0.4
+        self.phase_continuity = 0  # Track phase for smooth transitions
+        
+        # Synth-wave parameters
+        self.lfo_rate = 0.2  # Low frequency oscillator for filter sweep
+        self.filter_cutoff = 0.5
+        
+        # Audio smoothing
+        self.previous_chunk = None
+        self.fade_samples = 512  # Number of samples for crossfade
         
         # Visualization parameters
         self.waveform_points = []
@@ -43,26 +54,47 @@ class AudioVisualizer:
         self.play_audio()
     
     def generate_audio_chunk(self):
-        """Generate a chunk of soothing audio data"""
+        """Generate a chunk of smooth synth-wave audio data"""
         t = np.linspace(0, BUFFER_SIZE / SAMPLE_RATE, BUFFER_SIZE)
+        t_global = t + self.time_offset
         
-        # Create a soothing sound with multiple harmonics and slow modulation
-        base_freq = self.frequency_base + 20 * np.sin(self.time_offset * self.frequency_mod)
+        # Synth-wave style oscillators with smooth frequency modulation
+        base_freq = self.frequency_base + 15 * np.sin(self.time_offset * self.frequency_mod)
         
-        # Main tone with harmonics
-        wave1 = np.sin(2 * np.pi * base_freq * t + self.time_offset)
-        wave2 = 0.5 * np.sin(2 * np.pi * base_freq * 1.5 * t + self.time_offset * 1.2)
-        wave3 = 0.3 * np.sin(2 * np.pi * base_freq * 2 * t + self.time_offset * 0.8)
+        # Main synth lead with detuned oscillators
+        osc1 = np.sin(2 * np.pi * base_freq * t_global + self.phase_continuity)
+        osc2 = np.sin(2 * np.pi * base_freq * 1.01 * t_global + self.phase_continuity * 1.1)  # Slight detune
+        osc3 = np.sin(2 * np.pi * base_freq * 0.5 * t_global + self.phase_continuity * 0.7)   # Sub oscillator
         
-        # Add some ambient texture
-        ambient = 0.1 * np.sin(2 * np.pi * base_freq * 0.5 * t + self.time_offset * 0.3)
+        # Synth-wave style sawtooth wave
+        saw_wave = 2 * ((base_freq * t_global + self.phase_continuity / (2 * np.pi)) % 1) - 1
+        saw_wave = np.clip(saw_wave, -1, 1)  # Hard clip for digital feel
         
-        # Combine waves
-        combined_wave = (wave1 + wave2 + wave3 + ambient) * self.amplitude
+        # Low-frequency oscillator for filter movement
+        lfo = np.sin(2 * np.pi * self.lfo_rate * t_global)
+        filter_mod = 0.5 + 0.3 * lfo
         
-        # Apply a gentle envelope to avoid clicks
-        envelope = np.exp(-t * 2)  # Gentle decay
-        combined_wave *= (1 - envelope * 0.3)  # Subtle envelope effect
+        # Mix oscillators with synth-wave character
+        main_wave = (0.4 * osc1 + 0.3 * osc2 + 0.2 * osc3 + 0.3 * saw_wave * filter_mod)
+        
+        # Add some harmonic content for richness
+        harmonic1 = 0.15 * np.sin(2 * np.pi * base_freq * 2 * t_global + self.phase_continuity * 2)
+        harmonic2 = 0.1 * np.sin(2 * np.pi * base_freq * 3 * t_global + self.phase_continuity * 3)
+        
+        # Combine all elements
+        combined_wave = (main_wave + harmonic1 + harmonic2) * self.amplitude
+        
+        # Apply smooth envelope to prevent clicks (attack/sustain/release style)
+        envelope = np.ones_like(combined_wave)
+        fade_in_samples = min(self.fade_samples, len(combined_wave) // 4)
+        fade_out_samples = min(self.fade_samples, len(combined_wave) // 4)
+        
+        # Fade in at the beginning
+        envelope[:fade_in_samples] = np.linspace(0, 1, fade_in_samples)
+        # Fade out at the end
+        envelope[-fade_out_samples:] = np.linspace(1, 0, fade_out_samples)
+        
+        combined_wave *= envelope
         
         # Convert to stereo and ensure C-contiguous array
         stereo_wave = np.column_stack((combined_wave, combined_wave))
@@ -70,6 +102,10 @@ class AudioVisualizer:
         # Convert to 16-bit integers and ensure C-contiguous
         audio_data = (stereo_wave * 32767).astype(np.int16)
         audio_data = np.ascontiguousarray(audio_data)
+        
+        # Update phase continuity for smooth transitions
+        self.phase_continuity += 2 * np.pi * base_freq * (BUFFER_SIZE / SAMPLE_RATE)
+        self.phase_continuity = self.phase_continuity % (2 * np.pi)
         
         self.time_offset += BUFFER_SIZE / SAMPLE_RATE
         
@@ -109,41 +145,73 @@ class AudioVisualizer:
             self.waveform_points.append((x, y))
     
     def draw(self):
-        """Draw everything to the screen"""
-        self.screen.fill(BLACK)
+        """Draw everything to the screen with synth-wave aesthetics"""
+        # Dark gradient background
+        self.screen.fill(DARK_PURPLE)
         
-        # Draw center point
-        pygame.draw.circle(self.screen, WHITE, SCREEN_CENTER, 5)
+        # Add some background grid for synth-wave feel
+        for i in range(0, SCREEN_WIDTH, 60):
+            pygame.draw.line(self.screen, (40, 40, 80), (i, 0), (i, SCREEN_HEIGHT), 1)
+        for i in range(0, SCREEN_HEIGHT, 40):
+            pygame.draw.line(self.screen, (40, 40, 80), (0, i), (SCREEN_WIDTH, i), 1)
         
-        # Draw base circle (reference)
-        pygame.draw.circle(self.screen, (50, 50, 50), SCREEN_CENTER, CIRCLE_RADIUS, 2)
+        # Draw glowing center point
+        for radius in [8, 6, 4, 2]:
+            alpha = 255 - (radius * 30)
+            color = (*NEON_CYAN, max(0, alpha))
+            # Create a surface for alpha blending
+            glow_surface = pygame.Surface((radius*4, radius*4), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surface, color, (radius*2, radius*2), radius)
+            self.screen.blit(glow_surface, (SCREEN_CENTER[0] - radius*2, SCREEN_CENTER[1] - radius*2))
         
-        # Draw waveform
+        # Draw base circle (reference) with neon glow
+        pygame.draw.circle(self.screen, (60, 60, 120), SCREEN_CENTER, CIRCLE_RADIUS, 2)
+        pygame.draw.circle(self.screen, ELECTRIC_BLUE, SCREEN_CENTER, CIRCLE_RADIUS, 1)
+        
+        # Draw waveform with synth-wave colors and glow
         if len(self.waveform_points) > 2:
-            # Create color gradient based on time
-            color_shift = (math.sin(self.time_offset) + 1) / 2
+            # Create dynamic color based on audio intensity and time
+            intensity = np.mean(np.abs(self.current_audio_data[:, 0])) / 32767.0
+            time_shift = (math.sin(self.time_offset * 0.5) + 1) / 2
+            
+            # Primary neon color
             color = (
-                int(100 + color_shift * 155),
-                int(150 + color_shift * 105),
-                int(200 + color_shift * 55)
+                int(NEON_PINK[0] * (0.5 + intensity * 0.5)),
+                int(NEON_PINK[1] + (NEON_CYAN[1] - NEON_PINK[1]) * time_shift),
+                int(NEON_PINK[2] + (NEON_CYAN[2] - NEON_PINK[2]) * time_shift)
             )
             
-            pygame.draw.polygon(self.screen, color, self.waveform_points, 3)
+            # Draw waveform with glow effect
+            # Outer glow
+            pygame.draw.polygon(self.screen, (color[0]//4, color[1]//4, color[2]//4), self.waveform_points, 8)
+            # Main line
+            pygame.draw.polygon(self.screen, color, self.waveform_points, 4)
+            # Inner highlight
+            bright_color = tuple(min(255, c + 50) for c in color)
+            pygame.draw.polygon(self.screen, bright_color, self.waveform_points, 2)
             
-            # Draw points for extra visual appeal
-            for i, point in enumerate(self.waveform_points[::10]):  # Every 10th point
-                brightness = int(200 + 55 * math.sin(self.time_offset + i * 0.1))
-                point_color = (brightness, brightness//2, brightness//3)
-                pygame.draw.circle(self.screen, point_color, (int(point[0]), int(point[1])), 2)
+            # Draw pulsing points at key positions
+            for i, point in enumerate(self.waveform_points[::30]):  # Every 30th point
+                pulse = math.sin(self.time_offset * 2 + i * 0.5) * 0.5 + 0.5
+                point_size = int(2 + pulse * 3)
+                point_brightness = int(150 + pulse * 105)
+                point_color = (point_brightness, point_brightness//2, 255)
+                pygame.draw.circle(self.screen, point_color, (int(point[0]), int(point[1])), point_size)
         
-        # Draw some UI text
-        font = pygame.font.Font(None, 36)
-        title_text = font.render("AudioLab - Circular Waveform", True, WHITE)
+        # Draw retro-style UI
+        font = pygame.font.Font(None, 48)
+        title_text = font.render("◆ AUDIOLAB ◆", True, NEON_CYAN)
         self.screen.blit(title_text, (20, 20))
         
-        small_font = pygame.font.Font(None, 24)
-        info_text = small_font.render("Press SPACE to regenerate audio, ESC to quit", True, (200, 200, 200))
-        self.screen.blit(info_text, (20, SCREEN_HEIGHT - 40))
+        # Add a subtitle
+        subtitle_font = pygame.font.Font(None, 24)
+        subtitle_text = subtitle_font.render("S Y N T H   W A V E   V I S U A L I Z E R", True, NEON_PINK)
+        self.screen.blit(subtitle_text, (25, 65))
+        
+        # Control instructions
+        small_font = pygame.font.Font(None, 20)
+        info_text = small_font.render("► SPACE: New wave pattern  ► ESC: Exit", True, WHITE)
+        self.screen.blit(info_text, (20, SCREEN_HEIGHT - 30))
         
         pygame.display.flip()
     
@@ -156,10 +224,11 @@ class AudioVisualizer:
                 if event.key == pygame.K_ESCAPE:
                     return False
                 elif event.key == pygame.K_SPACE:
-                    # Regenerate audio with slight variation
-                    self.frequency_base += np.random.uniform(-20, 20)
-                    self.frequency_base = max(100, min(400, self.frequency_base))
-                    self.frequency_mod = np.random.uniform(0.1, 1.0)
+                    # Regenerate audio with synth-wave variations
+                    self.frequency_base += np.random.uniform(-30, 30)
+                    self.frequency_base = max(80, min(300, self.frequency_base))
+                    self.frequency_mod = np.random.uniform(0.1, 0.8)
+                    self.lfo_rate = np.random.uniform(0.1, 0.5)
         return True
     
     def run(self):
