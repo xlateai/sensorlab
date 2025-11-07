@@ -24,10 +24,13 @@ interface WaveDefinition {
   sweepK: number; // For sweep waves
 }
 
-interface SavedWave {
+interface CompositeWave {
   id: string;
   name: string;
   waves: WaveDefinition[];
+  volume: number;
+  multiplicity: number;
+  isPlaying: boolean;
   createdAt: Date;
 }
 
@@ -67,8 +70,8 @@ export default function WaveEditor({
   const [multiplicity, setMultiplicity] = useState(1.0); // Frequency multiplier from 0 to 1
   const [isNegated, setIsNegated] = useState(false); // Negate waveform (invert phase)
   
-  // Bookmark system
-  const [savedWaves, setSavedWaves] = useState<SavedWave[]>([]);
+  // Composite wave system
+  const [compositeWaves, setCompositeWaves] = useState<CompositeWave[]>([]);
   const [waveName, setWaveName] = useState('');
   
   // Dropdown management - only one dropdown open at a time
@@ -569,31 +572,70 @@ export default function WaveEditor({
     });
   };
   
-  // Bookmark functions
+  // Composite wave functions
   const saveCurrentWave = () => {
     const id = generateUUID();
     // Use first 4 letters of UUID if no name is provided
     const name = waveName.trim() === '' ? id.substring(0, 4) : waveName.trim();
     
-    const newSavedWave: SavedWave = {
+    const newCompositeWave: CompositeWave = {
       id,
       name,
       waves: [...waves],
+      volume: 0.3,
+      multiplicity: 1.0,
+      isPlaying: false,
       createdAt: new Date()
     };
     
-    setSavedWaves(prev => [...prev, newSavedWave]);
+    setCompositeWaves(prev => [...prev, newCompositeWave]);
     setWaveName(''); // Clear the input
-    Alert.alert('Saved!', `"${newSavedWave.name}" has been saved!`);
+    Alert.alert('Saved!', `"${newCompositeWave.name}" has been saved!`);
   };
   
-  const loadSavedWave = (savedWave: SavedWave) => {
-    setWaves([...savedWave.waves]);
-    setWaveName(savedWave.name); // Load name for potential editing
+  const loadCompositeWave = (compositeWave: CompositeWave) => {
+    setWaves([...compositeWave.waves]);
+    setWaveName(compositeWave.name); // Load name for potential editing
   };
   
-  const deleteSavedWave = (id: string) => {
-    setSavedWaves(prev => prev.filter(wave => wave.id !== id));
+  const deleteCompositeWave = (id: string) => {
+    setCompositeWaves(prev => prev.filter(wave => wave.id !== id));
+  };
+
+  const updateCompositeWave = (id: string, updates: Partial<CompositeWave>) => {
+    setCompositeWaves(prev => prev.map(wave => 
+      wave.id === id ? { ...wave, ...updates } : wave
+    ));
+  };
+
+  const playCompositeWave = (id: string) => {
+    updateCompositeWave(id, { isPlaying: true });
+  };
+
+  const stopCompositeWave = (id: string) => {
+    updateCompositeWave(id, { isPlaying: false });
+  };
+
+  // Edit modal state
+  const [editingCompositeWave, setEditingCompositeWave] = useState<CompositeWave | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const editCompositeWave = (compositeWave: CompositeWave) => {
+    setEditingCompositeWave(compositeWave);
+    setShowEditModal(true);
+  };
+
+  const saveEditedCompositeWave = (editedWaves: WaveDefinition[]) => {
+    if (editingCompositeWave) {
+      updateCompositeWave(editingCompositeWave.id, { waves: editedWaves });
+      setShowEditModal(false);
+      setEditingCompositeWave(null);
+    }
+  };
+
+  const cancelEditCompositeWave = () => {
+    setShowEditModal(false);
+    setEditingCompositeWave(null);
   };
   
   // Custom curve functions
@@ -603,6 +645,647 @@ export default function WaveEditor({
     setCustomCurves(prev => [...prev, newCurve]);
     Alert.alert('Success', `Custom curve "${name}" has been saved!`);
   };
+
+// Composite Wave Edit Modal Component
+const CompositeWaveEditModal = ({
+  isVisible,
+  compositeWave,
+  onSave,
+  onCancel,
+  customCurves
+}: {
+  isVisible: boolean;
+  compositeWave: CompositeWave | null;
+  onSave: (waves: WaveDefinition[]) => void;
+  onCancel: () => void;
+  customCurves: Array<{id: string, name: string, points: {x: number, y: number}[]}>;
+}) => {
+  const [editWaves, setEditWaves] = useState<WaveDefinition[]>([]);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
+  // Initialize edit waves when modal opens
+  useEffect(() => {
+    if (isVisible && compositeWave) {
+      setEditWaves([...compositeWave.waves]);
+    }
+  }, [isVisible, compositeWave]);
+
+  if (!isVisible || !compositeWave) return null;
+
+  const updateWave = (index: number, updates: Partial<WaveDefinition>) => {
+    const newWaves = [...editWaves];
+    newWaves[index] = { ...newWaves[index], ...updates };
+    setEditWaves(newWaves);
+  };
+
+  const addWave = () => {
+    if (editWaves.length < 8) {
+      const newId = (parseInt(editWaves[editWaves.length - 1].id) + 1).toString();
+      const newWave: WaveDefinition = {
+        id: newId,
+        type: 'sine',
+        shape: 'sine',
+        frequency: editWaves[0].frequency * 2,
+        startFreq: 100,
+        endFreq: 1000,
+        sweepK: 10
+      };
+      setEditWaves([...editWaves, newWave]);
+    }
+  };
+
+  const removeWave = (index: number) => {
+    if (editWaves.length > 1) {
+      const newWaves = editWaves.filter((_, i) => i !== index);
+      setEditWaves(newWaves);
+    }
+  };
+
+  const generateShapeVisualization = (shape: string, points: number, width: number, amplitude: number): string => {
+    try {
+      let pathData = '';
+      const cycles = 2;
+      
+      const customCurve = customCurves.find(curve => curve.id === shape);
+      
+      if (customCurve) {
+        for (let i = 0; i <= points; i++) {
+          const x = (i / points) * width;
+          const t = (i / points) * cycles;
+          
+          const curveProgress = (t % 1);
+          const curveIndex = Math.floor(curveProgress * (customCurve.points.length - 1));
+          const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+          const localT = (curveProgress * (customCurve.points.length - 1)) - curveIndex;
+          
+          const p1 = customCurve.points[curveIndex];
+          const p2 = customCurve.points[nextIndex];
+          const y = p1.y + (p2.y - p1.y) * localT;
+          
+          const normalizedY = (y - 0.5) * 2;
+          const yPos = (normalizedY * amplitude) + (amplitude * 2);
+          
+          if (i === 0) {
+            pathData = `M ${x} ${yPos}`;
+          } else {
+            pathData += ` L ${x} ${yPos}`;
+          }
+        }
+      } else {
+        for (let i = 0; i <= points; i++) {
+          const x = (i / points) * width;
+          const t = (i / points) * cycles * Math.PI * 2;
+          let y = 0;
+          
+          switch (shape) {
+            case 'sine':
+              y = Math.sin(t);
+              break;
+            case 'square':
+              y = Math.sin(t) >= 0 ? 1 : -1;
+              break;
+            case 'triangle':
+              y = (2 / Math.PI) * Math.asin(Math.sin(t));
+              break;
+            case 'sawtooth':
+              y = 2 * (t / (2 * Math.PI) - Math.floor(t / (2 * Math.PI) + 0.5));
+              break;
+            case 'noise':
+              y = Math.random() * 2 - 1;
+              break;
+            default:
+              y = Math.sin(t);
+          }
+          
+          const yPos = (y * amplitude) + (amplitude * 2);
+          
+          if (i === 0) {
+            pathData = `M ${x} ${yPos}`;
+          } else {
+            pathData += ` L ${x} ${yPos}`;
+          }
+        }
+      }
+      
+      return pathData;
+    } catch (error) {
+      console.warn('Error generating shape visualization:', error);
+      return `M 0 ${amplitude} L ${width} ${amplitude}`;
+    }
+  };
+
+  return (
+    <View style={styles.editModalOverlay}>
+      <TouchableOpacity 
+        style={styles.editModalBackdrop} 
+        onPress={onCancel}
+        activeOpacity={1}
+      />
+      
+      <View style={styles.editModalContainer}>
+        <View style={styles.editModalHeader}>
+          <Text style={styles.editModalTitle}>Edit "{compositeWave.name}"</Text>
+          <TouchableOpacity onPress={onCancel} style={styles.editModalCloseButton}>
+            <Ionicons name="close" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.editModalContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.editModalWaveSection}>
+            <View style={styles.editModalSectionHeader}>
+              <Text style={styles.editModalSectionTitle}>Waves</Text>
+              <TouchableOpacity 
+                style={styles.editModalAddButton}
+                onPress={addWave}
+                disabled={editWaves.length >= 8}
+              >
+                <Ionicons name="add" size={20} color="#00ff00" />
+              </TouchableOpacity>
+            </View>
+            
+            {editWaves.map((wave, index) => (
+              <View key={wave.id} style={styles.editModalWaveRow}>
+                <View style={styles.editModalWaveContainer}>
+                  <Text style={styles.editModalWaveLabel}>
+                    Wave {index + 1}
+                  </Text>
+                  
+                  {wave.type === 'sine' ? (
+                    <Slider
+                      style={styles.editModalSlider}
+                      minimumValue={10}
+                      maximumValue={2000}
+                      value={wave.frequency}
+                      onValueChange={(value) => updateWave(index, { frequency: value })}
+                      minimumTrackTintColor="#00ff00"
+                      maximumTrackTintColor="#333333"
+                      thumbTintColor="#00ff00"
+                    />
+                  ) : (
+                    <View style={styles.editModalSweepControls}>
+                      <View style={styles.editModalSweepRow}>
+                        <Text style={styles.editModalSweepLabel}>Start:</Text>
+                        <Slider
+                          style={styles.editModalSweepSlider}
+                          minimumValue={10}
+                          maximumValue={2000}
+                          value={wave.startFreq}
+                          onValueChange={(value) => updateWave(index, { startFreq: value })}
+                          minimumTrackTintColor="#888888"
+                          maximumTrackTintColor="#333333"
+                          thumbTintColor="#888888"
+                        />
+                        <Text style={styles.editModalSweepValue}>{Math.round(wave.startFreq)}</Text>
+                      </View>
+                      <View style={styles.editModalSweepRow}>
+                        <Text style={styles.editModalSweepLabel}>End:</Text>
+                        <Slider
+                          style={styles.editModalSweepSlider}
+                          minimumValue={10}
+                          maximumValue={2000}
+                          value={wave.endFreq}
+                          onValueChange={(value) => updateWave(index, { endFreq: value })}
+                          minimumTrackTintColor="#888888"
+                          maximumTrackTintColor="#333333"
+                          thumbTintColor="#888888"
+                        />
+                        <Text style={styles.editModalSweepValue}>{Math.round(wave.endFreq)}</Text>
+                      </View>
+                      <View style={styles.editModalSweepRow}>
+                        <Text style={styles.editModalSweepLabel}>Count:</Text>
+                        <Slider
+                          style={styles.editModalSweepSlider}
+                          minimumValue={2}
+                          maximumValue={50}
+                          step={1}
+                          value={wave.sweepK}
+                          onValueChange={(value) => updateWave(index, { sweepK: value })}
+                          minimumTrackTintColor="#888888"
+                          maximumTrackTintColor="#333333"
+                          thumbTintColor="#888888"
+                        />
+                        <Text style={styles.editModalSweepValue}>{wave.sweepK}</Text>
+                      </View>
+                    </View>
+                  )}
+                  
+                  <Text style={styles.editModalWaveValue}>
+                    {wave.type === 'sine' 
+                      ? `${Math.round(wave.frequency)}Hz`
+                      : `${Math.round(wave.startFreq)}-${Math.round(wave.endFreq)}Hz`
+                    }
+                  </Text>
+                </View>
+                
+                {/* Wave Shape Dropdown - Simplified for modal */}
+                <View style={styles.editModalShapeContainer}>
+                  <TouchableOpacity
+                    style={styles.editModalShapeButton}
+                    onPress={() => {
+                      if (openDropdownId === wave.id) {
+                        setOpenDropdownId(null);
+                      } else {
+                        setOpenDropdownId(wave.id);
+                      }
+                    }}
+                  >
+                    <Text style={styles.editModalShapeText}>
+                      {wave.shape.charAt(0).toUpperCase() + wave.shape.slice(1)}
+                    </Text>
+                    <Ionicons 
+                      name={openDropdownId === wave.id ? "chevron-up" : "chevron-down"} 
+                      size={16} 
+                      color="#888888" 
+                    />
+                  </TouchableOpacity>
+                  
+                  {openDropdownId === wave.id && (
+                    <View style={styles.editModalShapeDropdown}>
+                      {['sine', 'square', 'triangle', 'sawtooth', 'noise'].map((shapeOption) => (
+                        <TouchableOpacity
+                          key={shapeOption}
+                          style={[
+                            styles.editModalShapeOption,
+                            wave.shape === shapeOption && styles.editModalShapeOptionSelected
+                          ]}
+                          onPress={() => {
+                            updateWave(index, { shape: shapeOption as any });
+                            setOpenDropdownId(null);
+                          }}
+                        >
+                          <Text style={[
+                            styles.editModalShapeOptionText,
+                            wave.shape === shapeOption && styles.editModalShapeOptionTextSelected
+                          ]}>
+                            {shapeOption.charAt(0).toUpperCase() + shapeOption.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.editModalTypeButton, wave.type === 'sweep' && styles.editModalTypeButtonActive]}
+                  onPress={() => updateWave(index, { type: wave.type === 'sine' ? 'sweep' : 'sine' })}
+                >
+                  <Text style={[styles.editModalTypeButtonText, wave.type === 'sweep' && styles.editModalTypeButtonTextActive]}>
+                    {wave.type === 'sine' ? 'S' : 'Sw'}
+                  </Text>
+                </TouchableOpacity>
+                
+                {editWaves.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.editModalRemoveButton}
+                    onPress={() => removeWave(index)}
+                  >
+                    <Ionicons name="remove" size={16} color="#ff0000" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+        
+        <View style={styles.editModalFooter}>
+          <TouchableOpacity style={styles.editModalCancelButton} onPress={onCancel}>
+            <Text style={styles.editModalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.editModalSaveButton} 
+            onPress={() => onSave(editWaves)}
+          >
+            <Text style={styles.editModalSaveText}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// Composite Wave Control Component
+const CompositeWaveControl = ({
+  compositeWave,
+  onPlay,
+  onStop,
+  onVolumeChange,
+  onMultiplicityChange,
+  onEdit,
+  onDelete,
+  onLoad,
+  customCurves
+}: {
+  compositeWave: CompositeWave;
+  onPlay: () => void;
+  onStop: () => void;
+  onVolumeChange: (volume: number) => void;
+  onMultiplicityChange: (multiplicity: number) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onLoad: () => void;
+  customCurves: Array<{id: string, name: string, points: {x: number, y: number}[]}>;
+}) => {
+  // Audio context refs for individual composite wave playback
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorsRef = useRef<OscillatorNode[]>([]);
+  const gainNodesRef = useRef<GainNode[]>([]);
+
+  // Generate waveform shape functions - copied from main component
+  const generateWaveShape = (shape: string, freq: number, audioContext: AudioContext): OscillatorNode => {
+    const oscillator = audioContext.createOscillator();
+    
+    const customCurve = customCurves.find(curve => curve.id === shape);
+    
+    if (customCurve && customCurve.points && customCurve.points.length > 1) {
+      const harmonics = 128;
+      const real = new Float32Array(harmonics);
+      const imag = new Float32Array(harmonics);
+      
+      const samples = 512;
+      const wavetable: number[] = [];
+      
+      for (let i = 0; i < samples; i++) {
+        const t = i / samples;
+        const curveIndex = Math.floor(t * (customCurve.points.length - 1));
+        const nextIndex = Math.min(curveIndex + 1, customCurve.points.length - 1);
+        const localT = (t * (customCurve.points.length - 1)) - curveIndex;
+        
+        const p1 = customCurve.points[curveIndex];
+        const p2 = customCurve.points[nextIndex];
+        const y = p1.y + (p2.y - p1.y) * localT;
+        wavetable[i] = (y - 0.5) * 2;
+      }
+      
+      for (let h = 1; h < harmonics && h < 64; h++) {
+        let realSum = 0;
+        let imagSum = 0;
+        
+        for (let i = 0; i < samples; i++) {
+          const angle = (2 * Math.PI * h * i) / samples;
+          realSum += wavetable[i] * Math.cos(angle);
+          imagSum -= wavetable[i] * Math.sin(angle);
+        }
+        
+        real[h] = realSum / samples;
+        imag[h] = imagSum / samples;
+      }
+      
+      const customWave = audioContext.createPeriodicWave(real, imag, { disableNormalization: false });
+      oscillator.setPeriodicWave(customWave);
+    } else {
+      switch (shape) {
+        case 'sine':
+          oscillator.type = 'sine';
+          break;
+        case 'square':
+          oscillator.type = 'square';
+          break;
+        case 'triangle':
+          oscillator.type = 'triangle';
+          break;
+        case 'sawtooth':
+          oscillator.type = 'sawtooth';
+          break;
+        case 'noise':
+          const real = new Float32Array(16);
+          const imag = new Float32Array(16);
+          for (let i = 0; i < 16; i++) {
+            real[i] = Math.random() * 2 - 1;
+            imag[i] = Math.random() * 2 - 1;
+          }
+          const customWave = audioContext.createPeriodicWave(real, imag);
+          oscillator.setPeriodicWave(customWave);
+          break;
+        default:
+          oscillator.type = 'sine';
+      }
+    }
+    
+    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+    return oscillator;
+  };
+
+  const generateWaveFrequencies = (wave: WaveDefinition): number[] => {
+    if (wave.type === 'sine') {
+      return [wave.frequency];
+    } else {
+      if (wave.sweepK < 2) return [wave.startFreq];
+      
+      const freqs: number[] = [];
+      const step = (wave.endFreq - wave.startFreq) / (wave.sweepK - 1);
+      
+      for (let i = 0; i < wave.sweepK; i++) {
+        freqs.push(wave.startFreq + (step * i));
+      }
+      
+      return freqs;
+    }
+  };
+
+  const startCompositeWave = async () => {
+    try {
+      if (!Platform.OS || Platform.OS === 'web') {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = audioContext;
+        
+        oscillatorsRef.current = [];
+        gainNodesRef.current = [];
+        
+        const currentWaves = compositeWave.waves.flatMap(wave => {
+          const frequencies = generateWaveFrequencies(wave);
+          return frequencies.map(freq => ({ frequency: freq, shape: wave.shape }));
+        });
+        
+        currentWaves.forEach((waveData) => {
+          const oscillator = generateWaveShape(waveData.shape, waveData.frequency, audioContext);
+          const multipliedFreq = waveData.frequency * compositeWave.multiplicity;
+          oscillator.frequency.setValueAtTime(multipliedFreq, audioContext.currentTime);
+          
+          const gainNode = audioContext.createGain();
+          const volumePerOscillator = compositeWave.volume / currentWaves.length;
+          gainNode.gain.setValueAtTime(volumePerOscillator, audioContext.currentTime);
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillatorsRef.current.push(oscillator);
+          gainNodesRef.current.push(gainNode);
+          
+          oscillator.start();
+        });
+        
+        onPlay();
+      }
+    } catch (error) {
+      console.error('Error starting composite wave:', error);
+    }
+  };
+
+  const stopCompositeWave = () => {
+    try {
+      if (audioContextRef.current) {
+        oscillatorsRef.current.forEach(oscillator => {
+          if (oscillator) {
+            oscillator.stop();
+          }
+        });
+        
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+        
+        oscillatorsRef.current = [];
+        gainNodesRef.current = [];
+      }
+      
+      onStop();
+    } catch (error) {
+      console.warn('Error stopping composite wave:', error);
+    }
+  };
+
+  const togglePlayback = () => {
+    if (compositeWave.isPlaying) {
+      stopCompositeWave();
+    } else {
+      startCompositeWave();
+    }
+  };
+
+  // Update volume during playback
+  useEffect(() => {
+    if (gainNodesRef.current.length > 0 && audioContextRef.current) {
+      const volumePerOscillator = compositeWave.volume / gainNodesRef.current.length;
+      gainNodesRef.current.forEach((gainNode) => {
+        if (gainNode && audioContextRef.current) {
+          gainNode.gain.setValueAtTime(volumePerOscillator, audioContextRef.current.currentTime);
+        }
+      });
+    }
+  }, [compositeWave.volume]);
+
+  // Update frequencies during playback
+  useEffect(() => {
+    if (oscillatorsRef.current.length > 0 && audioContextRef.current) {
+      const currentFrequencies = compositeWave.waves.flatMap(wave => generateWaveFrequencies(wave));
+      
+      oscillatorsRef.current.forEach((oscillator, index) => {
+        if (oscillator && audioContextRef.current && currentFrequencies[index]) {
+          const multipliedFreq = currentFrequencies[index] * compositeWave.multiplicity;
+          oscillator.frequency.setValueAtTime(
+            multipliedFreq, 
+            audioContextRef.current.currentTime
+          );
+        }
+      });
+    }
+  }, [compositeWave.multiplicity]);
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Composite Wave',
+      `Delete "${compositeWave.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: onDelete }
+      ]
+    );
+  };
+
+  return (
+    <View style={styles.compositeWaveItem}>
+      <View style={styles.compositeWaveHeader}>
+        <View style={styles.compositeWaveInfo}>
+          <Text style={styles.compositeWaveName}>{compositeWave.name}</Text>
+          <Text style={styles.compositeWaveDetails}>
+            {compositeWave.waves.length} wave{compositeWave.waves.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+        
+        <View style={styles.compositeWaveActions}>
+          <TouchableOpacity
+            style={styles.compositeWaveLoadButton}
+            onPress={onLoad}
+          >
+            <Ionicons name="download" size={16} color="#00ff00" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.compositeWaveEditButton}
+            onPress={onEdit}
+          >
+            <Ionicons name="create" size={16} color="#00ff00" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.compositeWaveDeleteButton}
+            onPress={handleDelete}
+          >
+            <Ionicons name="trash" size={16} color="#ff4444" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.compositeWaveControls}>
+        {/* Play/Stop Button */}
+        <TouchableOpacity
+          style={[
+            styles.compositeWavePlayButton,
+            compositeWave.isPlaying && styles.compositeWavePlayButtonActive
+          ]}
+          onPress={togglePlayback}
+        >
+          <Ionicons 
+            name={compositeWave.isPlaying ? "stop" : "play"} 
+            size={20} 
+            color={compositeWave.isPlaying ? "#ff0000" : "#00ff00"} 
+          />
+        </TouchableOpacity>
+
+        {/* Volume Control */}
+        <View style={styles.compositeWaveSliderContainer}>
+          <View style={styles.compositeWaveSliderHeader}>
+            <Ionicons name="volume-medium" size={16} color="#00ff00" />
+            <Text style={styles.compositeWaveSliderLabel}>Volume</Text>
+            <Text style={styles.compositeWaveSliderValue}>
+              {Math.round(compositeWave.volume * 100)}%
+            </Text>
+          </View>
+          <Slider
+            style={styles.compositeWaveSlider}
+            minimumValue={0}
+            maximumValue={1}
+            value={compositeWave.volume}
+            onValueChange={onVolumeChange}
+            minimumTrackTintColor="#00ff00"
+            maximumTrackTintColor="#333333"
+            thumbTintColor="#00ff00"
+          />
+        </View>
+
+        {/* Multiplicity Control */}
+        <View style={styles.compositeWaveSliderContainer}>
+          <View style={styles.compositeWaveSliderHeader}>
+            <Ionicons name="contract" size={16} color="#00ff00" />
+            <Text style={styles.compositeWaveSliderLabel}>Multiplicity</Text>
+            <Text style={styles.compositeWaveSliderValue}>
+              {Math.round(compositeWave.multiplicity * 100)}%
+            </Text>
+          </View>
+          <Slider
+            style={styles.compositeWaveSlider}
+            minimumValue={0}
+            maximumValue={1}
+            value={compositeWave.multiplicity}
+            onValueChange={onMultiplicityChange}
+            minimumTrackTintColor="#00ff00"
+            maximumTrackTintColor="#333333"
+            thumbTintColor="#00ff00"
+          />
+        </View>
+      </View>
+    </View>
+  );
+};
 
 // Bezier Curve Editor Component
 const BezierCurveEditor = ({ 
@@ -1606,33 +2289,24 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
         </View>
       </View>
       
-      {/* Saved Waves */}
-      {savedWaves.length > 0 && (
-        <View style={styles.savedWavesContainer}>
-          <Text style={styles.savedWavesTitle}>Saved Waves</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedWavesScroll}>
-            {savedWaves.map((savedWave) => (
-              <TouchableOpacity
-                key={savedWave.id}
-                style={styles.savedWaveItem}
-                onPress={() => loadSavedWave(savedWave)}
-                onLongPress={() => {
-                  Alert.alert(
-                    'Delete Wave',
-                    `Delete "${savedWave.name}"?`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => deleteSavedWave(savedWave.id) }
-                    ]
-                  );
-                }}
-              >
-                <Ionicons name="musical-note" size={24} color="#ff8800" />
-                <Text style={styles.savedWaveName}>{savedWave.name}</Text>
-                <Text style={styles.savedWaveFreqs}>
-                  {savedWave.waves.length} wave{savedWave.waves.length !== 1 ? 's' : ''}
-                </Text>
-              </TouchableOpacity>
+      {/* Composite Waves */}
+      {compositeWaves.length > 0 && (
+        <View style={styles.compositeWavesContainer}>
+          <Text style={styles.compositeWavesTitle}>Composite Waves</Text>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.compositeWavesScroll}>
+            {compositeWaves.map((compositeWave) => (
+              <CompositeWaveControl
+                key={compositeWave.id}
+                compositeWave={compositeWave}
+                onPlay={() => playCompositeWave(compositeWave.id)}
+                onStop={() => stopCompositeWave(compositeWave.id)}
+                onVolumeChange={(volume) => updateCompositeWave(compositeWave.id, { volume })}
+                onMultiplicityChange={(multiplicity) => updateCompositeWave(compositeWave.id, { multiplicity })}
+                onEdit={() => editCompositeWave(compositeWave)}
+                onDelete={() => deleteCompositeWave(compositeWave.id)}
+                onLoad={() => loadCompositeWave(compositeWave)}
+                customCurves={customCurves}
+              />
             ))}
           </ScrollView>
         </View>
@@ -1662,6 +2336,15 @@ const SweepWave = ({ startFreq, endFreq, k, width, height, animationProgress, wa
         isVisible={showCurveEditor}
         onClose={() => setShowCurveEditor(false)}
         onSave={handleSaveCustomCurve}
+      />
+      
+      {/* Composite Wave Edit Modal */}
+      <CompositeWaveEditModal
+        isVisible={showEditModal}
+        compositeWave={editingCompositeWave}
+        onSave={saveEditedCompositeWave}
+        onCancel={cancelEditCompositeWave}
+        customCurves={customCurves}
       />
     </TouchableOpacity>
   );
@@ -2008,42 +2691,360 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 0, 0, 0.3)',
   },
-  savedWavesContainer: {
+  // Composite Waves Styles
+  compositeWavesContainer: {
     marginTop: 16,
     padding: 16,
     backgroundColor: '#0a0a0a',
     borderRadius: 8,
   },
-  savedWavesTitle: {
+  compositeWavesTitle: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 12,
   },
-  savedWavesScroll: {
-    flexDirection: 'row',
+  compositeWavesScroll: {
+    maxHeight: 400,
   },
-  savedWaveItem: {
+  compositeWaveItem: {
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
-    padding: 12,
-    marginRight: 8,
-    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 136, 0, 0.3)',
-    minWidth: 80,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
   },
-  savedWaveName: {
+  compositeWaveHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  compositeWaveInfo: {
+    flex: 1,
+  },
+  compositeWaveName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  compositeWaveDetails: {
+    color: '#888888',
+    fontSize: 12,
+  },
+  compositeWaveActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  compositeWaveLoadButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  compositeWaveEditButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  compositeWaveDeleteButton: {
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.3)',
+  },
+  compositeWaveControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  compositeWavePlayButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 25,
+    padding: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  compositeWavePlayButtonActive: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  compositeWaveSliderContainer: {
+    flex: 1,
+  },
+  compositeWaveSliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 6,
+  },
+  compositeWaveSliderLabel: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 4,
-    textAlign: 'center',
+    flex: 1,
   },
-  savedWaveFreqs: {
+  compositeWaveSliderValue: {
+    color: '#00ff00',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    minWidth: 35,
+    textAlign: 'right',
+  },
+  compositeWaveSlider: {
+    width: '100%',
+    height: 20,
+  },
+  
+  // Edit Modal Styles
+  editModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  editModalContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  editModalTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  editModalCloseButton: {
+    padding: 4,
+  },
+  editModalContent: {
+    maxHeight: 400,
+  },
+  editModalWaveSection: {
+    padding: 16,
+  },
+  editModalSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  editModalSectionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  editModalAddButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  editModalWaveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 8,
+    padding: 12,
+  },
+  editModalWaveContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  editModalWaveLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  editModalSlider: {
+    width: '100%',
+    height: 20,
+  },
+  editModalSweepControls: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 4,
+    padding: 8,
+    marginVertical: 4,
+  },
+  editModalSweepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  editModalSweepLabel: {
     color: '#888888',
     fontSize: 10,
-    marginTop: 2,
+    width: 40,
+    fontWeight: '500',
+  },
+  editModalSweepSlider: {
+    flex: 1,
+    height: 20,
+    marginHorizontal: 8,
+  },
+  editModalSweepValue: {
+    color: '#888888',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    width: 40,
+    textAlign: 'right',
+  },
+  editModalWaveValue: {
+    color: '#888888',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 4,
+    fontFamily: 'monospace',
+  },
+  editModalShapeContainer: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  editModalShapeButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    minWidth: 90,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  editModalShapeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  editModalShapeDropdown: {
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    marginBottom: 4,
+    zIndex: 1000,
+  },
+  editModalShapeOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(136, 136, 136, 0.2)',
+  },
+  editModalShapeOptionSelected: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+  },
+  editModalShapeOptionText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  editModalShapeOptionTextSelected: {
+    color: '#00ff00',
+  },
+  editModalTypeButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+    minWidth: 32,
+  },
+  editModalTypeButtonActive: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  editModalTypeButtonText: {
+    color: '#888888',
+    fontSize: 10,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  editModalTypeButtonTextActive: {
+    color: '#00ff00',
+  },
+  editModalRemoveButton: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderRadius: 16,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 0, 0.3)',
+  },
+  editModalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  editModalCancelButton: {
+    backgroundColor: 'rgba(136, 136, 136, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(136, 136, 136, 0.3)',
+  },
+  editModalCancelText: {
+    color: '#888888',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  editModalSaveButton: {
+    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 0, 0.3)',
+  },
+  editModalSaveText: {
+    color: '#00ff00',
+    fontSize: 16,
+    fontWeight: '500',
     textAlign: 'center',
   },
   waveTypeSection: {
