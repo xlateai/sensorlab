@@ -1,253 +1,373 @@
-import pygame
+import torch
+import torch.nn as nn
+import torch.optim as optim
 import numpy as np
-import math
+import sounddevice as sd
+import threading
 import time
+import queue
+from collections import deque
 
-# Initialize pygame
-pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
-pygame.init()
+class RealTimeAudioPredictor(nn.Module):
+    """
+    Neural network that learns to predict the next audio frame from previous frames.
+    Designed for real-time learning and inference.
+    """
+    
+    def __init__(self, sequence_length=512, hidden_size=256, num_layers=3):
+        super(RealTimeAudioPredictor, self).__init__()
+        self.sequence_length = sequence_length
+        self.hidden_size = hidden_size
+        
+        # LSTM for temporal modeling
+        self.lstm = nn.LSTM(
+            input_size=1,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=0.1
+        )
+        
+        # Output layers
+        self.output_layers = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_size // 2, hidden_size // 4),
+            nn.ReLU(),
+            nn.Linear(hidden_size // 4, 1),
+            nn.Tanh()  # Output between -1 and 1
+        )
+        
+        # Initialize weights
+        self._init_weights()
+        
+        # Hidden state for continuous generation
+        self.hidden_state = None
+        
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.LSTM):
+                for name, param in module.named_parameters():
+                    if 'weight' in name:
+                        nn.init.xavier_uniform_(param)
+                    elif 'bias' in name:
+                        nn.init.zeros_(param)
+    
+    def forward(self, x, hidden=None):
+        """
+        Forward pass for training.
+        x: (batch_size, sequence_length, 1)
+        """
+        lstm_out, hidden = self.lstm(x, hidden)
+        # Use the last output for prediction
+        last_output = lstm_out[:, -1, :]
+        prediction = self.output_layers(last_output)
+        return prediction, hidden
+    
+    def predict_next(self, sequence):
+        """
+        Predict the next audio sample given a sequence.
+        sequence: (sequence_length,) numpy array
+        """
+        self.eval()
+        with torch.no_grad():
+            # Convert to tensor and reshape
+            x = torch.tensor(sequence, dtype=torch.float32).unsqueeze(0).unsqueeze(-1)
+            prediction, self.hidden_state = self.forward(x, self.hidden_state)
+            return prediction.item()
+    
+    def reset_hidden_state(self):
+        """Reset hidden state for fresh generation."""
+        self.hidden_state = None
 
-# Constants
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 600
-SCREEN_CENTER = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-CIRCLE_RADIUS = 200
-SAMPLE_RATE = 44100
-BUFFER_SIZE = 4096
-
-# Colors
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-NEON_PINK = (255, 20, 147)
-NEON_CYAN = (0, 255, 255)
-NEON_PURPLE = (186, 85, 211)
-ELECTRIC_BLUE = (30, 144, 255)
-DARK_PURPLE = (25, 25, 50)
-
-class AudioVisualizer:
-    def __init__(self):
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("AudioLab - Circular Waveform Visualizer")
-        self.clock = pygame.time.Clock()
-        
-        # Audio parameters
-        self.time_offset = 0
-        self.frequency_base = 85  # Much lower frequency for ambient feel
-        self.frequency_mod = 0.15   # Very slow modulation
-        self.amplitude = 0.6  # Slightly higher for presence
-        self.phase_continuity = 0  # Track phase for smooth transitions
-        
-        # Ambient parameters
-        self.lfo_rate = 0.08  # Very slow LFO for gentle movement
-        self.filter_cutoff = 0.5
-        self.echo_delay = 0.3  # Seconds of echo delay
-        self.echo_samples = int(self.echo_delay * SAMPLE_RATE)
-        self.echo_buffer = np.zeros(self.echo_samples)
-        
-        # Audio smoothing
-        self.previous_chunk = None
-        self.fade_samples = 256  # Shorter fades for less artifacts
-        
-        # Visualization parameters
-        self.waveform_points = []
-        self.num_points = 1440  # Much higher resolution - 4 points per degree
-        
-        # Generate initial audio buffer
-        self.current_audio_data = self.generate_audio_chunk()
-        self.play_audio()
+class RealTimeLearningAudioSystem:
+    """
+    System that simultaneously:
+    1. Records audio from microphone
+    2. Trains model to predict next audio frame
+    3. Generates and plays predicted audio
+    """
     
-    def generate_audio_chunk(self):
-        """Generate a chunk of ambient, echo-y audio data"""
-        t = np.linspace(0, BUFFER_SIZE / SAMPLE_RATE, BUFFER_SIZE)
-        t_global = t + self.time_offset
+    def __init__(self, sample_rate=44100, chunk_size=1024, sequence_length=512):
+        self.sample_rate = sample_rate
+        self.chunk_size = chunk_size
+        self.sequence_length = sequence_length
         
-        # Ambient style oscillators with very gentle modulation
-        base_freq = self.frequency_base + 8 * np.sin(self.time_offset * self.frequency_mod)
+        # Model and optimizer
+        self.model = RealTimeAudioPredictor(sequence_length=sequence_length)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+        self.criterion = nn.MSELoss()
         
-        # Main ambient pad - warm sine wave
-        osc1 = np.sin(2 * np.pi * base_freq * t_global + self.phase_continuity)
+        # Audio buffers and queues
+        self.mic_buffer = deque(maxlen=sequence_length * 10)  # Keep more history
+        self.training_queue = queue.Queue(maxsize=100)
         
-        # Slightly detuned oscillator for warmth
-        osc2 = 0.4 * np.sin(2 * np.pi * base_freq * 1.003 * t_global + self.phase_continuity * 1.07)
+        # Control flags
+        self.is_running = False
+        self.learning_enabled = True
         
-        # Sub-bass for depth (two octaves down)
-        sub_osc = 0.2 * np.sin(2 * np.pi * base_freq * 0.25 * t_global + self.phase_continuity * 0.25)
+        # Statistics
+        self.training_loss = 0.0
+        self.training_steps = 0
+        self.prediction_error = 0.0
         
-        # Higher harmonic for gentle brightness
-        harmonic = 0.15 * np.sin(2 * np.pi * base_freq * 1.5 * t_global + self.phase_continuity * 1.5)
+        # Audio streams
+        self.input_stream = None
+        self.output_stream = None
         
-        # Very slow LFO for gentle movement
-        lfo = np.sin(2 * np.pi * self.lfo_rate * t_global)
-        amplitude_mod = 0.8 + 0.2 * lfo
+        # Mix control (how much predicted vs random audio to play)
+        self.prediction_mix = 0.0  # Start with 0% prediction, 100% noise
+        self.mix_increase_rate = 0.01  # Gradually increase prediction mix
         
-        # Mix oscillators for ambient character
-        main_wave = (osc1 + osc2 + sub_osc + harmonic) * amplitude_mod
+    def audio_input_callback(self, indata, frames, time, status):
+        """Callback for microphone input."""
+        if status:
+            print(f"Input status: {status}")
         
-        # Apply echo effect
-        echo_wave = np.zeros_like(main_wave)
-        for i in range(len(main_wave)):
-            if i < len(self.echo_buffer):
-                echo_wave[i] = self.echo_buffer[i] * 0.4  # Echo at 40% volume
+        # Convert to mono and normalize
+        audio_mono = np.mean(indata, axis=1) if indata.shape[1] > 1 else indata.flatten()
+        audio_normalized = np.clip(audio_mono, -1.0, 1.0)
         
-        # Update echo buffer (shift and add new samples)
-        self.echo_buffer = np.roll(self.echo_buffer, -len(main_wave))
-        if len(main_wave) <= len(self.echo_buffer):
-            self.echo_buffer[-len(main_wave):] = main_wave
+        # Add to buffer
+        self.mic_buffer.extend(audio_normalized)
         
-        # Combine main signal with echo
-        combined_wave = (main_wave + echo_wave) * self.amplitude * 0.5
-        
-        # Gentle soft limiting for warmth
-        combined_wave = np.tanh(combined_wave * 0.8)
-        
-        # Apply very gentle envelope
-        envelope = np.ones_like(combined_wave)
-        fade_samples = min(128, len(combined_wave) // 16)  # Very short fades
-        
-        if fade_samples > 0:
-            envelope[:fade_samples] = np.sin(np.linspace(0, np.pi/2, fade_samples))**2
-            envelope[-fade_samples:] = np.cos(np.linspace(0, np.pi/2, fade_samples))**2
-        
-        combined_wave *= envelope
-        
-        # Convert to stereo and ensure C-contiguous array
-        stereo_wave = np.column_stack((combined_wave, combined_wave))
-        
-        # Convert to 16-bit integers with proper scaling
-        audio_data = (stereo_wave * 12000).astype(np.int16)  # Conservative scaling for warmth
-        audio_data = np.ascontiguousarray(audio_data)
-        
-        # Debug: Print audio data information
-        print(f"Audio data shape: {audio_data.shape} (samples: {audio_data.shape[0]}, channels: {audio_data.shape[1]})")
-        print(f"Audio data dtype: {audio_data.dtype}")
-        print(f"Audio data range: [{np.min(audio_data)}, {np.max(audio_data)}] (16-bit max: ±32767)")
-        print(f"Volume percentage: {(np.max(np.abs(audio_data)) / 32767) * 100:.1f}% of max volume")
-        print(f"Combined wave range before scaling: [{np.min(combined_wave):.4f}, {np.max(combined_wave):.4f}]")
-        print(f"Buffer duration: {BUFFER_SIZE / SAMPLE_RATE * 1000:.1f}ms")
-        print(f"First 10 samples (left channel): {audio_data[:10, 0]}")
-        print(f"Is C-contiguous: {audio_data.flags['C_CONTIGUOUS']}")
-        print("---")
-        
-        # Update phase continuity for smooth transitions
-        self.phase_continuity += 2 * np.pi * base_freq * (BUFFER_SIZE / SAMPLE_RATE)
-        self.phase_continuity = self.phase_continuity % (2 * np.pi)
-        
-        self.time_offset += BUFFER_SIZE / SAMPLE_RATE
-        
-        return audio_data
-    
-    def play_audio(self):
-        """Play the current audio chunk"""
-        try:
-            sound_array = pygame.sndarray.make_sound(self.current_audio_data)
-            sound_array.play()
-        except Exception as e:
-            print(f"Audio playback error: {e}")
-    
-    def update_waveform_visualization(self):
-        """Update the circular waveform visualization with high resolution"""
-        self.waveform_points = []
-        
-        # Use more of the audio data for smoother visualization
-        # Interpolate the audio data to match our high-resolution point count
-        audio_samples = self.current_audio_data[:, 0]  # Left channel
-        
-        # Create smooth interpolation from audio data to our point count
-        sample_indices = np.linspace(0, len(audio_samples) - 1, self.num_points)
-        interpolated_audio = np.interp(sample_indices, np.arange(len(audio_samples)), audio_samples)
-        
-        for i in range(self.num_points):
-            angle = (i / self.num_points) * 2 * math.pi
-            
-            # Normalize the audio value
-            amplitude_value = interpolated_audio[i] / 32767.0
-            
-            # Calculate radius based on base circle radius plus amplitude
-            radius = CIRCLE_RADIUS + (amplitude_value * 100)  # Scaled for good visibility
-            
-            # Calculate point position
-            x = SCREEN_CENTER[0] + radius * math.cos(angle)
-            y = SCREEN_CENTER[1] + radius * math.sin(angle)
-            
-            self.waveform_points.append((x, y))
-    
-    def draw(self):
-        """Draw smooth antialiased waveform visualization"""
-        # Plain black background
-        self.screen.fill(BLACK)
-        
-        # Draw the waveform as connected antialiased lines
-        if len(self.waveform_points) > 2:
-            # Draw multiple passes for a softer, slightly blurred effect
-            for thickness in [4, 3, 2, 1]:
-                alpha = 80 if thickness > 1 else 255  # Outer lines are more transparent
-                color = (alpha, alpha, alpha) if thickness > 1 else WHITE
+        # Create training data if we have enough samples
+        if len(self.mic_buffer) >= self.sequence_length + 1:
+            try:
+                # Get sequence and target
+                sequence = list(self.mic_buffer)[-self.sequence_length-1:-1]
+                target = self.mic_buffer[-1]
                 
-                # Draw connected line segments with antialiasing
-                for i in range(len(self.waveform_points)):
-                    start_point = self.waveform_points[i]
-                    end_point = self.waveform_points[(i + 1) % len(self.waveform_points)]
+                # Add to training queue (non-blocking)
+                if not self.training_queue.full():
+                    self.training_queue.put((sequence, target), block=False)
+            except Exception as e:
+                print(f"Training data creation error: {e}")
+    
+    def audio_output_callback(self, outdata, frames, time, status):
+        """Callback for audio output - plays predicted audio."""
+        if status:
+            print(f"Output status: {status}")
+        
+        try:
+            if len(self.mic_buffer) >= self.sequence_length:
+                # Get recent audio for prediction
+                recent_audio = np.array(list(self.mic_buffer)[-self.sequence_length:])
+                
+                # Generate predicted audio
+                predicted_samples = []
+                current_sequence = recent_audio.copy()
+                
+                for _ in range(frames):
+                    # Predict next sample
+                    predicted_sample = self.model.predict_next(current_sequence)
+                    predicted_samples.append(predicted_sample)
                     
-                    # Use aaline for antialiasing
-                    pygame.draw.aaline(self.screen, color, start_point, end_point, thickness)
-        
-        # Minimal UI - just controls at bottom
-        small_font = pygame.font.Font(None, 20)
-        info_text = small_font.render("SPACE: New pattern  |  ESC: Exit", True, (128, 128, 128))
-        text_rect = info_text.get_rect()
-        text_rect.centerx = SCREEN_WIDTH // 2
-        text_rect.bottom = SCREEN_HEIGHT - 20
-        self.screen.blit(info_text, text_rect)
-        
-        pygame.display.flip()
+                    # Update sequence for next prediction
+                    current_sequence = np.roll(current_sequence, -1)
+                    current_sequence[-1] = predicted_sample
+                
+                predicted_audio = np.array(predicted_samples)
+                
+                # Generate some ambient noise for mixing
+                t = np.linspace(0, frames / self.sample_rate, frames)
+                noise_freq = 220 + 50 * np.sin(time.outputBufferDacTime * 0.1)
+                ambient_audio = 0.1 * np.sin(2 * np.pi * noise_freq * t)
+                
+                # Mix predicted and ambient audio
+                mixed_audio = (
+                    self.prediction_mix * predicted_audio + 
+                    (1 - self.prediction_mix) * ambient_audio
+                )
+                
+                # Scale to appropriate range and apply to output
+                audio_scaled = np.clip(mixed_audio * 0.3, -1.0, 1.0)
+                outdata[:] = audio_scaled.reshape(-1, 1)
+                
+                # Gradually increase prediction mix as model learns
+                if self.training_steps > 100:  # Start mixing after some training
+                    self.prediction_mix = min(0.8, self.prediction_mix + self.mix_increase_rate)
+                
+            else:
+                # Not enough data yet, play gentle noise
+                t = np.linspace(0, frames / self.sample_rate, frames)
+                gentle_noise = 0.05 * np.sin(2 * np.pi * 220 * t)
+                outdata[:] = gentle_noise.reshape(-1, 1)
+                
+        except Exception as e:
+            print(f"Audio generation error: {e}")
+            outdata.fill(0)
     
-    def handle_events(self):
-        """Handle pygame events"""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return False
-                elif event.key == pygame.K_SPACE:
-                    # Regenerate audio with ambient variations
-                    self.frequency_base += np.random.uniform(-15, 15)
-                    self.frequency_base = max(60, min(120, self.frequency_base))
-                    self.frequency_mod = np.random.uniform(0.05, 0.3)
-                    self.lfo_rate = np.random.uniform(0.05, 0.15)
-        return True
+    def training_worker(self):
+        """Background thread that continuously trains the model."""
+        print("Training worker started...")
+        
+        while self.is_running:
+            try:
+                if not self.learning_enabled:
+                    time.sleep(0.1)
+                    continue
+                
+                # Get training data
+                training_data = []
+                targets = []
+                
+                # Collect a small batch
+                batch_size = min(8, self.training_queue.qsize())
+                if batch_size == 0:
+                    time.sleep(0.01)
+                    continue
+                
+                for _ in range(batch_size):
+                    try:
+                        sequence, target = self.training_queue.get(timeout=0.1)
+                        training_data.append(sequence)
+                        targets.append(target)
+                    except queue.Empty:
+                        break
+                
+                if not training_data:
+                    continue
+                
+                # Convert to tensors
+                X = torch.tensor(training_data, dtype=torch.float32).unsqueeze(-1)
+                y = torch.tensor(targets, dtype=torch.float32).unsqueeze(-1)
+                
+                # Training step
+                self.model.train()
+                self.optimizer.zero_grad()
+                
+                predictions, _ = self.model(X)
+                loss = self.criterion(predictions, y)
+                
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                self.optimizer.step()
+                
+                # Update statistics
+                self.training_loss = 0.9 * self.training_loss + 0.1 * loss.item()
+                self.training_steps += 1
+                
+                # Print progress occasionally
+                if self.training_steps % 100 == 0:
+                    print(f"Training step {self.training_steps}, Loss: {self.training_loss:.6f}, "
+                          f"Mix: {self.prediction_mix:.1%}, Queue size: {self.training_queue.qsize()}")
+                
+            except Exception as e:
+                print(f"Training error: {e}")
+                time.sleep(0.1)
     
-    def run(self):
-        """Main application loop"""
-        running = True
-        audio_timer = 0
+    def start(self):
+        """Start the real-time learning system."""
+        print("Starting Real-Time Learning Audio System...")
+        print("The system will:")
+        print("1. Listen to your microphone")
+        print("2. Train a neural network to predict the next audio frame")
+        print("3. Play the predicted audio (mixed with ambient sound)")
+        print("\nControls:")
+        print("- Press 'l' to toggle learning on/off")
+        print("- Press 'r' to reset the model")
+        print("- Press 'q' to quit")
+        print("\nStarting in 3 seconds...")
+        time.sleep(3)
         
-        print("AudioLab started! Press SPACE to change audio, ESC to quit.")
+        self.is_running = True
         
-        while running:
-            dt = self.clock.tick(60) / 1000.0  # 60 FPS, dt in seconds
-            audio_timer += dt
-            
-            running = self.handle_events()
-            
-            # Generate new audio chunk periodically
-            if audio_timer >= (BUFFER_SIZE / SAMPLE_RATE) * 0.8:  # Slight overlap
-                self.current_audio_data = self.generate_audio_chunk()
-                self.play_audio()
-                audio_timer = 0
-            
-            # Update visualization
-            self.update_waveform_visualization()
-            
-            # Draw everything
-            self.draw()
+        # Start training thread
+        training_thread = threading.Thread(target=self.training_worker, daemon=True)
+        training_thread.start()
         
-        pygame.quit()
+        # Start audio streams
+        self.input_stream = sd.InputStream(
+            samplerate=self.sample_rate,
+            channels=1,
+            dtype=np.float32,
+            blocksize=self.chunk_size,
+            callback=self.audio_input_callback
+        )
+        
+        self.output_stream = sd.OutputStream(
+            samplerate=self.sample_rate,
+            channels=1,
+            dtype=np.float32,
+            blocksize=self.chunk_size,
+            callback=self.audio_output_callback
+        )
+        
+        self.input_stream.start()
+        self.output_stream.start()
+        
+        print("System started! Make some sounds into your microphone...")
+        
+        # Simple command interface
+        try:
+            while self.is_running:
+                command = input("Command (l=toggle learning, r=reset, q=quit): ").strip().lower()
+                
+                if command == 'q':
+                    break
+                elif command == 'l':
+                    self.learning_enabled = not self.learning_enabled
+                    status = "enabled" if self.learning_enabled else "disabled"
+                    print(f"Learning {status}")
+                elif command == 'r':
+                    print("Resetting model...")
+                    self.model = RealTimeAudioPredictor(sequence_length=self.sequence_length)
+                    self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+                    self.training_loss = 0.0
+                    self.training_steps = 0
+                    self.prediction_mix = 0.0
+                    print("Model reset complete")
+                elif command == '':
+                    # Just show status
+                    print(f"Status - Learning: {self.learning_enabled}, "
+                          f"Steps: {self.training_steps}, "
+                          f"Loss: {self.training_loss:.6f}, "
+                          f"Mix: {self.prediction_mix:.1%}")
+                
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+        
+        self.stop()
+    
+    def stop(self):
+        """Stop the system and clean up."""
+        print("Stopping system...")
+        self.is_running = False
+        
+        if self.input_stream:
+            self.input_stream.stop()
+            self.input_stream.close()
+        
+        if self.output_stream:
+            self.output_stream.stop()
+            self.output_stream.close()
+        
+        print("System stopped.")
+
+def main():
+    """Main function to run the real-time learning audio system."""
+    print("Real-Time Audio Learning System")
+    print("=" * 40)
+    
+    # Create and start the system
+    system = RealTimeLearningAudioSystem(
+        sample_rate=44100,
+        chunk_size=512,  # Smaller chunks for lower latency
+        sequence_length=256  # Shorter sequence for faster learning
+    )
+    
+    try:
+        system.start()
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        system.stop()
 
 if __name__ == "__main__":
-    try:
-        app = AudioVisualizer()
-        app.run()
-    except Exception as e:
-        print(f"Error running AudioLab: {e}")
-        pygame.quit()
+    main()
