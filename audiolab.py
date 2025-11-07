@@ -47,7 +47,7 @@ class AudioVisualizer:
         
         # Visualization parameters
         self.waveform_points = []
-        self.num_points = 360  # One point per degree
+        self.num_points = 720  # Higher resolution - 2 points per degree for smoother curve
         
         # Generate initial audio buffer
         self.current_audio_data = self.generate_audio_chunk()
@@ -140,23 +140,25 @@ class AudioVisualizer:
             print(f"Audio playback error: {e}")
     
     def update_waveform_visualization(self):
-        """Update the circular waveform visualization based on current audio data"""
+        """Update the circular waveform visualization with high resolution"""
         self.waveform_points = []
         
-        # Use a subset of the audio data for visualization
-        visualization_data = self.current_audio_data[::BUFFER_SIZE//self.num_points, 0]
+        # Use more of the audio data for smoother visualization
+        # Interpolate the audio data to match our high-resolution point count
+        audio_samples = self.current_audio_data[:, 0]  # Left channel
+        
+        # Create smooth interpolation from audio data to our point count
+        sample_indices = np.linspace(0, len(audio_samples) - 1, self.num_points)
+        interpolated_audio = np.interp(sample_indices, np.arange(len(audio_samples)), audio_samples)
         
         for i in range(self.num_points):
             angle = (i / self.num_points) * 2 * math.pi
             
-            # Get amplitude value (normalize it)
-            if i < len(visualization_data):
-                amplitude_value = visualization_data[i] / 32767.0
-            else:
-                amplitude_value = 0
+            # Normalize the audio value
+            amplitude_value = interpolated_audio[i] / 32767.0
             
             # Calculate radius based on base circle radius plus amplitude
-            radius = CIRCLE_RADIUS + (amplitude_value * 80)  # Scale amplitude for visibility
+            radius = CIRCLE_RADIUS + (amplitude_value * 100)  # Scaled for good visibility
             
             # Calculate point position
             x = SCREEN_CENTER[0] + radius * math.cos(angle)
@@ -165,73 +167,22 @@ class AudioVisualizer:
             self.waveform_points.append((x, y))
     
     def draw(self):
-        """Draw everything to the screen with synth-wave aesthetics"""
-        # Dark gradient background
-        self.screen.fill(DARK_PURPLE)
+        """Draw clean waveform visualization"""
+        # Plain black background
+        self.screen.fill(BLACK)
         
-        # Add some background grid for synth-wave feel
-        for i in range(0, SCREEN_WIDTH, 60):
-            pygame.draw.line(self.screen, (40, 40, 80), (i, 0), (i, SCREEN_HEIGHT), 1)
-        for i in range(0, SCREEN_HEIGHT, 40):
-            pygame.draw.line(self.screen, (40, 40, 80), (0, i), (SCREEN_WIDTH, i), 1)
-        
-        # Draw glowing center point
-        for radius in [8, 6, 4, 2]:
-            alpha = 255 - (radius * 30)
-            color = (*NEON_CYAN, max(0, alpha))
-            # Create a surface for alpha blending
-            glow_surface = pygame.Surface((radius*4, radius*4), pygame.SRCALPHA)
-            pygame.draw.circle(glow_surface, color, (radius*2, radius*2), radius)
-            self.screen.blit(glow_surface, (SCREEN_CENTER[0] - radius*2, SCREEN_CENTER[1] - radius*2))
-        
-        # Draw base circle (reference) with neon glow
-        pygame.draw.circle(self.screen, (60, 60, 120), SCREEN_CENTER, CIRCLE_RADIUS, 2)
-        pygame.draw.circle(self.screen, ELECTRIC_BLUE, SCREEN_CENTER, CIRCLE_RADIUS, 1)
-        
-        # Draw waveform with synth-wave colors and glow
+        # Draw only the waveform - clean white line
         if len(self.waveform_points) > 2:
-            # Create dynamic color based on audio intensity and time
-            intensity = np.mean(np.abs(self.current_audio_data[:, 0])) / 32767.0
-            time_shift = (math.sin(self.time_offset * 0.5) + 1) / 2
-            
-            # Primary neon color
-            color = (
-                int(NEON_PINK[0] * (0.5 + intensity * 0.5)),
-                int(NEON_PINK[1] + (NEON_CYAN[1] - NEON_PINK[1]) * time_shift),
-                int(NEON_PINK[2] + (NEON_CYAN[2] - NEON_PINK[2]) * time_shift)
-            )
-            
-            # Draw waveform with glow effect
-            # Outer glow
-            pygame.draw.polygon(self.screen, (color[0]//4, color[1]//4, color[2]//4), self.waveform_points, 8)
-            # Main line
-            pygame.draw.polygon(self.screen, color, self.waveform_points, 4)
-            # Inner highlight
-            bright_color = tuple(min(255, c + 50) for c in color)
-            pygame.draw.polygon(self.screen, bright_color, self.waveform_points, 2)
-            
-            # Draw pulsing points at key positions
-            for i, point in enumerate(self.waveform_points[::30]):  # Every 30th point
-                pulse = math.sin(self.time_offset * 2 + i * 0.5) * 0.5 + 0.5
-                point_size = int(2 + pulse * 3)
-                point_brightness = int(150 + pulse * 105)
-                point_color = (point_brightness, point_brightness//2, 255)
-                pygame.draw.circle(self.screen, point_color, (int(point[0]), int(point[1])), point_size)
+            # Draw the waveform as a smooth white polygon outline
+            pygame.draw.polygon(self.screen, WHITE, self.waveform_points, 2)
         
-        # Draw retro-style UI
-        font = pygame.font.Font(None, 48)
-        title_text = font.render("◆ AUDIOLAB ◆", True, NEON_CYAN)
-        self.screen.blit(title_text, (20, 20))
-        
-        # Add a subtitle
-        subtitle_font = pygame.font.Font(None, 24)
-        subtitle_text = subtitle_font.render("S Y N T H   W A V E   V I S U A L I Z E R", True, NEON_PINK)
-        self.screen.blit(subtitle_text, (25, 65))
-        
-        # Control instructions
+        # Minimal UI - just controls at bottom
         small_font = pygame.font.Font(None, 20)
-        info_text = small_font.render("► SPACE: New wave pattern  ► ESC: Exit", True, WHITE)
-        self.screen.blit(info_text, (20, SCREEN_HEIGHT - 30))
+        info_text = small_font.render("SPACE: New pattern  |  ESC: Exit", True, (128, 128, 128))
+        text_rect = info_text.get_rect()
+        text_rect.centerx = SCREEN_WIDTH // 2
+        text_rect.bottom = SCREEN_HEIGHT - 20
+        self.screen.blit(info_text, text_rect)
         
         pygame.display.flip()
     
