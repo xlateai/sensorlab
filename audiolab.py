@@ -64,11 +64,12 @@ class AudioVisualizer:
         envelope = np.exp(-t * 2)  # Gentle decay
         combined_wave *= (1 - envelope * 0.3)  # Subtle envelope effect
         
-        # Convert to stereo
-        stereo_wave = np.array([combined_wave, combined_wave]).T
+        # Convert to stereo and ensure C-contiguous array
+        stereo_wave = np.column_stack((combined_wave, combined_wave))
         
-        # Convert to 16-bit integers
+        # Convert to 16-bit integers and ensure C-contiguous
         audio_data = (stereo_wave * 32767).astype(np.int16)
+        audio_data = np.ascontiguousarray(audio_data)
         
         self.time_offset += BUFFER_SIZE / SAMPLE_RATE
         
