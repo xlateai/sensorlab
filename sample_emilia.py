@@ -17,6 +17,7 @@ print(f"Speaker: {first_sample['json']['speaker']}")
 audio_data = first_sample['mp3']['array']
 sample_rate = first_sample['mp3']['sampling_rate']
 
+print(audio_data.shape)
 print(f"Playing audio: '{first_sample['json']['text']}'")
 
 # Initialize pygame mixer
