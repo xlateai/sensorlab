@@ -195,6 +195,7 @@ if __name__ == "__main__":
     
     # Take random steps until episode terminates
     print(f"\nTaking random steps until episode ends:")
+    print("(Only showing steps with +1 reward - correct guesses)")
     step_count = 0
     done = False
     
@@ -207,10 +208,12 @@ if __name__ == "__main__":
         
         obs, reward, done, truncated, info = env.step(random_char)
         
-        print(f"Step {step_count}: Action='{random_char}' (U+{random_unicode_point:04X}) | Reward={reward} | Expected='{info.get('expected', 'N/A')}' | Progress: '{env.current_transcription_guess}' | Timestep: {env.current_timestep}")
+        # Only print when reward is +1 (correct guess)
+        if reward == 1:
+            print(f"✓ Step {step_count}: Correct! '{random_char}' | Current guess: '{env.current_transcription_guess}' | Progress: {len(env.current_transcription_guess)}/{len(env.current_transcription_target)}")
         
         if done:
-            print(f"Episode complete! Reason: {info.get('termination_reason', 'unknown')}")
+            print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
             print(f"Total steps: {step_count}")
             print(f"Audio length: {len(env.current_audio_array)} samples")
             print(f"Final transcription: '{env.current_transcription_guess}'")
