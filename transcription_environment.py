@@ -200,11 +200,14 @@ if __name__ == "__main__":
     
     while not done:
         step_count += 1
-        # Random action - pick a random character or space
-        random_char = random.choice(string.ascii_letters + string.digits + ' .,!?')
+        # Random action - pick a random UTF-8 character from the massive space
+        # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
+        random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
+        random_char = chr(random_unicode_point)
+        
         obs, reward, done, truncated, info = env.step(random_char)
         
-        print(f"Step {step_count}: Action='{random_char}' | Reward={reward} | Expected='{info.get('expected', 'N/A')}' | Progress: '{env.current_transcription_guess}' | Timestep: {env.current_timestep}")
+        print(f"Step {step_count}: Action='{random_char}' (U+{random_unicode_point:04X}) | Reward={reward} | Expected='{info.get('expected', 'N/A')}' | Progress: '{env.current_transcription_guess}' | Timestep: {env.current_timestep}")
         
         if done:
             print(f"Episode complete! Reason: {info.get('termination_reason', 'unknown')}")
