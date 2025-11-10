@@ -11,7 +11,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     character.
     """
     
-    def __init__(self):
+    def __init__(self, max_samples: int=4):
         pass
 
     def step(self, action):
