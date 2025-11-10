@@ -35,6 +35,7 @@ if __name__ == "__main__":
         # Storage for REINFORCE
         log_probs = []
         rewards = []
+        supervised_log_probs = []  # Log probs of correct characters
         
         # Take agent-predicted steps until episode terminates
         step_count = 0
@@ -57,15 +58,25 @@ if __name__ == "__main__":
             distribution = agent.forward(audio_value)
             
             # Sample action from distribution
-            action_value = distribution.sample()
+            action_value = distribution.sample()  # This will be in [0, 1] range due to sigmoid
+            action_value = torch.clamp(action_value, 0.0, 1.0)  # Clamp to ensure [0,1] range
             
-            # Convert continuous action to character
-            # Map to printable ASCII range [32, 126]
-            char_code = int(torch.clamp(action_value * 10 + 79, 32, 126))  # Center around 79 ('O')
-            predicted_char = chr(char_code)
+            # Convert continuous action to character using environment method
+            # Scale from [0,1] to Unicode range [32, 65535]
+            char_code = int(action_value * (65535 - 32) + 32)
+            predicted_char = env.numeric_to_character(char_code)
             
             # Store log probability for REINFORCE
             log_probs.append(distribution.log_prob(action_value))
+            
+            # Supervised learning component: get correct character and its log prob
+            correct_char = env.next_character()
+            if correct_char is not None:
+                # Convert correct character to normalized [0,1] range
+                correct_char_code = env.character_to_numeric(correct_char)
+                correct_action_value = (correct_char_code - 32) / (65535 - 32)  # Normalize to [0,1]
+                correct_log_prob = distribution.log_prob(torch.tensor(correct_action_value))
+                supervised_log_probs.append(correct_log_prob)
             
             # Take step in environment
             obs, reward, done, truncated, info = env.step(predicted_char)
@@ -79,19 +90,33 @@ if __name__ == "__main__":
         
         episode_duration = time.time() - episode_start_time
         
-        # REINFORCE update
+        # REINFORCE update with composite loss
         if log_probs:
             # Convert to tensors
             log_probs = torch.stack(log_probs)
             rewards = torch.tensor(rewards, dtype=torch.float32)
             
-            # Simple REINFORCE: multiply log probs by rewards
-            policy_loss = -torch.sum(log_probs * rewards)
+            # REINFORCE loss: multiply log probs by rewards
+            reinforcement_loss = -torch.sum(log_probs * rewards)
+            
+            # Supervised loss: maximize log probability of correct characters
+            supervised_loss = torch.tensor(0.0)
+            if supervised_log_probs:
+                supervised_log_probs = torch.stack(supervised_log_probs)
+                supervised_loss = -torch.mean(supervised_log_probs)  # Negative log likelihood
+            
+            # Composite loss: combine both components
+            # Use a smaller weight for supervised to avoid overwhelming REINFORCE
+            total_loss = reinforcement_loss + 0.1 * supervised_loss
             
             # Backpropagation
             optimizer.zero_grad()
-            policy_loss.backward()
+            total_loss.backward()
             optimizer.step()
+            
+            # Log the loss components for monitoring
+            if episode % 10 == 0 or supervised_log_probs:  # Log more frequently if we have supervised data
+                print(f"    Losses - REINFORCE: {reinforcement_loss.item():.3f}, Supervised: {supervised_loss.item():.3f}, Total: {total_loss.item():.3f}")
         
         # Print episode summary
         total_reward = sum(rewards) if rewards else 0

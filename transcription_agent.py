@@ -100,7 +100,8 @@ class TranscriptionMemoryCellAgent(nn.Module):
         self.hidden_state = hidden2.detach()  # Detach to prevent gradient flow to previous timesteps
         
         # 4. Predict mean and std for Normal distribution
-        mean = self.mean_output(hidden2)  # [1, 1]
+        mean_raw = self.mean_output(hidden2)  # [1, 1]
+        mean = torch.sigmoid(mean_raw)  # Normalize to [0, 1]
         std = F.softplus(self.std_output(hidden2)) + 1e-6  # [1, 1], ensure positive std
         
         # Create and return Normal distribution

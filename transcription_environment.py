@@ -202,6 +202,54 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         time.sleep(duration)
         pygame.mixer.quit()
 
+    def next_character(self):
+        """
+        Get the next character that should be predicted at the current position.
+        Returns None if transcription is already complete.
+        """
+        if self.current_transcription_target is None:
+            return None
+        
+        current_pos = len(self.current_transcription_guess)
+        if current_pos >= len(self.current_transcription_target):
+            return None  # Transcription already complete
+        
+        return self.current_transcription_target[current_pos]
+
+    def numeric_to_character(self, numeric_value):
+        """
+        Convert a numeric value to a character.
+        
+        Args:
+            numeric_value: Should be an integer in range [0, 65535] for Unicode BMP
+                          If float, caller should normalize to [0,1] and multiply by range
+        
+        Returns:
+            str: Single character
+        """
+        if not isinstance(numeric_value, int):
+            raise ValueError(f"numeric_to_character expects integer input, got {type(numeric_value)}. "
+                           f"Please normalize float to [0,1] and multiply by your desired range first.")
+        
+        # Clamp to valid Unicode Basic Multilingual Plane range
+        char_code = max(32, min(65535, numeric_value))  # Printable range
+        return chr(char_code)
+    
+    def character_to_numeric(self, character):
+        """
+        Convert a character to its Unicode code point.
+        
+        Args:
+            character: Single character string
+            
+        Returns:
+            int: Unicode code point
+        """
+        if not isinstance(character, str) or len(character) != 1:
+            raise ValueError(f"character_to_numeric expects single character, got: {character}")
+        
+        return ord(character)
+
 
 if __name__ == "__main__":
     import string
