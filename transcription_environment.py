@@ -14,8 +14,9 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     character.
     """
     
-    def __init__(self, max_samples: int=4):
+    def __init__(self, max_samples: int=4, verbose: bool = True):
         self.max_samples = max_samples
+        self.verbose = verbose
         self.dataset = None
         self.available_samples = []
         self.current_audio_array = None
@@ -28,7 +29,8 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
 
     def _load_dataset(self):
         """Load the Emilia dataset and prepare the first max_samples for selection."""
-        print(f"Loading Emilia dataset with max_samples={self.max_samples}...")
+        if self.verbose:
+            print(f"Loading Emilia dataset with max_samples={self.max_samples}...")
         self.dataset = load_dataset("amphion/Emilia-Dataset", streaming=True)
         
         # Get the first max_samples from the dataset
@@ -37,12 +39,15 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             try:
                 sample = next(train_iter)
                 self.available_samples.append(sample)
-                print(f"Loaded sample {i+1}/{self.max_samples}: '{sample['json']['text'][:50]}...'")
+                if self.verbose:
+                    print(f"Loaded sample {i+1}/{self.max_samples}: '{sample['json']['text'][:50]}...'")
             except StopIteration:
-                print(f"Dataset exhausted after {i} samples")
+                if self.verbose:
+                    print(f"Dataset exhausted after {i} samples")
                 break
         
-        print(f"Successfully loaded {len(self.available_samples)} samples")
+        if self.verbose:
+            print(f"Successfully loaded {len(self.available_samples)} samples")
 
     def step(self, action):
         """
@@ -128,9 +133,10 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.current_transcription_guess = ""
         self.current_timestep = 0
         
-        print(f"Reset with sample: '{self.current_transcription_target}'")
-        print(f"Audio length: {len(self.current_audio_array)} samples")
-        print(f"Target length: {len(self.current_transcription_target)} characters")
+        if self.verbose:
+            print(f"Reset with sample: '{self.current_transcription_target}'")
+            print(f"Audio length: {len(self.current_audio_array)} samples")
+            print(f"Target length: {len(self.current_transcription_target)} characters")
         
         # Return initial observation
         observation = self._get_observation()
@@ -148,7 +154,8 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         import time
         
         if self.current_audio_array is None:
-            print("No audio sample loaded. Call reset() first.")
+            if self.verbose:
+                print("No audio sample loaded. Call reset() first.")
             return
             
         # Get sample rate from the most recent sample
@@ -183,19 +190,21 @@ if __name__ == "__main__":
     # Reset to get a sample
     obs, info = env.reset()
     
-    print(f"\nAudio Stats:")
-    print(f"Sample rate: {info['sample_rate']} Hz")
-    print(f"Audio duration: {len(env.current_audio_array) / info['sample_rate']:.2f} seconds")
-    print(f"Audio min/max: {env.current_audio_array.min():.4f} / {env.current_audio_array.max():.4f}")
-    print(f"Audio mean: {env.current_audio_array.mean():.4f}")
-    print(f"Audio std: {env.current_audio_array.std():.4f}")
+    if env.verbose:
+        print(f"\nAudio Stats:")
+        print(f"Sample rate: {info['sample_rate']} Hz")
+        print(f"Audio duration: {len(env.current_audio_array) / info['sample_rate']:.2f} seconds")
+        print(f"Audio min/max: {env.current_audio_array.min():.4f} / {env.current_audio_array.max():.4f}")
+        print(f"Audio mean: {env.current_audio_array.mean():.4f}")
+        print(f"Audio std: {env.current_audio_array.std():.4f}")
     
     # Play the audio
     # env.play_current_sample_audio()
     
     # Take random steps until episode terminates
-    print(f"\nTaking random steps until episode ends:")
-    print("(Only showing steps with +1 reward - correct guesses)")
+    if env.verbose:
+        print(f"\nTaking random steps until episode ends:")
+        print("(Only showing steps with +1 reward - correct guesses)")
     step_count = 0
     done = False
     
@@ -209,16 +218,17 @@ if __name__ == "__main__":
         obs, reward, done, truncated, info = env.step(random_char)
         
         # Only print when reward is +1 (correct guess)
-        if reward == 1:
+        if reward == 1 and env.verbose:
             print(f"✓ Step {step_count}: Correct! '{random_char}' | Current guess: '{env.current_transcription_guess}' | Progress: {len(env.current_transcription_guess)}/{len(env.current_transcription_target)}")
         
         if done:
-            print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
-            print(f"Total steps: {step_count}")
-            print(f"Audio length: {len(env.current_audio_array)} samples")
-            print(f"Final transcription: '{env.current_transcription_guess}'")
-            print(f"Target transcription: '{env.current_transcription_target}'")
-            completion_rate = len(env.current_transcription_guess) / len(env.current_transcription_target) * 100
-            print(f"Completion rate: {completion_rate:.1f}%")
+            if env.verbose:
+                print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
+                print(f"Total steps: {step_count}")
+                print(f"Audio length: {len(env.current_audio_array)} samples")
+                print(f"Final transcription: '{env.current_transcription_guess}'")
+                print(f"Target transcription: '{env.current_transcription_target}'")
+                completion_rate = len(env.current_transcription_guess) / len(env.current_transcription_target) * 100
+                print(f"Completion rate: {completion_rate:.1f}%")
             break
 
