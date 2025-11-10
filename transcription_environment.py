@@ -78,6 +78,10 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 reward = 1
                 transcription_complete = len(self.current_transcription_guess) >= len(self.current_transcription_target)
                 info = {"correct": True, "expected": expected_char, "predicted": action}
+                
+                # Print progress for correct guesses if verbose
+                if self.verbose:
+                    print(f"✓ Step {self.current_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
             else:
                 # Incorrect prediction - don't append to guess
                 reward = 0
@@ -100,6 +104,16 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 info["termination_reason"] = "transcription_complete_early"
             elif audio_finished:
                 info["termination_reason"] = "audio_finished"
+            
+            # Print episode completion info if verbose
+            if self.verbose:
+                print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
+                print(f"Total steps: {self.current_timestep}")
+                print(f"Audio length: {len(self.current_audio_array)} samples")
+                print(f"Final transcription: '{self.current_transcription_guess}'")
+                print(f"Target transcription: '{self.current_transcription_target}'")
+                completion_rate = len(self.current_transcription_guess) / len(self.current_transcription_target) * 100
+                print(f"Completion rate: {completion_rate:.1f}%")
         
         # Observation is current audio timestep (or zeros if beyond audio length)
         obs = self._get_observation()
@@ -137,6 +151,14 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             print(f"Reset with sample: '{self.current_transcription_target}'")
             print(f"Audio length: {len(self.current_audio_array)} samples")
             print(f"Target length: {len(self.current_transcription_target)} characters")
+            print(f"\nAudio Stats:")
+            print(f"Sample rate: {selected_sample['mp3']['sampling_rate']} Hz")
+            print(f"Audio duration: {len(self.current_audio_array) / selected_sample['mp3']['sampling_rate']:.2f} seconds")
+            print(f"Audio shape: {self.current_audio_array.shape} (num_timesteps: {self.current_audio_array.shape[0]}, vector_bandwidth: {self.current_audio_array.ndim}D)")
+            print(f"Audio min/max: {self.current_audio_array.min():.4f} / {self.current_audio_array.max():.4f}")
+            print(f"Audio mean: {self.current_audio_array.mean():.4f}")
+            print(f"Audio std: {self.current_audio_array.std():.4f}")
+            print(f"\nReady to take steps (only showing +1 reward - correct guesses)...")
         
         # Return initial observation
         observation = self._get_observation()
@@ -190,21 +212,10 @@ if __name__ == "__main__":
     # Reset to get a sample
     obs, info = env.reset()
     
-    if env.verbose:
-        print(f"\nAudio Stats:")
-        print(f"Sample rate: {info['sample_rate']} Hz")
-        print(f"Audio duration: {len(env.current_audio_array) / info['sample_rate']:.2f} seconds")
-        print(f"Audio min/max: {env.current_audio_array.min():.4f} / {env.current_audio_array.max():.4f}")
-        print(f"Audio mean: {env.current_audio_array.mean():.4f}")
-        print(f"Audio std: {env.current_audio_array.std():.4f}")
-    
     # Play the audio
     # env.play_current_sample_audio()
     
     # Take random steps until episode terminates
-    if env.verbose:
-        print(f"\nTaking random steps until episode ends:")
-        print("(Only showing steps with +1 reward - correct guesses)")
     step_count = 0
     done = False
     
@@ -217,18 +228,6 @@ if __name__ == "__main__":
         
         obs, reward, done, truncated, info = env.step(random_char)
         
-        # Only print when reward is +1 (correct guess)
-        if reward == 1 and env.verbose:
-            print(f"✓ Step {step_count}: Correct! '{random_char}' | Current guess: '{env.current_transcription_guess}' | Progress: {len(env.current_transcription_guess)}/{len(env.current_transcription_target)}")
-        
         if done:
-            if env.verbose:
-                print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
-                print(f"Total steps: {step_count}")
-                print(f"Audio length: {len(env.current_audio_array)} samples")
-                print(f"Final transcription: '{env.current_transcription_guess}'")
-                print(f"Target transcription: '{env.current_transcription_target}'")
-                completion_rate = len(env.current_transcription_guess) / len(env.current_transcription_target) * 100
-                print(f"Completion rate: {completion_rate:.1f}%")
             break
 
