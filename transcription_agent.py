@@ -4,6 +4,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions import Normal
 
 class TranscriptionMemoryCellAgent(nn.Module):
     """
@@ -35,8 +36,9 @@ class TranscriptionMemoryCellAgent(nn.Module):
         self.hidden_layer1 = nn.Linear(embedding_size, embedding_size)
         self.hidden_layer2 = nn.Linear(embedding_size, embedding_size)
         
-        # 4. Final layer to squeeze down to character prediction (single value)
-        self.character_output = nn.Linear(embedding_size, 1)
+        # 4. Final layers to predict mean and std for Normal distribution
+        self.mean_output = nn.Linear(embedding_size, 1)
+        self.std_output = nn.Linear(embedding_size, 1)
         
         # Initialize hidden state
         self.hidden_state = torch.zeros(1, embedding_size)
@@ -48,7 +50,7 @@ class TranscriptionMemoryCellAgent(nn.Module):
         """Initialize weights with Xavier/Glorot initialization"""
         for module in [self.audio_expander, self.query_proj, self.key_proj, 
                       self.value_proj, self.attention_output, self.hidden_layer1, 
-                      self.hidden_layer2, self.character_output]:
+                      self.hidden_layer2, self.mean_output, self.std_output]:
             if isinstance(module, nn.Sequential):
                 for layer in module:
                     if isinstance(layer, nn.Linear):
@@ -66,7 +68,7 @@ class TranscriptionMemoryCellAgent(nn.Module):
             audio_value: Single float value from audio stream
             
         Returns:
-            character_prediction: Single float value representing character prediction
+            Normal distribution for character prediction
         """
         # Convert audio value to tensor
         audio_tensor = torch.tensor([[audio_value]], dtype=torch.float32)
@@ -97,10 +99,13 @@ class TranscriptionMemoryCellAgent(nn.Module):
         # Update hidden state for next timestep
         self.hidden_state = hidden2.detach()  # Detach to prevent gradient flow to previous timesteps
         
-        # 4. Final character prediction
-        character_prediction = self.character_output(hidden2)  # [1, 1]
+        # 4. Predict mean and std for Normal distribution
+        mean = self.mean_output(hidden2)  # [1, 1]
+        std = F.softplus(self.std_output(hidden2)) + 1e-6  # [1, 1], ensure positive std
         
-        return character_prediction.squeeze().item()  # Return single float value
+        # Create and return Normal distribution
+        distribution = Normal(mean.squeeze(), std.squeeze())
+        return distribution
     
     def reset(self):
         """Reset the hidden state to all zeros (initial value)"""
