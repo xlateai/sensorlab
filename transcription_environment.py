@@ -49,18 +49,21 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         Action should be a character prediction.
         Returns +1 reward for correct character, 0 for incorrect.
         Only appends to guess string if correct.
+        
+        Terminal criteria:
+        1. Timesteps equal to audio sequence length, OR
+        2. Full transcription completed early
         """
         if self.current_transcription_target is None:
             raise ValueError("Environment not reset. Call reset() first.")
             
         current_pos = len(self.current_transcription_guess)
+        reward = 0
         
-        # Check if we're at the end of the target transcription
-        if current_pos >= len(self.current_transcription_target):
-            done = True
-            reward = 0
-            info = {"message": "Transcription complete"}
-        else:
+        # Check if transcription is already complete
+        transcription_complete = (current_pos >= len(self.current_transcription_target))
+        
+        if not transcription_complete:
             # Get the expected character at current position
             expected_char = self.current_transcription_target[current_pos]
             
@@ -68,16 +71,30 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 # Correct prediction
                 self.current_transcription_guess += action
                 reward = 1
-                done = len(self.current_transcription_guess) >= len(self.current_transcription_target)
+                transcription_complete = len(self.current_transcription_guess) >= len(self.current_transcription_target)
                 info = {"correct": True, "expected": expected_char, "predicted": action}
             else:
                 # Incorrect prediction - don't append to guess
                 reward = 0
-                done = False
                 info = {"correct": False, "expected": expected_char, "predicted": action}
+        else:
+            # Transcription already complete, no more characters to predict
+            info = {"message": "Transcription already complete", "predicted": action}
         
         # Move to next timestep
         self.current_timestep += 1
+        
+        # Terminal conditions:
+        # 1. Audio sequence is finished (timestep >= audio length)
+        # 2. Transcription is complete (early termination)
+        audio_finished = self.current_timestep >= len(self.current_audio_array)
+        done = audio_finished or transcription_complete
+        
+        if done:
+            if transcription_complete and not audio_finished:
+                info["termination_reason"] = "transcription_complete_early"
+            elif audio_finished:
+                info["termination_reason"] = "audio_finished"
         
         # Observation is current audio timestep (or zeros if beyond audio length)
         obs = self._get_observation()
@@ -176,16 +193,26 @@ if __name__ == "__main__":
     # Play the audio
     # env.play_current_sample_audio()
     
-    # Take a few random steps and show results
-    print(f"\nTaking random steps:")
-    for i in range(10):
+    # Take random steps until episode terminates
+    print(f"\nTaking random steps until episode ends:")
+    step_count = 0
+    done = False
+    
+    while not done:
+        step_count += 1
         # Random action - pick a random character or space
         random_char = random.choice(string.ascii_letters + string.digits + ' .,!?')
         obs, reward, done, truncated, info = env.step(random_char)
         
-        print(f"Step {i+1}: Action='{random_char}' | Reward={reward} | Expected='{info.get('expected', 'N/A')}' | Progress: '{env.current_transcription_guess}'")
+        print(f"Step {step_count}: Action='{random_char}' | Reward={reward} | Expected='{info.get('expected', 'N/A')}' | Progress: '{env.current_transcription_guess}' | Timestep: {env.current_timestep}")
         
         if done:
-            print("Episode complete!")
+            print(f"Episode complete! Reason: {info.get('termination_reason', 'unknown')}")
+            print(f"Total steps: {step_count}")
+            print(f"Audio length: {len(env.current_audio_array)} samples")
+            print(f"Final transcription: '{env.current_transcription_guess}'")
+            print(f"Target transcription: '{env.current_transcription_target}'")
+            completion_rate = len(env.current_transcription_guess) / len(env.current_transcription_target) * 100
+            print(f"Completion rate: {completion_rate:.1f}%")
             break
 
