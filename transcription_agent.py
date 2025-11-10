@@ -5,13 +5,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class TranscriptionMemoryCellAgent:
+class TranscriptionMemoryCellAgent(nn.Module):
     """
     Memory cell agent that processes audio one timestep at a time and maintains
     internal state to predict characters.
     """
 
     def __init__(self, embedding_size: int = 32):
+        super().__init__()
+
         self.embedding_size = embedding_size
         
         # 1. FFNN to expand single audio value into embedding_size vector
@@ -103,3 +105,7 @@ class TranscriptionMemoryCellAgent:
     def reset(self):
         """Reset the hidden state to all zeros (initial value)"""
         self.hidden_state = torch.zeros(1, self.embedding_size)
+
+    @property
+    def num_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)

@@ -11,6 +11,7 @@ if __name__ == "__main__":
     
     # Create agent (in inference mode, no training yet)
     agent = TranscriptionMemoryCellAgent(embedding_size=32)
+    print(f"Agent has {agent.num_parameters} parameters.")
     
     # Reset environment to get a sample
     obs, info = env.reset()
