@@ -14,7 +14,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     character.
     """
     
-    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = True):
+    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = False):
         self.max_samples = max_samples
         self.chunk_size = chunk_size
         self.verbose = verbose
@@ -81,8 +81,8 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 info = {"correct": True, "expected": expected_char, "predicted": action}
                 
                 # Print progress for correct guesses if verbose
-                if self.verbose:
-                    print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
+                # if self.verbose:
+                print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
             else:
                 # Incorrect prediction - don't append to guess
                 reward = 0
