@@ -257,6 +257,11 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             raise ValueError(f"character_to_numeric expects single character, got: {character}")
         
         return ord(character)
+    
+    @property
+    def was_completed(self):
+        """Check if the current transcription guess matches the target."""
+        return self.current_transcription_guess == self.current_transcription_target
 
 
 if __name__ == "__main__":

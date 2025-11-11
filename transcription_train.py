@@ -8,7 +8,7 @@ import torch
 CHUNK_SIZE = 512
 # CHUNK_SIZE = 32
 
-NUM_EPISODES = 10
+NUM_EPISODES = 100
 
 
 def safe_chr(code):
@@ -20,7 +20,7 @@ def safe_chr(code):
 
 if __name__ == "__main__":
     
-    env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=CHUNK_SIZE, verbose=True)
+    env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=CHUNK_SIZE)
     agent = TranscriptionMemoryCellAgent(embedding_size=32, chunk_size=CHUNK_SIZE)
 
     optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
@@ -33,8 +33,6 @@ if __name__ == "__main__":
 
         while not done:
             optimizer.zero_grad()
-
-            print(obs)
 
             # Get prediction from agent (Beta distribution returns values in [0,1])
             distribution = agent.forward(obs)
@@ -56,13 +54,16 @@ if __name__ == "__main__":
             log_prob = distribution.log_prob(target)
             loss = -log_prob  # don't need reward multiply because this is the optimal action
 
-            print(loss, log_prob, target)
+            # print(loss, log_prob, target)
 
             loss.backward()
             optimizer.step()
 
             # print(f"[{episode_i}/{timestep}]", guess, expected_char, reward, raw_sample, obs.shape, env.current_audio_timestep)
             timestep += 1
+
+            if env.was_completed:
+                print(f"Full completion of transcription!!! 100%!")
 
             if done:
                 break
