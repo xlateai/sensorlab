@@ -3,8 +3,8 @@ from transcription_agent import TranscriptionMemoryCellAgent
 
 
 # CHUNK_SIZE = 1024
-# CHUNK_SIZE = 512
-CHUNK_SIZE = 32
+CHUNK_SIZE = 512
+# CHUNK_SIZE = 32
 
 
 def safe_chr(code):
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         expected_char = info.get('expected_char', None)
         expected_char_integer = ord(expected_char) if expected_char else None
 
-        # print(guess, expected_char, reward)
+        print(guess, expected_char, reward, raw_sample, obs.shape, env.current_timestep)
 
         if done:
             break
