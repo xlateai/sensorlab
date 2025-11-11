@@ -31,7 +31,7 @@ if __name__ == "__main__":
         # Get prediction from agent (Beta distribution returns values in [0,1])
         distribution = agent.forward(obs)
         raw_sample = distribution.sample()
-        print(f"Raw sample (0-1): {raw_sample.item():.4f}")
+        # print(f"Raw sample (0-1): {raw_sample.item():.4f}")
         
         # Scale from [0,1] to character range [32, 65535]
         scaled_sample = raw_sample * (65535 - 32) + 32
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         expected_char = info.get('expected_char', None)
         expected_char_integer = ord(expected_char) if expected_char else None
 
-        print(guess, expected_char, reward)
+        # print(guess, expected_char, reward)
 
         if done:
             break
