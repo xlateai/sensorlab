@@ -17,24 +17,24 @@ if __name__ == "__main__":
     step_count = 0
     done = False
 
-    obs = env.reset()
+    obs, info = env.reset()
     
     while not done:
         step_count += 1
-        # Random action - pick a random UTF-8 character from the massive space
-        # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
-        # random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
-        # guess = chr(random_unicode_point)
-        guess = agent.forward(obs)
+        # Get prediction from agent (Beta distribution returns values in [0,1])
+        distribution = agent.forward(obs)
+        raw_sample = distribution.sample()
+        print(f"Raw sample (0-1): {raw_sample.item():.4f}")
+        
+        # Scale from [0,1] to character range [32, 65535]
+        scaled_sample = raw_sample * (65535 - 32) + 32
+        guess = chr(int(scaled_sample.item()))
         
         obs, reward, done, truncated, info = env.step(guess)
         expected_char = info.get('expected_char', None)
         expected_char_integer = ord(expected_char) if expected_char else None
 
-        # use MAE as loss
-        loss = abs(ord(obs) - expected_char_integer) if expected_char_integer is not None else None
-        if loss is not None:
-            print(loss)
+        print(guess, expected_char, reward)
 
         if done:
             break

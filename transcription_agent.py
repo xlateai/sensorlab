@@ -4,12 +4,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal
+from torch.distributions import Beta
 
 class TranscriptionMemoryCellAgent(nn.Module):
     """
     Memory cell agent that processes audio one timestep at a time and maintains
-    internal state to predict characters.
+    internal state to predict characters using a Beta distribution (always outputs [0,1]).
     """
 
     def __init__(self, embedding_size: int = 32):
@@ -36,9 +36,9 @@ class TranscriptionMemoryCellAgent(nn.Module):
         self.hidden_layer1 = nn.Linear(embedding_size, embedding_size)
         self.hidden_layer2 = nn.Linear(embedding_size, embedding_size)
         
-        # 4. Final layers to predict mean and std for Normal distribution
-        self.mean_output = nn.Linear(embedding_size, 1)
-        self.std_output = nn.Linear(embedding_size, 1)
+        # 4. Final layers to predict alpha and beta parameters for Beta distribution
+        self.alpha_output = nn.Linear(embedding_size, 1)
+        self.beta_output = nn.Linear(embedding_size, 1)
         
         # Initialize hidden state
         self.hidden_state = torch.zeros(1, embedding_size)
@@ -50,7 +50,7 @@ class TranscriptionMemoryCellAgent(nn.Module):
         """Initialize weights with Xavier/Glorot initialization"""
         for module in [self.audio_expander, self.query_proj, self.key_proj, 
                       self.value_proj, self.attention_output, self.hidden_layer1, 
-                      self.hidden_layer2, self.mean_output, self.std_output]:
+                      self.hidden_layer2, self.alpha_output, self.beta_output]:
             if isinstance(module, nn.Sequential):
                 for layer in module:
                     if isinstance(layer, nn.Linear):
@@ -60,18 +60,24 @@ class TranscriptionMemoryCellAgent(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
     
-    def forward(self, audio_value: float):
+    def forward(self, audio_value):
         """
         Forward pass for a single audio timestep.
         
         Args:
-            audio_value: Single float value from audio stream
+            audio_value: Single float value from audio stream, or numpy array containing a single value
             
         Returns:
-            Normal distribution for character prediction
+            Beta distribution for character prediction (samples always in [0, 1])
         """
         # Convert audio value to tensor
-        audio_tensor = torch.tensor([[audio_value]], dtype=torch.float32)
+        # Handle both float and numpy array inputs
+        if isinstance(audio_value, (float, int)):
+            audio_tensor = torch.tensor([[audio_value]], dtype=torch.float32)
+        else:
+            # Assume it's a numpy array or similar, extract the scalar value
+            scalar_value = float(audio_value.item() if hasattr(audio_value, 'item') else audio_value[0])
+            audio_tensor = torch.tensor([[scalar_value]], dtype=torch.float32)
         
         # 1. Expand single audio value to embedding_size vector
         expanded_audio = self.audio_expander(audio_tensor)  # [1, embedding_size]
@@ -99,13 +105,16 @@ class TranscriptionMemoryCellAgent(nn.Module):
         # Update hidden state for next timestep
         self.hidden_state = hidden2.detach()  # Detach to prevent gradient flow to previous timesteps
         
-        # 4. Predict mean and std for Normal distribution
-        mean_raw = self.mean_output(hidden2)  # [1, 1]
-        mean = torch.sigmoid(mean_raw)  # Normalize to [0, 1]
-        std = F.softplus(self.std_output(hidden2)) + 1e-6  # [1, 1], ensure positive std
+        # 4. Predict alpha and beta parameters for Beta distribution
+        alpha_raw = self.alpha_output(hidden2)  # [1, 1]
+        beta_raw = self.beta_output(hidden2)   # [1, 1]
         
-        # Create and return Normal distribution
-        distribution = Normal(mean.squeeze(), std.squeeze())
+        # Ensure positive parameters for Beta distribution (must be > 0)
+        alpha = F.softplus(alpha_raw) + 1e-6  # [1, 1]
+        beta = F.softplus(beta_raw) + 1e-6    # [1, 1]
+        
+        # Create and return Beta distribution (always samples in [0, 1])
+        distribution = Beta(alpha.squeeze(), beta.squeeze())
         return distribution
     
     def reset(self):
