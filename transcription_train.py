@@ -51,9 +51,7 @@ if __name__ == "__main__":
 
             # for now, let's just increase the probability of the correct action
             normalized_expected = (expected_char_integer - 32) / (65535 - 32)
-            # clamp between 1e-5 and 1-1e-5 to avoid issues with Beta distribution
-            normalized_expected = max(1e-5, min(1 - 1e-5, normalized_expected))
-            assert 0.0 < normalized_expected < 1.0, f"Normalized expected {normalized_expected} out of bounds for char '{expected_char}' ({expected_char_integer})"
+            assert 0.0 <= normalized_expected <= 1.0, f"Normalized expected {normalized_expected} out of bounds for char '{expected_char}' ({expected_char_integer})"
             target = torch.tensor([[normalized_expected]], dtype=torch.float32)
             log_prob = distribution.log_prob(target)
             loss = -log_prob  # don't need reward multiply because this is the optimal action

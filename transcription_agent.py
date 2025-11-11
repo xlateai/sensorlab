@@ -119,7 +119,8 @@ class TranscriptionMemoryCellAgent(nn.Module):
         beta = F.softplus(beta_raw) + 1e-6    # [1, 1]
         
         # Create and return Beta distribution (always samples in [0, 1])
-        distribution = Beta(alpha.squeeze(), beta.squeeze())
+        # NOTE: must clamp to at least 1.0 to avoid NaNs during training
+        distribution = Beta(alpha.squeeze().clamp(1.0), beta.squeeze().clamp(1.0))
         return distribution
     
     def reset(self):
