@@ -23,7 +23,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.current_audio_array = None
         self.current_transcription_target = ""
         self.current_transcription_guess = ""
-        self.current_timestep = 0
+        self.current_audio_timestep = 0
         
         # Load dataset and prepare available samples
         self._load_dataset()
@@ -82,7 +82,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 
                 # Print progress for correct guesses if verbose
                 if self.verbose:
-                    print(f"✓ Step {self.current_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
+                    print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
             else:
                 # Incorrect prediction - don't append to guess
                 reward = 0
@@ -92,12 +92,12 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             info = {"message": "Transcription already complete", "predicted": action}
         
         # Move to next chunk
-        self.current_timestep += self.chunk_size
+        self.current_audio_timestep += self.chunk_size
         
         # Terminal conditions:
         # 1. Audio sequence is finished (timestep >= audio length)
         # 2. Transcription is complete (early termination)
-        audio_finished = self.current_timestep >= len(self.current_audio_array)
+        audio_finished = self.current_audio_timestep >= len(self.current_audio_array)
         done = audio_finished or transcription_complete
         
         if done:
@@ -109,7 +109,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             # Print episode completion info if verbose
             if self.verbose:
                 print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
-                print(f"Total steps: {self.current_timestep}")
+                print(f"Total steps: {self.current_audio_timestep}")
                 print(f"Audio length: {len(self.current_audio_array)} samples")
                 print(f"Final transcription: '{self.current_transcription_guess}'")
                 print(f"Target transcription: '{self.current_transcription_target}'")
@@ -125,7 +125,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         """Get the current audio chunk as observation."""
         if self.current_audio_array is None:
             return np.zeros(self.chunk_size, dtype=np.float32)
-        start = self.current_timestep
+        start = self.current_audio_timestep
         end = start + self.chunk_size
         audio_len = len(self.current_audio_array)
         if start >= audio_len:
@@ -153,7 +153,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.current_audio_array = selected_sample['mp3']['array']
         self.current_transcription_target = selected_sample['json']['text']
         self.current_transcription_guess = ""
-        self.current_timestep = 0
+        self.current_audio_timestep = 0
         
         if self.verbose:
             print(f"Reset with sample: '{self.current_transcription_target}'")
