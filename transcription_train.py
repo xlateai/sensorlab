@@ -1,6 +1,10 @@
 from transcription_environment import TranscriptionEnvironmentSingleInstance
 from transcription_agent import TranscriptionMemoryCellAgent
-import random
+
+
+# CHUNK_SIZE = 1024
+# CHUNK_SIZE = 512
+CHUNK_SIZE = 32
 
 
 def safe_chr(code):
@@ -11,11 +15,9 @@ def safe_chr(code):
     return chr(code)
 
 if __name__ == "__main__":
-    import string
-    
     # Create environment with just 1 sample for testing
-    env = TranscriptionEnvironmentSingleInstance(max_samples=1)
-    agent = TranscriptionMemoryCellAgent(embedding_size=32)
+    env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=CHUNK_SIZE, verbose=True)
+    agent = TranscriptionMemoryCellAgent(embedding_size=32, chunk_size=CHUNK_SIZE)
 
     # Play the audio
     # env.play_current_sample_audio()

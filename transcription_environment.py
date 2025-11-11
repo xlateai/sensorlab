@@ -14,8 +14,9 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     character.
     """
     
-    def __init__(self, max_samples: int=4, verbose: bool = True):
+    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = True):
         self.max_samples = max_samples
+        self.chunk_size = chunk_size
         self.verbose = verbose
         self.dataset = None
         self.available_samples = []
@@ -90,8 +91,8 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             # Transcription already complete, no more characters to predict
             info = {"message": "Transcription already complete", "predicted": action}
         
-        # Move to next timestep
-        self.current_timestep += 1
+        # Move to next chunk
+        self.current_timestep += self.chunk_size
         
         # Terminal conditions:
         # 1. Audio sequence is finished (timestep >= audio length)
@@ -121,14 +122,21 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         return obs, reward, done, False, info
 
     def _get_observation(self):
-        """Get the current audio timestep as observation."""
-        if (self.current_audio_array is None or 
-            self.current_timestep >= len(self.current_audio_array)):
-            # Return silence if we're beyond the audio
-            return np.array([0.0], dtype=np.float32)
-        else:
-            # Return current audio sample
-            return np.array([self.current_audio_array[self.current_timestep]], dtype=np.float32)
+        """Get the current audio chunk as observation."""
+        if self.current_audio_array is None:
+            return np.zeros(self.chunk_size, dtype=np.float32)
+        start = self.current_timestep
+        end = start + self.chunk_size
+        audio_len = len(self.current_audio_array)
+        if start >= audio_len:
+            # Beyond audio, return zeros
+            return np.zeros(self.chunk_size, dtype=np.float32)
+        chunk = self.current_audio_array[start:end]
+        if len(chunk) < self.chunk_size:
+            # Pad with zeros if final chunk is short
+            pad_width = self.chunk_size - len(chunk)
+            chunk = np.pad(chunk, (0, pad_width), mode='constant')
+        return np.array(chunk, dtype=np.float32)
 
     def reset(self, *, seed=None, options=None):
         """Reset environment by selecting a random sample from available indices."""

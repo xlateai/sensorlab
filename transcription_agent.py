@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Beta
+import numpy as np
 
 class TranscriptionMemoryCellAgent(nn.Module):
     """
@@ -12,14 +13,15 @@ class TranscriptionMemoryCellAgent(nn.Module):
     internal state to predict characters using a Beta distribution (always outputs [0,1]).
     """
 
-    def __init__(self, embedding_size: int = 32):
+    def __init__(self, embedding_size: int = 32, chunk_size: int = 512):
         super().__init__()
 
         self.embedding_size = embedding_size
+        self.chunk_size = chunk_size
         
-        # 1. FFNN to expand single audio value into embedding_size vector
+        # 1. FFNN to expand audio chunk into embedding_size vector
         self.audio_expander = nn.Sequential(
-            nn.Linear(1, embedding_size),
+            nn.Linear(chunk_size, embedding_size),
             nn.ReLU(),
             nn.Linear(embedding_size, embedding_size),
             nn.ReLU(),
@@ -60,26 +62,28 @@ class TranscriptionMemoryCellAgent(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
     
-    def forward(self, audio_value):
+    def forward(self, audio_chunk):
         """
-        Forward pass for a single audio timestep.
+        Forward pass for a chunk of audio samples.
         
         Args:
-            audio_value: Single float value from audio stream, or numpy array containing a single value
-            
+            audio_chunk: 1D array/tensor of length chunk_size
         Returns:
             Beta distribution for character prediction (samples always in [0, 1])
         """
-        # Convert audio value to tensor
-        # Handle both float and numpy array inputs
-        if isinstance(audio_value, (float, int)):
-            audio_tensor = torch.tensor([[audio_value]], dtype=torch.float32)
+        # Convert audio chunk to tensor
+        if isinstance(audio_chunk, np.ndarray):
+            audio_tensor = torch.tensor(audio_chunk, dtype=torch.float32).unsqueeze(0)  # [1, chunk_size]
+        elif isinstance(audio_chunk, torch.Tensor):
+            if audio_chunk.dim() == 1:
+                audio_tensor = audio_chunk.unsqueeze(0)  # [1, chunk_size]
+            else:
+                audio_tensor = audio_chunk  # [1, chunk_size] or [batch, chunk_size]
         else:
-            # Assume it's a numpy array or similar, extract the scalar value
-            scalar_value = float(audio_value.item() if hasattr(audio_value, 'item') else audio_value[0])
-            audio_tensor = torch.tensor([[scalar_value]], dtype=torch.float32)
+            # Assume list or other sequence
+            audio_tensor = torch.tensor(audio_chunk, dtype=torch.float32).unsqueeze(0)
         
-        # 1. Expand single audio value to embedding_size vector
+        # 1. Expand audio chunk to embedding_size vector
         expanded_audio = self.audio_expander(audio_tensor)  # [1, embedding_size]
         
         # 2. Cross-attention between expanded audio and hidden state
