@@ -3,6 +3,13 @@ from transcription_agent import TranscriptionMemoryCellAgent
 import random
 
 
+def safe_chr(code):
+    # Clamp to valid range
+    code = int(code)
+    if 0xD800 <= code <= 0xDFFF:
+        code = 0xE000  # Skip surrogate range to next valid code point
+    return chr(code)
+
 if __name__ == "__main__":
     import string
     
@@ -28,7 +35,7 @@ if __name__ == "__main__":
         
         # Scale from [0,1] to character range [32, 65535]
         scaled_sample = raw_sample * (65535 - 32) + 32
-        guess = chr(int(scaled_sample.item()))
+        guess = safe_chr(int(scaled_sample.item()))
         
         obs, reward, done, truncated, info = env.step(guess)
         expected_char = info.get('expected_char', None)
