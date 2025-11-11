@@ -21,6 +21,7 @@ class TranscriptionMemoryCellAgent(nn.Module):
         
         # 1. FFNN to expand audio chunk into embedding_size vector
         self.audio_expander = nn.Sequential(
+            nn.LayerNorm(chunk_size),
             nn.Linear(chunk_size, embedding_size),
             nn.ReLU(),
             nn.Linear(embedding_size, embedding_size),

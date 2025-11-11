@@ -23,7 +23,7 @@ if __name__ == "__main__":
     env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=CHUNK_SIZE, verbose=True)
     agent = TranscriptionMemoryCellAgent(embedding_size=32, chunk_size=CHUNK_SIZE)
 
-    optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
     
     for episode_i in range(NUM_EPISODES):
 
@@ -33,6 +33,8 @@ if __name__ == "__main__":
 
         while not done:
             optimizer.zero_grad()
+
+            print(obs)
 
             # Get prediction from agent (Beta distribution returns values in [0,1])
             distribution = agent.forward(obs)
@@ -49,10 +51,14 @@ if __name__ == "__main__":
 
             # for now, let's just increase the probability of the correct action
             normalized_expected = (expected_char_integer - 32) / (65535 - 32)
-            assert 0.0 <= normalized_expected <= 1.0, f"Normalized expected {normalized_expected} out of bounds for char '{expected_char}' ({expected_char_integer})"
+            # clamp between 1e-5 and 1-1e-5 to avoid issues with Beta distribution
+            normalized_expected = max(1e-5, min(1 - 1e-5, normalized_expected))
+            assert 0.0 < normalized_expected < 1.0, f"Normalized expected {normalized_expected} out of bounds for char '{expected_char}' ({expected_char_integer})"
             target = torch.tensor([[normalized_expected]], dtype=torch.float32)
             log_prob = distribution.log_prob(target)
             loss = -log_prob  # don't need reward multiply because this is the optimal action
+
+            print(loss, log_prob, target)
 
             loss.backward()
             optimizer.step()
