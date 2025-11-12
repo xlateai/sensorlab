@@ -128,11 +128,11 @@ class TranscriptionAgentGroup:
         # do not clone the top agents
         top_agent_indices = self.episodic_rewards.argsort()[-int(self.num_agents * KEEP_TOP_PERCENT):]
         arange = jnp.arange(self.num_agents)
-        will_clone = jnp.where(jnp.isin(arange, top_agent_indices), False, will_clone)
+        self.will_clone = jnp.where(jnp.isin(arange, top_agent_indices), False, will_clone)
         
         # now, extract the indices of the agents that will clone from `will_clone`
-        clone_indices = arange[will_clone]
-        partner_indices = self._pair_indices[will_clone]
+        clone_indices = arange[self.will_clone]
+        partner_indices = self._pair_indices[self.will_clone]
 
         # now, the agents that will clone will take their partner's weights/biases (then mutate)
         self.clone(clone_indices, partner_indices)  # should also mutate
@@ -145,6 +145,9 @@ agents = TranscriptionAgentGroup(
     embedding_size=EMBEDDING_SIZE,
 )
 
+print("character dictionary")
+print(agents.env.character_dictionary)
+
 for episode_i in range(10):
     episodic_rewards = agents.episode()
     
@@ -152,6 +155,10 @@ for episode_i in range(10):
     max_reward = jnp.max(episodic_rewards)
     min_reward = jnp.min(episodic_rewards)
     mean_reward = jnp.mean(episodic_rewards)
+
+    # print the number that cloned
     print(f"Episode {episode_i}: Max Reward: {max_reward}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
 
     agents.update_parameters()
+
+    print(f"Number of agents that cloned: {jnp.sum(agents.will_clone)} out of {NUM_AGENTS}")

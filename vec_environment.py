@@ -73,15 +73,11 @@ class TranscriptionVecEnv:
             if not transcription_complete:
                 expected_char = self.current_transcription_target[current_pos]
                 action = actions[i]
-                # Calculate character code distance
-                char_distance = abs(ord(action) - ord(expected_char))
-                # Negative reward for distance
-                penalty = -0.001 * char_distance
                 if action == expected_char:
                     guess += action
-                    reward = 1 + penalty
+                    reward = 1
                 else:
-                    reward = penalty
+                    reward = 0
             else:
                 reward = 0
 
@@ -173,37 +169,34 @@ class TranscriptionVecEnv:
 
     def numeric_to_character(self, numeric_value):
         """
-        Convert a numeric value to a character.
-        
-        Args:
-            numeric_value: Should be an integer in range [0, 65535] for Unicode BMP
-                          If float, caller should normalize to [0,1] and multiply by range
-        
-        Returns:
-            str: Single character
+        Convert a numeric value (index) to a character using the character_dictionary.
         """
-        if not isinstance(numeric_value, int):
-            raise ValueError(f"numeric_to_character expects integer input, got {type(numeric_value)}. "
-                           f"Please normalize float to [0,1] and multiply by your desired range first.")
-        
-        # Clamp to valid Unicode Basic Multilingual Plane range
-        char_code = max(32, min(65535, numeric_value))  # Printable range
-        return chr(char_code)
+        idx = int(numeric_value)
+        dictionary = self.character_dictionary
+        if idx < 0 or idx >= len(dictionary):
+            raise ValueError(f"Index {idx} out of bounds for character dictionary of size {len(dictionary)}")
+        return dictionary[idx]
     
     def character_to_numeric(self, character):
         """
-        Convert a character to its Unicode code point.
-        
-        Args:
-            character: Single character string
-            
-        Returns:
-            int: Unicode code point
+        Convert a character to its index in the character_dictionary.
         """
+        dictionary = self.character_dictionary
         if not isinstance(character, str) or len(character) != 1:
             raise ValueError(f"character_to_numeric expects single character, got: {character}")
-        
-        return ord(character)
+        try:
+            return dictionary.index(character)
+        except ValueError:
+            raise ValueError(f"Character '{character}' not found in character dictionary.")
+
+    @property
+    def character_dictionary(self):
+        if not hasattr(self, '_character_dictionary_cache'):
+            chars = set()
+            for sample in self.available_samples:
+                chars.update(sample['json']['text'])
+            self._character_dictionary_cache = sorted(chars)
+        return self._character_dictionary_cache
     
     def was_completed(self, agent_idx):
         """Check if the current transcription guess matches the target for a specific agent."""
