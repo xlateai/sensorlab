@@ -48,5 +48,6 @@ out = agents.forward(obs)
 # Convert model output to character actions (simple argmax to int, then chr)
 actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(num_agents)]
 obs, rewards, dones = agents.step(actions)
+print("actions:", actions)
 print("rewards:", rewards)
 print("dones:", dones)
