@@ -29,8 +29,11 @@ class TranscriptionAgentGroup:
 
     def forward(self, obs):
         h1 = self.layer1.forward(obs)
+        h1 = jax.nn.relu(h1)
         h2 = self.layer2.forward(h1)
+        h2 = jax.nn.relu(h2)
         out = self.layer3.forward(h2)
+        out = jax.nn.sigmoid(out)
         return out
 
     def step(self, actions):
