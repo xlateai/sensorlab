@@ -9,6 +9,17 @@ NUM_AGENTS = 16
 CHUNK_SIZE = 1024
 EMBEDDING_SIZE = 32
 MAX_SAMPLES = 1
+FMC_BALANCE = 1.0
+
+
+def relativize(vector: jnp.ndarray):
+    std = vector.std()
+    if std == 0:
+        return jnp.ones(len(vector))
+    standard = (vector - vector.mean()) / std
+    standard = standard.at[standard > 0].set(jnp.log(1 + standard[standard > 0]) + 1)
+    standard = standard.at[standard <= 0].set(jnp.exp(standard[standard <= 0]))
+    return standard
 
 
 class TranscriptionAgentGroup:
@@ -44,7 +55,7 @@ class TranscriptionAgentGroup:
     
     def random_distances(self):
         # generate random pairs of indices for all agents
-        self._pair_indices = jax.random.randint(jax.random.PRNGKey(0), (self.num_agents, 2), 0, self.num_agents)
+        self._pair_indices = jax.random.randint(jax.random.PRNGKey(0), (self.num_agents,), 0, self.num_agents)
         
         # now, sum the distances for each layer
         d1 = self.layer1.distances(self._pair_indices)
@@ -54,7 +65,7 @@ class TranscriptionAgentGroup:
         return (d1 + d2 + d3) / 3.0
 
     def episode(self):
-        episodic_rewards = jnp.zeros(self.num_agents)
+        self.episodic_rewards = jnp.zeros(self.num_agents)
         
         obs = self.reset()
         step_count = 0
@@ -70,9 +81,28 @@ class TranscriptionAgentGroup:
             print("rewards:", rewards)
             print("dones:", dones)
 
-            episodic_rewards += rewards * (~dones)
+            self.episodic_rewards += rewards * (~dones)
 
-        return episodic_rewards
+        return self.episodic_rewards
+    
+    def calculate_virtual_rewards(self):
+        # first, we measure the euclidean distance between each of the parents.
+        pair_distances = self.random_distances()
+        rel_dists = relativize(pair_distances)
+        scores = relativize(self.episodic_rewards) ** FMC_BALANCE
+        return scores * rel_dists
+    
+    def update_parameters(self):
+        # let's use FMC to update the paramters
+        # observing random distances also assigns _pair_indices
+        
+        virtual_rewards = self.calculate_virtual_rewards()
+        partner_vr = virtual_rewards[self._pair_indices]
+
+        print(virtual_rewards)
+        print(partner_vr)
+
+        pass
 
 # Initialize param groups (3 layers)
 
@@ -86,3 +116,5 @@ agents = TranscriptionAgentGroup(
 
 episodic_rewards = agents.episode()
 print(episodic_rewards)
+
+agents.update_parameters()

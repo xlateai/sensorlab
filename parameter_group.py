@@ -65,15 +65,17 @@ class LinearLayerParamGroup:
         parent_weights = self.weights[parent_indices]
         parent_biases = self.biases[parent_indices]
 
-        # calculate the euclidean distance between the parent weights and biases
-        # this is a measure of the similarity between the parents
-        weight_dists = jnp.linalg.norm(parent_weights[:, 0] - parent_weights[:, 1], axis=(1, 2))
-        bias_dists = jnp.linalg.norm(parent_biases[:, 0] - parent_biases[:, 1], axis=1)
+        # For each agent, compare its weights/biases to its paired agent
+        # parent_indices should be shape (num_agents,)
+        # For each i, compare weights[i] to weights[pair_indices[i]]
+        pair_weights = self.weights[parent_indices]
+        pair_biases = self.biases[parent_indices]
+
+        weight_dists = jnp.linalg.norm(self.weights - pair_weights, axis=(1,2))
+        bias_dists = jnp.linalg.norm(self.biases - pair_biases, axis=1)
 
         dists = weight_dists + bias_dists
-
         assert dists.shape == (parent_indices.shape[0],)
-
         return dists
     
     def clone(self, clone_indices: jnp.ndarray, partner_indices: jnp.ndarray, auto_mutate: bool = True):
