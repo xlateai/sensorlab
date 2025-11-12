@@ -18,8 +18,10 @@ class TranscriptionAgentGroup:
         self.layer1 = LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size)
         self.layer2 = LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size)
         self.layer3 = LinearLayerParamGroup(key, num_agents, embedding_size, 1)
-        print("random distances:", self.random_distances())
-        exit()
+
+        # Debug: print random distances
+        # print("random distances:", self.random_distances())
+        # exit()
 
         self.env = TranscriptionVecEnv(num_agents=num_agents, chunk_size=chunk_size, max_samples=MAX_SAMPLES)
 
@@ -42,12 +44,12 @@ class TranscriptionAgentGroup:
     
     def random_distances(self):
         # generate random pairs of indices for all agents
-        indices = jax.random.randint(jax.random.PRNGKey(0), (self.num_agents, 2), 0, self.num_agents)
+        self._pair_indices = jax.random.randint(jax.random.PRNGKey(0), (self.num_agents, 2), 0, self.num_agents)
         
         # now, sum the distances for each layer
-        d1 = self.layer1.distances(indices)
-        d2 = self.layer2.distances(indices)
-        d3 = self.layer3.distances(indices)
+        d1 = self.layer1.distances(self._pair_indices)
+        d2 = self.layer2.distances(self._pair_indices)
+        d3 = self.layer3.distances(self._pair_indices)
 
         return (d1 + d2 + d3) / 3.0
 
