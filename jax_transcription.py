@@ -10,6 +10,7 @@ CHUNK_SIZE = 1024
 EMBEDDING_SIZE = 32
 MAX_SAMPLES = 1
 FMC_BALANCE = 1.0
+KEEP_TOP_PERCENT = 0.2
 
 
 def relativize(vector: jnp.ndarray):
@@ -26,9 +27,11 @@ class TranscriptionAgentGroup:
     def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int):
         self.num_agents = num_agents
 
+        self.key = key
         self.layer1 = LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size)
         self.layer2 = LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size)
         self.layer3 = LinearLayerParamGroup(key, num_agents, embedding_size, 1)
+        self.groups = [self.layer1, self.layer2, self.layer3]
 
         # Debug: print random distances
         # print("random distances:", self.random_distances())
@@ -55,7 +58,8 @@ class TranscriptionAgentGroup:
     
     def random_distances(self):
         # generate random pairs of indices for all agents
-        self._pair_indices = jax.random.randint(jax.random.PRNGKey(0), (self.num_agents,), 0, self.num_agents)
+        self.key, skey = jax.random.split(self.key, 2)
+        self._pair_indices = jax.random.randint(skey, (self.num_agents,), 0, self.num_agents)
         
         # now, sum the distances for each layer
         d1 = self.layer1.distances(self._pair_indices)
@@ -63,6 +67,10 @@ class TranscriptionAgentGroup:
         d3 = self.layer3.distances(self._pair_indices)
 
         return (d1 + d2 + d3) / 3.0
+    
+    def clone(self, clone_indices: jnp.ndarray, partner_indices: jnp.ndarray):
+        for group in self.groups:
+            group.clone(clone_indices, partner_indices)
 
     def episode(self):
         self.episodic_rewards = jnp.zeros(self.num_agents)
@@ -96,15 +104,32 @@ class TranscriptionAgentGroup:
         # let's use FMC to update the paramters
         # observing random distances also assigns _pair_indices
         
-        virtual_rewards = self.calculate_virtual_rewards()
-        partner_vr = virtual_rewards[self._pair_indices]
+        vr = self.calculate_virtual_rewards()
+        partner_vr = vr[self._pair_indices]
 
-        print(virtual_rewards)
+        print(vr)
         print(partner_vr)
 
-        pass
+        value = (partner_vr - vr) / jnp.where(vr > 0, vr, 1e-8)
 
-# Initialize param groups (3 layers)
+        self.key, skey = jax.random.split(self.key, 2)
+
+        # randomly clone based on their virtual rewards
+        r = jax.random.uniform(skey, (self.num_agents, ))
+        will_clone = value >= r
+
+        # do not clone the top agents
+        top_agent_indices = self.episodic_rewards.argsort()[-int(self.num_agents * KEEP_TOP_PERCENT):]
+        arange = jnp.arange(self.num_agents)
+        will_clone = jnp.where(jnp.isin(arange, top_agent_indices), False, will_clone)
+        
+        # now, extract the indices of the agents that will clone from `will_clone`
+        clone_indices = arange[will_clone]
+        partner_indices = self._pair_indices[will_clone]
+
+        # now, the agents that will clone will take their partner's weights/biases (then mutate)
+        self.clone(clone_indices, partner_indices)  # should also mutate
+
 
 agents = TranscriptionAgentGroup(
     key,
@@ -112,7 +137,6 @@ agents = TranscriptionAgentGroup(
     chunk_size=CHUNK_SIZE,
     embedding_size=EMBEDDING_SIZE,
 )
-
 
 episodic_rewards = agents.episode()
 print(episodic_rewards)
