@@ -6,9 +6,13 @@ from vec_environment import TranscriptionVecEnv
 key = jax.random.PRNGKey(0)
 
 NUM_AGENTS = 64
+
 CHUNK_SIZE = 256
 EMBEDDING_SIZE = 32
+
 MAX_SAMPLES = 1
+
+NUM_EPISODES = 1000
 FMC_BALANCE = 0.25
 KEEP_TOP_PERCENT = 0.05
 
@@ -160,7 +164,7 @@ agents = TranscriptionAgentGroup(
 print("character dictionary")
 print(agents.env.character_dictionary)
 
-for episode_i in range(10):
+for episode_i in range(NUM_EPISODES):
     episodic_rewards = agents.episode()
     
     # print max, min, and mean episodic rewards
@@ -169,6 +173,7 @@ for episode_i in range(10):
     mean_reward = jnp.mean(episodic_rewards)
 
     # print the number that cloned
+    print()
     print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(agents.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
 
     agents.update_parameters()
