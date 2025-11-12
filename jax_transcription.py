@@ -87,14 +87,17 @@ class TranscriptionAgentGroup:
             out = self.forward(obs)
             # Convert model output to integer indices, then to characters using the dictionary
             # Use argmax if output is a vector, or scale if output is scalar
+
             if out.shape[1] == 1:
                 # Scalar output: scale to [0, dict_size-1]
                 indices = jnp.clip((out.flatten() * dict_size).astype(int), 0, dict_size - 1)
             else:
                 # Vector output: use argmax
                 indices = jnp.argmax(out, axis=1)
+                raise ValueError("Output shape not recommended (yet)")
+            
             actions = [self.env.numeric_to_character(idx) for idx in indices]
-            print(actions)
+            # print(actions)
             obs, rewards, dones = self.step(actions)
             step_count += 1
 
@@ -166,7 +169,7 @@ for episode_i in range(10):
     mean_reward = jnp.mean(episodic_rewards)
 
     # print the number that cloned
-    print(f"Episode {episode_i}: Max Reward: {max_reward}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
+    print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(agents.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
 
     agents.update_parameters()
 
