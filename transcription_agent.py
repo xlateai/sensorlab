@@ -63,7 +63,7 @@ class TranscriptionMemoryCellAgent(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
     
-    def forward(self, audio_chunk) -> Beta:
+    def forward(self, audio_chunk):
         """
         Forward pass for a chunk of audio samples.
         
@@ -112,16 +112,18 @@ class TranscriptionMemoryCellAgent(nn.Module):
         
         # 4. Predict alpha and beta parameters for Beta distribution
         alpha_raw = self.alpha_output(hidden2)  # [1, 1]
-        beta_raw = self.beta_output(hidden2)   # [1, 1]
+        # beta_raw = self.beta_output(hidden2)   # [1, 1]
         
         # Ensure positive parameters for Beta distribution (must be > 0)
-        alpha = F.softplus(alpha_raw) + 1e-6  # [1, 1]
-        beta = F.softplus(beta_raw) + 1e-6    # [1, 1]
+        # alpha = F.softplus(alpha_raw) + 1e-6  # [1, 1]
+        # beta = F.softplus(beta_raw) + 1e-6    # [1, 1]
         
         # Create and return Beta distribution (always samples in [0, 1])
         # NOTE: must clamp to at least 1.0 to avoid NaNs during training
-        distribution = Beta(alpha.squeeze().clamp(1.0), beta.squeeze().clamp(1.0))
-        return distribution
+        # distribution = Beta(alpha.squeeze().clamp(1.0), beta.squeeze().clamp(1.0))
+        # return distribution
+
+        return torch.sigmoid(alpha_raw).squeeze()  # [1]
     
     def reset(self):
         """Reset the hidden state to all zeros (initial value)"""

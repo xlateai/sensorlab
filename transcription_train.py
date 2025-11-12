@@ -38,9 +38,10 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # Get prediction from agent (Beta distribution returns values in [0,1])
-            distribution = agent.forward(obs)
+            raw_sample = agent.forward(obs)
+            # distribution = agent.forward(obs)
             # raw_sample = distribution.sample()
-            raw_sample = distribution.mean  # use mean because why not
+            # raw_sample = distribution.mean  # use mean because why not
             # print(f"Raw sample (0-1): {raw_sample.item():.4f}")
             
             # Scale from [0,1] to character range [32, 65535]
@@ -55,11 +56,14 @@ if __name__ == "__main__":
             normalized_expected = (expected_char_integer - 32) / (65535 - 32)
             assert 0.0 <= normalized_expected <= 1.0, f"Normalized expected {normalized_expected} out of bounds for char '{expected_char}' ({expected_char_integer})"
             target = torch.tensor([[normalized_expected]], dtype=torch.float32)
-            log_prob = distribution.log_prob(target)
-            loss = -log_prob  # don't need reward multiply because this is the optimal action
+            # log_prob = distribution.log_prob(target)
+            # loss = -log_prob  # don't need reward multiply because this is the optimal action
 
-            print(distribution.concentration0, distribution.concentration1)
-            print(loss, log_prob, target)
+            # print(distribution.concentration0, distribution.concentration1)
+
+            # loss is mae
+            loss = torch.abs(raw_sample - target).mean()
+            # print(loss, raw_sample, target)
 
             loss.backward()
             optimizer.step()
