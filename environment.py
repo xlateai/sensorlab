@@ -118,8 +118,14 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         
         # Observation is current audio timestep (or zeros if beyond audio length)
         obs = self._get_observation()
+
+        self.observation = obs
+        self.reward = reward
+        self.done = done
+        self.terminated = False
+        self.info = info
         
-        return obs, reward, done, False, info
+        return self.observation, self.reward, self.done, self.terminated, self.info
 
     def _get_observation(self):
         """Get the current audio chunk as observation."""
@@ -169,14 +175,14 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             print(f"\nReady to take steps (only showing +1 reward - correct guesses)...")
         
         # Return initial observation
-        observation = self._get_observation()
-        info = {
+        self.observation = self._get_observation()
+        self.info = {
             "target_text": self.current_transcription_target,
             "audio_length": len(self.current_audio_array),
             "sample_rate": selected_sample['mp3']['sampling_rate']
         }
         
-        return observation, info
+        return self.observation, self.info
 
     def play_current_sample_audio(self):
         """Play the current audio sample using pygame."""
