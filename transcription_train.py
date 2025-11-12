@@ -23,7 +23,7 @@ if __name__ == "__main__":
     env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=CHUNK_SIZE)
     agent = TranscriptionMemoryCellAgent(embedding_size=32, chunk_size=CHUNK_SIZE)
 
-    optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=0.00001)
     
     for episode_i in range(NUM_EPISODES):
         print("episode", episode_i)
@@ -62,7 +62,7 @@ if __name__ == "__main__":
             # print(distribution.concentration0, distribution.concentration1)
 
             # loss is mae
-            loss = torch.abs(raw_sample - target).mean()
+            loss = torch.square(raw_sample - target).mean()
             # print(loss, raw_sample, target)
 
             loss.backward()

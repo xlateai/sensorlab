@@ -29,11 +29,8 @@ class TranscriptionMemoryCellAgent(nn.Module):
             nn.Linear(embedding_size, embedding_size)
         )
         
-        # 2. Cross-attention to combine expanded audio with hidden state
-        self.query_proj = nn.Linear(embedding_size, embedding_size)
-        self.key_proj = nn.Linear(embedding_size, embedding_size)
-        self.value_proj = nn.Linear(embedding_size, embedding_size)
-        self.attention_output = nn.Linear(embedding_size, embedding_size)
+        # 2. Linear layer to combine expanded audio and hidden state
+        self.combined_proj = nn.Linear(embedding_size * 2, embedding_size)
         
         # 3. Two additional linear layers for processing
         self.hidden_layer1 = nn.Linear(embedding_size, embedding_size)
@@ -51,9 +48,8 @@ class TranscriptionMemoryCellAgent(nn.Module):
     
     def _init_weights(self):
         """Initialize weights with Xavier/Glorot initialization"""
-        for module in [self.audio_expander, self.query_proj, self.key_proj, 
-                      self.value_proj, self.attention_output, self.hidden_layer1, 
-                      self.hidden_layer2, self.alpha_output, self.beta_output]:
+        for module in [self.audio_expander, self.combined_proj, self.hidden_layer1, 
+                  self.hidden_layer2, self.alpha_output, self.beta_output]:
             if isinstance(module, nn.Sequential):
                 for layer in module:
                     if isinstance(layer, nn.Linear):
@@ -87,21 +83,9 @@ class TranscriptionMemoryCellAgent(nn.Module):
         # 1. Expand audio chunk to embedding_size vector
         expanded_audio = self.audio_expander(audio_tensor)  # [1, embedding_size]
         
-        # 2. Cross-attention between expanded audio and hidden state
-        # Use expanded audio as query, hidden state as key and value
-        query = self.query_proj(expanded_audio)  # [1, embedding_size]
-        key = self.key_proj(self.hidden_state)   # [1, embedding_size]
-        value = self.value_proj(self.hidden_state)  # [1, embedding_size]
-        
-        # Compute attention scores
-        attention_scores = torch.matmul(query, key.transpose(-2, -1)) / (self.embedding_size ** 0.5)  # [1, 1]
-        attention_weights = F.softmax(attention_scores, dim=-1)  # [1, 1]
-        
-        # Apply attention to values
-        attended_output = torch.matmul(attention_weights, value)  # [1, embedding_size]
-        
-        # Combine with residual connection and project
-        combined = self.attention_output(attended_output + expanded_audio)  # [1, embedding_size]
+        # 2. Combine expanded audio and hidden state with linear transformation
+        combined_input = torch.cat([expanded_audio, self.hidden_state], dim=-1)  # [1, embedding_size * 2]
+        combined = self.combined_proj(combined_input)  # [1, embedding_size]
         
         # 3. Process through two hidden layers
         hidden1 = F.relu(self.hidden_layer1(combined))  # [1, embedding_size]
