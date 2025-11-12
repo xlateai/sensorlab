@@ -1,4 +1,4 @@
-from transcription_environment import TranscriptionEnvironmentSingleInstance
+from environment import TranscriptionEnvironmentSingleInstance
 from transcription_agent import TranscriptionMemoryCellAgent
 
 import torch
@@ -20,10 +20,9 @@ def safe_chr(code):
 
 if __name__ == "__main__":
     
-    env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=CHUNK_SIZE)
+    env = TranscriptionEnvironmentSingleInstance(max_samples=4, chunk_size=CHUNK_SIZE)
     agent = TranscriptionMemoryCellAgent(embedding_size=32, chunk_size=CHUNK_SIZE)
-
-    optimizer = torch.optim.Adam(agent.parameters(), lr=0.00001)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
     
     for episode_i in range(NUM_EPISODES):
         print("episode", episode_i)
@@ -62,13 +61,13 @@ if __name__ == "__main__":
             # print(distribution.concentration0, distribution.concentration1)
 
             # loss is mae
-            loss = torch.square(raw_sample - target).mean()
-            # print(loss, raw_sample, target)
 
-            loss.backward()
-            optimizer.step()
-
-            total_epoch_loss += loss.item()
+            was_correct = info.get('correct', False)
+            if not was_correct:
+                loss = torch.square(raw_sample - target).mean()
+                loss.backward()
+                optimizer.step()
+                total_epoch_loss += loss.item()
 
             # print(f"[{episode_i}/{timestep}]", guess, expected_char, reward, raw_sample, obs.shape, env.current_audio_timestep)
             timestep += 1
