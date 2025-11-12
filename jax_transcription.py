@@ -11,7 +11,7 @@ hidden_size = 128
 output_size = 64  # Predict 64 character counts
 
 # Initialize environment
-env = TranscriptionEnvironmentSingleInstance(chunk_size=chunk_size)
+env = TranscriptionEnvironmentSingleInstance(chunk_size=chunk_size, max_samples=1)
 
 # Initialize param groups (3 layers)
 key = jax.random.PRNGKey(0)
@@ -20,7 +20,7 @@ layer2 = LinearLayerParamGroup(key, num_agents, hidden_size, hidden_size)
 layer3 = LinearLayerParamGroup(key, num_agents, hidden_size, output_size)
 
 # Step environment (get input)
-obs = env.step(num_samples=1)  # Should return shape (chunk_size,) or (num_agents, chunk_size)
+obs = env.step()  # Should return shape (chunk_size,) or (num_agents, chunk_size)
 
 # Prepare input for agents
 x = jnp.tile(obs, (num_agents, 1))  # Shape: (num_agents, chunk_size)
