@@ -5,12 +5,12 @@ from vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
 
-NUM_AGENTS = 16
-CHUNK_SIZE = 1024
-EMBEDDING_SIZE = 32
+NUM_AGENTS = 64
+CHUNK_SIZE = 256
+EMBEDDING_SIZE = 64
 MAX_SAMPLES = 1
-FMC_BALANCE = 1.0
-KEEP_TOP_PERCENT = 0.2
+FMC_BALANCE = 0.5
+KEEP_TOP_PERCENT = 0.05
 
 
 def relativize(vector: jnp.ndarray):
@@ -147,5 +147,11 @@ agents = TranscriptionAgentGroup(
 
 for episode_i in range(10):
     episodic_rewards = agents.episode()
+    
+    # print max, min, and mean episodic rewards
+    max_reward = jnp.max(episodic_rewards)
+    min_reward = jnp.min(episodic_rewards)
+    mean_reward = jnp.mean(episodic_rewards)
+    print(f"Episode {episode_i}: Max Reward: {max_reward}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
+
     agents.update_parameters()
-    print(episodic_rewards, "episode rewards for", episode_i)

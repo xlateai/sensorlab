@@ -73,11 +73,15 @@ class TranscriptionVecEnv:
             if not transcription_complete:
                 expected_char = self.current_transcription_target[current_pos]
                 action = actions[i]
+                # Calculate character code distance
+                char_distance = abs(ord(action) - ord(expected_char))
+                # Negative reward for distance
+                penalty = -0.001 * char_distance
                 if action == expected_char:
                     guess += action
-                    reward = 1
+                    reward = 1 + penalty
                 else:
-                    reward = 0
+                    reward = penalty
             else:
                 reward = 0
 
