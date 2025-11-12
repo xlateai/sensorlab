@@ -16,8 +16,8 @@ class LinearLayerParamGroup:
         num_agents: int,
         input_size: int,
         output_size: int,
-        mutation_rate: float = 0.5,
-        mutation_amplitude: float = 3.0,
+        mutation_rate: float = 0.25,
+        mutation_amplitude: float = 1.0,
     ):
         self.key = key
 

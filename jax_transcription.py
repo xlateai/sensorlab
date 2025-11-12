@@ -7,9 +7,9 @@ key = jax.random.PRNGKey(0)
 
 NUM_AGENTS = 64
 CHUNK_SIZE = 256
-EMBEDDING_SIZE = 64
+EMBEDDING_SIZE = 32
 MAX_SAMPLES = 1
-FMC_BALANCE = 0.5
+FMC_BALANCE = 0.25
 KEEP_TOP_PERCENT = 0.05
 
 
@@ -46,11 +46,11 @@ class TranscriptionAgentGroup:
 
     def forward(self, obs):
         h1 = self.layer1.forward(obs)
-        h1 = jax.nn.sigmoid(h1)
+        h1 = jax.nn.relu(h1)
         h2 = self.layer2.forward(h1)
-        h2 = jax.nn.sigmoid(h2)
+        h2 = jax.nn.relu(h2)
         out = self.layer3.forward(h2)
-        out = jax.nn.sigmoid(out)
+        out = jnp.clip(out, 0.0, 1.0)
         return out
 
     def step(self, actions):
@@ -78,14 +78,23 @@ class TranscriptionAgentGroup:
 
     def episode(self):
         self.episodic_rewards = jnp.zeros(self.num_agents)
-        
         obs = self.reset()
         step_count = 0
         dones = jnp.array([False] * NUM_AGENTS)
+        dictionary = self.env.character_dictionary
+        dict_size = len(dictionary)
         while not jnp.all(dones):
             out = self.forward(obs)
-            actions = [chr(int(out[i].item() * (65535 - 32) + 32)) for i in range(NUM_AGENTS)]
-            # actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 65535))) for i in range(NUM_AGENTS)]
+            # Convert model output to integer indices, then to characters using the dictionary
+            # Use argmax if output is a vector, or scale if output is scalar
+            if out.shape[1] == 1:
+                # Scalar output: scale to [0, dict_size-1]
+                indices = jnp.clip((out.flatten() * dict_size).astype(int), 0, dict_size - 1)
+            else:
+                # Vector output: use argmax
+                indices = jnp.argmax(out, axis=1)
+            actions = [self.env.numeric_to_character(idx) for idx in indices]
+            print(actions)
             obs, rewards, dones = self.step(actions)
             step_count += 1
 
