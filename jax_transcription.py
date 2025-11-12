@@ -3,8 +3,11 @@ import jax.numpy as jnp
 from parameter_group import LinearLayerParamGroup
 from vec_environment import TranscriptionVecEnv
 
-# Parameters
-CHUNK_SIZE = 256
+key = jax.random.PRNGKey(0)
+
+NUM_AGENTS = 16
+CHUNK_SIZE = 1024
+EMBEDDING_SIZE = 32
 MAX_SAMPLES = 1
 
 
@@ -31,24 +34,20 @@ class TranscriptionAgentGroup:
         return obs, rewards, dones
 
 # Initialize param groups (3 layers)
-key = jax.random.PRNGKey(0)
-num_agents = 8
-chunk_size = CHUNK_SIZE
-embedding_size = 32
 
 agents = TranscriptionAgentGroup(
     key,
-    num_agents=num_agents,
-    chunk_size=chunk_size,
-    embedding_size=embedding_size,
+    num_agents=NUM_AGENTS,
+    chunk_size=CHUNK_SIZE,
+    embedding_size=EMBEDDING_SIZE,
 )
 
 obs = agents.reset()
 step_count = 0
-dones = jnp.array([False] * num_agents)
+dones = jnp.array([False] * NUM_AGENTS)
 while not jnp.all(dones):
     out = agents.forward(obs)
-    actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(num_agents)]
+    actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(NUM_AGENTS)]
     obs, rewards, dones = agents.step(actions)
     step_count += 1
     print(f"Step {step_count}")
