@@ -8,7 +8,7 @@ num_agents = 64
 chunk_size = 256
 input_size = chunk_size
 hidden_size = 128
-output_size = 64  # Predict 64 character counts
+output_size = 1  # just one character prediction
 
 # Initialize environment
 env = TranscriptionEnvironmentSingleInstance(chunk_size=chunk_size, max_samples=1)
@@ -30,4 +30,4 @@ h1 = layer1.forward(x)
 h2 = layer2.forward(h1)
 out = layer3.forward(h2)  # Shape: (num_agents, output_size)
 
-print(out)
+print(out.shape)
