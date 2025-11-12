@@ -63,7 +63,7 @@ class TranscriptionMemoryCellAgent(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
     
-    def forward(self, audio_chunk):
+    def forward(self, audio_chunk) -> Beta:
         """
         Forward pass for a chunk of audio samples.
         

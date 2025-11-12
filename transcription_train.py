@@ -5,7 +5,7 @@ import torch
 
 
 # CHUNK_SIZE = 1024
-CHUNK_SIZE = 512
+CHUNK_SIZE = 256
 # CHUNK_SIZE = 32
 
 NUM_EPISODES = 100
@@ -26,6 +26,9 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
     
     for episode_i in range(NUM_EPISODES):
+        print("episode", episode_i)
+
+        total_epoch_loss = 0.0
 
         timestep = 0
         done = False
@@ -36,7 +39,8 @@ if __name__ == "__main__":
 
             # Get prediction from agent (Beta distribution returns values in [0,1])
             distribution = agent.forward(obs)
-            raw_sample = distribution.sample()
+            # raw_sample = distribution.sample()
+            raw_sample = distribution.mean  # use mean because why not
             # print(f"Raw sample (0-1): {raw_sample.item():.4f}")
             
             # Scale from [0,1] to character range [32, 65535]
@@ -54,10 +58,13 @@ if __name__ == "__main__":
             log_prob = distribution.log_prob(target)
             loss = -log_prob  # don't need reward multiply because this is the optimal action
 
-            # print(loss, log_prob, target)
+            print(distribution.concentration0, distribution.concentration1)
+            print(loss, log_prob, target)
 
             loss.backward()
             optimizer.step()
+
+            total_epoch_loss += loss.item()
 
             # print(f"[{episode_i}/{timestep}]", guess, expected_char, reward, raw_sample, obs.shape, env.current_audio_timestep)
             timestep += 1
@@ -67,4 +74,6 @@ if __name__ == "__main__":
 
             if done:
                 break
+
+        print(f"Episode {episode_i} average loss: {total_epoch_loss / timestep:.4f}")
         
