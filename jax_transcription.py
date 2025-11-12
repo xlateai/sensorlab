@@ -5,13 +5,14 @@ from environment import TranscriptionEnvironmentSingleInstance
 
 # Parameters
 CHUNK_SIZE = 256
+MAX_SAMPLES = 1
 
 
 class TranscriptionAgentGroup:
     def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int):
         self.num_agents = num_agents
 
-        self.env = TranscriptionEnvironmentSingleInstance(chunk_size=chunk_size, max_samples=1)
+        self.env = TranscriptionEnvironmentSingleInstance(chunk_size=chunk_size, max_samples=MAX_SAMPLES)
         self.env.reset()
 
         self.layer1 = LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size)
@@ -32,7 +33,7 @@ key = jax.random.PRNGKey(0)
 agents = TranscriptionAgentGroup(
     key,
     num_agents=64,
-    input_size=CHUNK_SIZE,
+    chunk_size=CHUNK_SIZE,
     embedding_size=32,
 )
 
