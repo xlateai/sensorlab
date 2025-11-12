@@ -54,6 +54,8 @@ class TranscriptionAgentGroup:
         return (d1 + d2 + d3) / 3.0
 
     def episode(self):
+        episodic_rewards = jnp.zeros(self.num_agents)
+        
         obs = self.reset()
         step_count = 0
         dones = jnp.array([False] * NUM_AGENTS)
@@ -62,10 +64,15 @@ class TranscriptionAgentGroup:
             actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(NUM_AGENTS)]
             obs, rewards, dones = self.step(actions)
             step_count += 1
+
             print(f"Step {step_count}")
             print("actions:", actions)
             print("rewards:", rewards)
             print("dones:", dones)
+
+            episodic_rewards += rewards * (~dones)
+
+        return episodic_rewards
 
 # Initialize param groups (3 layers)
 
@@ -77,4 +84,5 @@ agents = TranscriptionAgentGroup(
 )
 
 
-agents.episode()
+episodic_rewards = agents.episode()
+print(episodic_rewards)
