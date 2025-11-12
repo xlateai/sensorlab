@@ -24,8 +24,9 @@ def relativize(vector: jnp.ndarray):
 
 
 class TranscriptionAgentGroup:
-    def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int):
+    def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int, verbose: bool = False):
         self.num_agents = num_agents
+        self.verbose = verbose
 
         self.key = key
         self.layer1 = LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size)
@@ -45,9 +46,9 @@ class TranscriptionAgentGroup:
 
     def forward(self, obs):
         h1 = self.layer1.forward(obs)
-        h1 = jax.nn.relu(h1)
+        h1 = jax.nn.sigmoid(h1)
         h2 = self.layer2.forward(h1)
-        h2 = jax.nn.relu(h2)
+        h2 = jax.nn.sigmoid(h2)
         out = self.layer3.forward(h2)
         out = jax.nn.sigmoid(out)
         return out
@@ -70,6 +71,9 @@ class TranscriptionAgentGroup:
     
     def clone(self, clone_indices: jnp.ndarray, partner_indices: jnp.ndarray):
         for group in self.groups:
+            # debug print
+            # average_weight_value = jnp.mean(group.weights)
+            # print(average_weight_value, "avg weight value")
             group.clone(clone_indices, partner_indices)
 
     def episode(self):
@@ -80,14 +84,16 @@ class TranscriptionAgentGroup:
         dones = jnp.array([False] * NUM_AGENTS)
         while not jnp.all(dones):
             out = self.forward(obs)
-            actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(NUM_AGENTS)]
+            actions = [chr(int(out[i].item() * (65535 - 32) + 32)) for i in range(NUM_AGENTS)]
+            # actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 65535))) for i in range(NUM_AGENTS)]
             obs, rewards, dones = self.step(actions)
             step_count += 1
 
-            print(f"Step {step_count}")
-            print("actions:", actions)
-            print("rewards:", rewards)
-            print("dones:", dones)
+            if self.verbose:
+                print(f"Step {step_count}")
+                print("actions:", actions)
+                print("rewards:", rewards)
+                print("dones:", dones)
 
             self.episodic_rewards += rewards * (~dones)
 
@@ -107,8 +113,9 @@ class TranscriptionAgentGroup:
         vr = self.calculate_virtual_rewards()
         partner_vr = vr[self._pair_indices]
 
-        print(vr)
-        print(partner_vr)
+        if self.verbose:
+            print(vr)
+            print(partner_vr)
 
         value = (partner_vr - vr) / jnp.where(vr > 0, vr, 1e-8)
 
@@ -138,7 +145,7 @@ agents = TranscriptionAgentGroup(
     embedding_size=EMBEDDING_SIZE,
 )
 
-episodic_rewards = agents.episode()
-print(episodic_rewards)
-
-agents.update_parameters()
+for episode_i in range(10):
+    episodic_rewards = agents.episode()
+    agents.update_parameters()
+    print(episodic_rewards, "episode rewards for", episode_i)
