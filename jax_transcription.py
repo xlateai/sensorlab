@@ -44,10 +44,14 @@ agents = TranscriptionAgentGroup(
 )
 
 obs = agents.reset()
-out = agents.forward(obs)
-# Convert model output to character actions (simple argmax to int, then chr)
-actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(num_agents)]
-obs, rewards, dones = agents.step(actions)
-print("actions:", actions)
-print("rewards:", rewards)
-print("dones:", dones)
+step_count = 0
+dones = jnp.array([False] * num_agents)
+while not jnp.all(dones):
+    out = agents.forward(obs)
+    actions = [chr(int(jnp.clip(jnp.argmax(out[i]), 32, 126))) for i in range(num_agents)]
+    obs, rewards, dones = agents.step(actions)
+    step_count += 1
+    print(f"Step {step_count}")
+    print("actions:", actions)
+    print("rewards:", rewards)
+    print("dones:", dones)
