@@ -20,7 +20,7 @@ layer2 = LinearLayerParamGroup(key, num_agents, hidden_size, hidden_size)
 layer3 = LinearLayerParamGroup(key, num_agents, hidden_size, output_size)
 
 # Step environment (get input)
-obs = env.step()  # Should return shape (chunk_size,) or (num_agents, chunk_size)
+obs, info = env.reset()  # Should return shape (chunk_size,) or (num_agents, chunk_size)
 
 # Prepare input for agents
 x = jnp.tile(obs, (num_agents, 1))  # Shape: (num_agents, chunk_size)
