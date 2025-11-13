@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     NUM_EPISODES = 100
 
-    for _ in range(NUM_EPISODES):
+    for episode_i in range(NUM_EPISODES):
         obs, info = env.reset()
         while env.done is False:
             optimizer.zero_grad()
@@ -77,3 +77,5 @@ if __name__ == "__main__":
                 continue
             loss.backward()
             optimizer.step()
+
+        print(f"[ep{episode_i}] Percent completed: {env.get_completion_percent()*100:.2f}%")

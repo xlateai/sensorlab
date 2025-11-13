@@ -50,6 +50,14 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         if self.verbose:
             print(f"Successfully loaded {len(self.available_samples)} samples")
 
+    def get_completion_percent(self):
+        """Get the percent of the transcription that has been correctly guessed."""
+        if self.current_transcription_target is None or len(self.current_transcription_target) == 0:
+            return 0.0
+        correct_length = len(self.current_transcription_guess)
+        total_length = len(self.current_transcription_target)
+        return correct_length / total_length
+
     def step(self, action):
         """
         Action should be a character prediction.
@@ -82,7 +90,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 
                 # Print progress for correct guesses if verbose
                 # if self.verbose:
-                print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
+                # print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
             else:
                 # Incorrect prediction - don't append to guess
                 reward = 0
