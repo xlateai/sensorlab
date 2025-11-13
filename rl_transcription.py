@@ -97,4 +97,4 @@ if __name__ == "__main__":
             if done:
                 break
 
-        print(f"[{episode_i}]: total reward: {total_rewards:0.2f}, completion: {env.get_completion_percent()*100:0.2f}%, entropy: {total_entropy/total_steps:0.4f}")
+        print(f"[{episode_i}]: cumrw: {total_rewards:0.2f}, compl: {env.get_completion_percent()*100:0.2f}%, entr: {total_entropy/total_steps:0.4f}, noops: {env.total_noop_actions}, incorr: {env.total_incorrect_actions}")

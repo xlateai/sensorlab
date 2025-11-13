@@ -29,6 +29,9 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.correct_reward = correct_reward
         self.noop_reward = 0.0
 
+        self.total_incorrect_actions = 0
+        self.total_noop_actions = 0
+
         # Load dataset and prepare available samples
         self._load_dataset()
 
@@ -82,6 +85,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             # No-op: do nothing, advance timestep, reward 0
             reward = self.noop_reward
             info = {"noop": True}
+            self.total_noop_actions += 1
         elif not transcription_complete:
             # Get the expected character at current position
             expected_char = self.current_transcription_target[current_pos]
@@ -96,6 +100,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 # Incorrect prediction - don't append to guess
                 reward = self.incorrect_reward
                 info = {"correct": False, "expected": expected_char, "predicted": predicted_char}
+                self.total_incorrect_actions += 1
         else:
             # Transcription already complete, no more characters to predict
             info = {"message": "Transcription already complete", "predicted": action}
@@ -123,6 +128,10 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 print(f"Completion rate: {completion_rate:.1f}%")
 
         obs = self._get_observation()
+
+        # Add tracking info
+        info["total_incorrect_actions"] = self.total_incorrect_actions
+        info["total_noop_actions"] = self.total_noop_actions
 
         self.observation = obs
         self.reward = reward
@@ -166,6 +175,9 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.current_transcription_guess = ""
         self.current_audio_timestep = 0
         self.done = False
+
+        self.total_incorrect_actions = 0
+        self.total_noop_actions = 0
         
         if self.verbose:
             print(f"Reset with sample: '{self.current_transcription_target}'")
@@ -185,9 +197,10 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.info = {
             "target_text": self.current_transcription_target,
             "audio_length": len(self.current_audio_array),
-            "sample_rate": selected_sample['mp3']['sampling_rate']
+            "sample_rate": selected_sample['mp3']['sampling_rate'],
+            "total_incorrect_actions": self.total_incorrect_actions,
+            "total_noop_actions": self.total_noop_actions
         }
-        
         return self.observation, self.info
 
     def play_current_sample_audio(self):
