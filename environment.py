@@ -14,7 +14,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     character.
     """
     
-    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = False, incorrect_reward: float = 0.0, correct_reward: float = 1.0):
+    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = False, incorrect_reward: float = -0.01, correct_reward: float = 1.0):
         self.max_samples = max_samples
         self.chunk_size = chunk_size
         self.verbose = verbose
@@ -27,7 +27,8 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
 
         self.incorrect_reward = incorrect_reward
         self.correct_reward = correct_reward
-        
+        self.noop_reward = 0.0
+
         # Load dataset and prepare available samples
         self._load_dataset()
 
@@ -63,61 +64,55 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
 
     def step(self, action):
         """
-        Action should be a character prediction.
-        Returns +1 reward for correct character, 0 for incorrect.
+        Action should be an integer:
+        0 = no-op (do nothing, advance timestep, reward 0)
+        1..N = character prediction (shifted by +1)
+        Returns +1 reward for correct character, -0.01 for incorrect, 0 for no-op.
         Only appends to guess string if correct.
-        
-        Terminal criteria:
-        1. Timesteps equal to audio sequence length, OR
-        2. Full transcription completed early
         """
         if self.current_transcription_target is None:
             raise ValueError("Environment not reset. Call reset() first.")
-            
+
         current_pos = len(self.current_transcription_guess)
         reward = 0
-        
-        # Check if transcription is already complete
         transcription_complete = (current_pos >= len(self.current_transcription_target))
-        
-        if not transcription_complete:
+        info = {}
+
+        if action == 0:
+            # No-op: do nothing, advance timestep, reward 0
+            reward = self.noop_reward
+            info = {"noop": True}
+        elif not transcription_complete:
             # Get the expected character at current position
             expected_char = self.current_transcription_target[current_pos]
-            
-            if action == expected_char:
+            predicted_char = self.numeric_to_character(action)
+            if predicted_char == expected_char:
                 # Correct prediction
-                self.current_transcription_guess += action
+                self.current_transcription_guess += predicted_char
                 reward = self.correct_reward
                 transcription_complete = len(self.current_transcription_guess) >= len(self.current_transcription_target)
-                info = {"correct": True, "expected": expected_char, "predicted": action}
-                
-                # Print progress for correct guesses if verbose
-                # if self.verbose:
-                # print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
+                info = {"correct": True, "expected": expected_char, "predicted": predicted_char}
             else:
                 # Incorrect prediction - don't append to guess
                 reward = self.incorrect_reward
-                info = {"correct": False, "expected": expected_char, "predicted": action}
+                info = {"correct": False, "expected": expected_char, "predicted": predicted_char}
         else:
             # Transcription already complete, no more characters to predict
             info = {"message": "Transcription already complete", "predicted": action}
-        
+
         # Move to next chunk
         self.current_audio_timestep += self.chunk_size
-        
+
         # Terminal conditions:
-        # 1. Audio sequence is finished (timestep >= audio length)
-        # 2. Transcription is complete (early termination)
         audio_finished = self.current_audio_timestep >= len(self.current_audio_array)
         done = audio_finished or transcription_complete
-        
+
         if done:
             if transcription_complete and not audio_finished:
                 info["termination_reason"] = "transcription_complete_early"
             elif audio_finished:
                 info["termination_reason"] = "audio_finished"
-            
-            # Print episode completion info if verbose
+
             if self.verbose:
                 print(f"\nEpisode complete! Reason: {info.get('termination_reason', 'unknown')}")
                 print(f"Total steps: {self.current_audio_timestep}")
@@ -126,8 +121,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 print(f"Target transcription: '{self.current_transcription_target}'")
                 completion_rate = len(self.current_transcription_guess) / len(self.current_transcription_target) * 100
                 print(f"Completion rate: {completion_rate:.1f}%")
-        
-        # Observation is current audio timestep (or zeros if beyond audio length)
+
         obs = self._get_observation()
 
         self.observation = obs
@@ -135,7 +129,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.done = done
         self.terminated = False
         self.info = info
-        
+
         return self.observation, self.reward, self.done, self.terminated, self.info
 
     def _get_observation(self):
@@ -245,22 +239,27 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     def numeric_to_character(self, numeric_value):
         """
         Convert a numeric value (index) to a character using the character_dictionary.
+        0 is reserved for no-op. 1 maps to first character, etc.
         """
         idx = int(numeric_value)
+        if idx == 0:
+            return None  # No-op
         dictionary = self.character_dictionary
+        idx -= 1  # Shift down by 1
         if idx < 0 or idx >= len(dictionary):
-            raise ValueError(f"Index {idx} out of bounds for character dictionary of size {len(dictionary)}")
+            raise ValueError(f"Index {idx+1} out of bounds for character dictionary of size {len(dictionary)}")
         return dictionary[idx]
-    
+
     def character_to_numeric(self, character):
         """
         Convert a character to its index in the character_dictionary.
+        Returns 1-based index (0 is reserved for no-op).
         """
         dictionary = self.character_dictionary
         if not isinstance(character, str) or len(character) != 1:
             raise ValueError(f"character_to_numeric expects single character, got: {character}")
         try:
-            return dictionary.index(character)
+            return dictionary.index(character) + 1  # Shift up by 1
         except ValueError:
             raise ValueError(f"Character '{character}' not found in character dictionary.")
     
@@ -297,14 +296,10 @@ if __name__ == "__main__":
     
     while not done:
         step_count += 1
-        # Random action - pick a random UTF-8 character from the massive space
-        # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
-        # random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
-        # choose from character dictionary indices
+        # Random action: 0 = no-op, 1..dict_size = character
         dict_size = len(env.character_dictionary)
-        random_index = random.randint(0, dict_size - 1)
-        random_char = env.numeric_to_character(random_index)
-        obs, reward, done, truncated, info = env.step(random_char)
+        random_action = random.randint(0, dict_size)  # inclusive of 0
+        obs, reward, done, truncated, info = env.step(random_action)
         
         if done:
             break

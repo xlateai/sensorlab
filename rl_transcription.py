@@ -24,7 +24,7 @@ class Agent:
             torch.nn.ReLU(),
         )
 
-        num_possible_characters = len(env.character_dictionary)# + 1  # +1 for no-op
+        num_possible_characters = len(env.character_dictionary) + 1  # +1 for no-op
         self.action_head = torch.nn.Sequential(
             torch.nn.Linear(embedding_size * 2, embedding_size),
             torch.nn.ReLU(),
