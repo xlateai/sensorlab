@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # Create environment with just 1 sample for testing
     env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=512)
     agent = Agent(env, chunk_size=env.chunk_size)
-    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-6)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
     
     for episode_i in range(NUM_EPISODES := 100):
         obs, info = env.reset()
