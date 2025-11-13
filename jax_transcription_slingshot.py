@@ -26,17 +26,20 @@ class Agents:
         self.num_agents = num_agents
         self.chunk_size = chunk_size
         self.embedding_size = embedding_size
-        self.layer1 = LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size)
-        self.layer2 = LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size)
-        self.layer3 = LinearLayerParamGroup(key, num_agents, embedding_size, 1)
-        self.groups = [self.layer1, self.layer2, self.layer3]
+
+        self.groups = [
+            LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size),
+            LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
+            LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
+            LinearLayerParamGroup(key, num_agents, embedding_size, 1),
+        ]
+
 
     def forward(self, obs):
-        h1 = self.layer1.forward(obs)
-        h1 = jax.nn.relu(h1)
-        h2 = self.layer2.forward(h1)
-        h2 = jax.nn.relu(h2)
-        out = self.layer3.forward(h2)
+        out = obs
+        for group in self.groups:
+            out = group.forward(out)
+            out = jax.nn.relu(out)
         out = jnp.clip(out, 0.0, 1.0)
         return out
     
