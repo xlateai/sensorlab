@@ -13,7 +13,7 @@ EMBEDDING_SIZE = 8
 MAX_SAMPLES = 1
 
 # max multiplier for slingshot update
-MAX_SCALE = 3.0
+MAX_SCALE = 2.0
 MIN_SCALE = 1.1
 
 NUM_EPISODES = 1000
@@ -48,6 +48,26 @@ class Agents:
             delta_biases = group.biases[best_agent_i] - group.biases
             deltas.append((delta_weights, delta_biases))
         return deltas
+    
+    def add_deltas(self, deltas, with_random_scales: bool = True):
+        # let's add the deltas to each group (ignoring best_i since it won't need to change)
+        # the idea is let's generate weight-value sepcific scales to apply to each delta
+        self.key, skey = jax.random.split(self.key, 2)
+        for group, (delta_weights, delta_biases) in zip(self.groups, deltas):
+            if with_random_scales:
+                scales_weights = jax.random.uniform(
+                    skey,
+                    (self.num_agents, group.input_size, group.output_size),
+                ) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
+                scales_biases = jax.random.uniform(
+                    skey,
+                    (self.num_agents, group.output_size),
+                ) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
+                group.weights = group.weights + delta_weights * scales_weights
+                group.biases = group.biases + delta_biases * scales_biases
+            else:
+                group.weights = group.weights + delta_weights
+                group.biases = group.biases + delta_biases
 
 
 class TranscriptionAgentGroup:
@@ -114,7 +134,7 @@ class TranscriptionAgentGroup:
 
         # now, we can compute the new weights for each group
         deltas = self.agents.get_deltas(best_agent_i)
-        print(deltas[0][0])
+        self.agents.add_deltas(deltas, with_random_scales=True)
 
 
 agents = TranscriptionAgentGroup(
@@ -141,5 +161,3 @@ for episode_i in range(NUM_EPISODES):
     print(f"Best complete percent: {max_reward/len(agents.env.current_transcription_target)*100:.2f}%")
 
     agents.update_parameters()
-
-    print(f"Number of agents that cloned: {jnp.sum(agents.will_clone)} out of {NUM_AGENTS}")
