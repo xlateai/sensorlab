@@ -8,7 +8,7 @@ key = jax.random.PRNGKey(0)
 NUM_AGENTS = 32
 
 CHUNK_SIZE = 512
-EMBEDDING_SIZE = 8
+EMBEDDING_SIZE = 32
 
 MAX_SAMPLES = 1
 
@@ -86,11 +86,13 @@ class Agents:
             mean_weight_dist = jnp.mean(weight_dists)
             mean_bias_dist = jnp.mean(bias_dists)
             total_parameter_distance += mean_weight_dist + mean_bias_dist
+
         s += f"Average parameter distance between agents: {total_parameter_distance:.4f}\n"
         for i, group in enumerate(self.groups):
             s += f"Layer {i+1}:\n"
             s += f"  Weights - mean: {jnp.mean(group.weights):.4f}, min: {jnp.min(group.weights):.4f}, max: {jnp.max(group.weights):.4f}, sum: {jnp.sum(group.weights):.4f}\n"
             s += f"  Biases  - mean: {jnp.mean(group.biases):.4f}, min: {jnp.min(group.biases):.4f}, max: {jnp.max(group.biases):.4f}, sum: {jnp.sum(group.biases):.4f}\n"
+        
         return s
 
 
