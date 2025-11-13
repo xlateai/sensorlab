@@ -14,7 +14,7 @@ MAX_SAMPLES = 1
 
 # max multiplier for slingshot update
 MAX_SCALE = 2.0
-MIN_SCALE = 1.1
+MIN_SCALE = 0.0
 
 NUM_EPISODES = 1000
 KEEP_TOP_PERCENT = 0.1
@@ -48,8 +48,9 @@ class Agents:
         # Add the deltas to each group, skipping the frozen agent (best_i)
         self.key, skey1, skey2 = jax.random.split(self.key, 3)
         for group, (delta_weights, delta_biases) in zip(self.groups, deltas):
-            # 50% chance to flip sign for each agent
-            flip_signs = jax.random.bernoulli(skey1, 0.5, (self.num_agents,))
+            # 25% chance to flip sign
+            percentage_to_negate = 0.1
+            flip_signs = jax.random.bernoulli(skey1, percentage_to_negate, (self.num_agents,))
             sign_factors = 1.0 - 2.0 * flip_signs  # 1 or -1
             sign_factors_w = sign_factors[:, None, None]
             sign_factors_b = sign_factors[:, None]
