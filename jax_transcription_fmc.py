@@ -5,16 +5,16 @@ from vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
 
-NUM_AGENTS = 64
+NUM_AGENTS = 32
 
-CHUNK_SIZE = 256
-EMBEDDING_SIZE = 32
+CHUNK_SIZE = 512
+EMBEDDING_SIZE = 8
 
 MAX_SAMPLES = 1
 
 NUM_EPISODES = 1000
 FMC_BALANCE = 1.0
-KEEP_TOP_PERCENT = 0.15
+KEEP_TOP_PERCENT = 0.1
 
 
 def relativize(vector: jnp.ndarray):
@@ -175,6 +175,7 @@ for episode_i in range(NUM_EPISODES):
     # print the number that cloned
     print()
     print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(agents.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
+    print(f"Best complete percent: {max_reward/len(agents.env.current_transcription_target)*100:.2f}%")
 
     agents.update_parameters()
 
