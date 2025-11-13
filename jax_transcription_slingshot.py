@@ -21,9 +21,11 @@ KEEP_TOP_PERCENT = 0.1
 
 
 class Agents:
-    def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int, ):
-        self.num_agents = num_agents
+    def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int):
         self.key = key
+        self.num_agents = num_agents
+        self.chunk_size = chunk_size
+        self.embedding_size = embedding_size
         self.layer1 = LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size)
         self.layer2 = LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size)
         self.layer3 = LinearLayerParamGroup(key, num_agents, embedding_size, 1)
@@ -37,12 +39,22 @@ class Agents:
         out = self.layer3.forward(h2)
         out = jnp.clip(out, 0.0, 1.0)
         return out
+    
+    def get_deltas(self, best_agent_i: int):
+        # return the values needed to add to each agent to reach the best agent
+        deltas = []
+        for group in self.groups:
+            delta_weights = group.weights[best_agent_i] - group.weights
+            delta_biases = group.biases[best_agent_i] - group.biases
+            deltas.append((delta_weights, delta_biases))
+        return deltas
 
 
 class TranscriptionAgentGroup:
     def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int, verbose: bool = False):
+        self.key, skey = jax.random.split(key, 2)
         self.verbose = verbose
-        self.agents = Agents(key=key, num_agents=num_agents, chunk_size=chunk_size, embedding_size=embedding_size)
+        self.agents = Agents(key=skey, num_agents=num_agents, chunk_size=chunk_size, embedding_size=embedding_size)
         self.env = TranscriptionVecEnv(num_agents=num_agents, chunk_size=chunk_size, max_samples=MAX_SAMPLES)
 
     def reset(self):
@@ -54,7 +66,7 @@ class TranscriptionAgentGroup:
         return obs, rewards, dones
 
     def episode(self):
-        self.episodic_rewards = jnp.zeros(self.num_agents)
+        self.episodic_rewards = jnp.zeros(self.agents.num_agents)
         obs = self.reset()
         step_count = 0
         dones = jnp.array([False] * NUM_AGENTS)
@@ -95,14 +107,14 @@ class TranscriptionAgentGroup:
         # the best agent
         best_agent_i = jnp.argmax(self.episodic_rewards)
 
-
-
         # now, let's use these gradients to slingshot the worst agents towards and past
         # the best agent
         # first, let's generate random scales or learning rates per agent
-        scales = jax.random.uniform(skey, (self.num_agents,)) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
+        # scales = jax.random.uniform(skey, (self.num_agents,)) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
 
         # now, we can compute the new weights for each group
+        deltas = self.agents.get_deltas(best_agent_i)
+        print(deltas[0][0])
 
 
 agents = TranscriptionAgentGroup(
