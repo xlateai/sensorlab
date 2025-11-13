@@ -56,6 +56,8 @@ if __name__ == "__main__":
     # Take random steps until episode terminates
     step_count = 0
     done = False
+
+    total_rewards = 0
     
     while not done:
         step_count += 1
@@ -73,11 +75,15 @@ if __name__ == "__main__":
         obs, reward, done, truncated, info = env.step(action)
 
         # For display, show the character if not a no-op
-        if action == 0:
-            action_str = "<NO-OP>"
-        else:
-            action_str = env.numeric_to_character(action)
-        print(action_str, reward, info.get("expected", ""))
+        # if action == 0:
+            # action_str = "<NO-OP>"
+        # else:
+            # action_str = env.numeric_to_character(action)
+        # print(action_str, reward, info.get("expected", ""))
+
+        # print the correct string
+        total_rewards += reward
+        print(env.current_transcription_guess, "| total reward:", total_rewards)
 
         if done:
             break
