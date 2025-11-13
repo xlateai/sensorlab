@@ -43,55 +43,53 @@ class Agent(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    import string
+    VERBOSE = True
     
     # Create environment with just 1 sample for testing
-    env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=512, verbose=False)
+    env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=512)
     agent = Agent(env, chunk_size=env.chunk_size)
     optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
     
-    # Reset to get a sample
-    obs, info = env.reset()
-    
-    # Play the audio
-    # env.play_current_sample_audio()
-    
-    # Take random steps until episode terminates
-    step_count = 0
-    done = False
+    for episode_i in range(NUM_EPISODES := 100):
+        obs, info = env.reset()
 
-    total_rewards = 0
-    
-    while not done:
-        step_count += 1
-        # Random action - pick a random UTF-8 character from the massive space
-        # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
-        # random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
-        # choose from character dictionary indices
-        # dict_size = len(env.character_dictionary)
-        # random_char = env.numeric_to_character(random_index)
+        # can play audio like this
+        # env.play_current_sample_audio()
 
-        dist = agent.forward(obs)
-        # print(dist.probs)
-        char_index = dist.sample()
-        action = char_index.item()  # Pass integer action directly
-        obs, reward, done, truncated, info = env.step(action)
+        total_rewards = 0
+        while not env.done:
+            # Random action - pick a random UTF-8 character from the massive space
+            # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
+            # random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
+            # choose from character dictionary indices
+            # dict_size = len(env.character_dictionary)
+            # random_char = env.numeric_to_character(random_index)
 
-        # For display, show the character if not a no-op
-        # if action == 0:
-            # action_str = "<NO-OP>"
-        # else:
-            # action_str = env.numeric_to_character(action)
-        # print(action_str, reward, info.get("expected", ""))
+            dist = agent.forward(obs)
+            # print(dist.probs)
+            char_index = dist.sample()
+            action = char_index.item()  # Pass integer action directly
+            obs, reward, done, truncated, info = env.step(action)
 
-        loss = -dist.log_prob(char_index) * reward  # Policy gradient loss
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # For display, show the character if not a no-op
+            # if action == 0:
+                # action_str = "<NO-OP>"
+            # else:
+                # action_str = env.numeric_to_character(action)
+            # print(action_str, reward, info.get("expected", ""))
 
-        # print the correct string
-        total_rewards += reward
-        print(env.current_transcription_guess, f"| total reward: {total_rewards:0.4f}", f"| loss: {loss.item():0.4f}")
+            loss = -dist.log_prob(char_index) * reward  # Policy gradient loss
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        if done:
-            break
+            # print the correct string
+            total_rewards += reward
+
+            if VERBOSE:
+                print(env.current_transcription_guess, f"| total reward: {total_rewards:0.4f}", f"| loss: {loss.item():0.4f}")
+
+            if done:
+                break
+
+        print(f"[{episode_i}]: total reward: {total_rewards:0.4f}, completion: {env.get_completion_percent():0.2f}%")
