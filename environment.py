@@ -232,42 +232,39 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
 
     def numeric_to_character(self, numeric_value):
         """
-        Convert a numeric value to a character.
-        
-        Args:
-            numeric_value: Should be an integer in range [0, 65535] for Unicode BMP
-                          If float, caller should normalize to [0,1] and multiply by range
-        
-        Returns:
-            str: Single character
+        Convert a numeric value (index) to a character using the character_dictionary.
         """
-        if not isinstance(numeric_value, int):
-            raise ValueError(f"numeric_to_character expects integer input, got {type(numeric_value)}. "
-                           f"Please normalize float to [0,1] and multiply by your desired range first.")
-        
-        # Clamp to valid Unicode Basic Multilingual Plane range
-        char_code = max(32, min(65535, numeric_value))  # Printable range
-        return chr(char_code)
+        idx = int(numeric_value)
+        dictionary = self.character_dictionary
+        if idx < 0 or idx >= len(dictionary):
+            raise ValueError(f"Index {idx} out of bounds for character dictionary of size {len(dictionary)}")
+        return dictionary[idx]
     
     def character_to_numeric(self, character):
         """
-        Convert a character to its Unicode code point.
-        
-        Args:
-            character: Single character string
-            
-        Returns:
-            int: Unicode code point
+        Convert a character to its index in the character_dictionary.
         """
+        dictionary = self.character_dictionary
         if not isinstance(character, str) or len(character) != 1:
             raise ValueError(f"character_to_numeric expects single character, got: {character}")
-        
-        return ord(character)
+        try:
+            return dictionary.index(character)
+        except ValueError:
+            raise ValueError(f"Character '{character}' not found in character dictionary.")
     
     @property
     def was_completed(self):
         """Check if the current transcription guess matches the target."""
         return self.current_transcription_guess == self.current_transcription_target
+
+    @property
+    def character_dictionary(self):
+        if not hasattr(self, '_character_dictionary_cache'):
+            chars = set()
+            for sample in self.available_samples:
+                chars.update(sample['json']['text'])
+            self._character_dictionary_cache = sorted(chars)
+        return self._character_dictionary_cache
 
 
 if __name__ == "__main__":
@@ -290,9 +287,11 @@ if __name__ == "__main__":
         step_count += 1
         # Random action - pick a random UTF-8 character from the massive space
         # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
-        random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
-        random_char = chr(random_unicode_point)
-        
+        # random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
+        # choose from character dictionary indices
+        dict_size = len(env.character_dictionary)
+        random_index = random.randint(0, dict_size - 1)
+        random_char = env.numeric_to_character(random_index)
         obs, reward, done, truncated, info = env.step(random_char)
         
         if done:
