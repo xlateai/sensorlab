@@ -69,6 +69,14 @@ class Agents:
                 group.weights = group.weights + delta_weights
                 group.biases = group.biases + delta_biases
 
+    def __str__(self):
+        s = ""
+        for i, group in enumerate(self.groups):
+            s += f"Layer {i+1}:\n"
+            s += f"  Weights - mean: {jnp.mean(group.weights):.4f}, min: {jnp.min(group.weights):.4f}, max: {jnp.max(group.weights):.4f}, sum: {jnp.sum(group.weights):.4f}\n"
+            s += f"  Biases  - mean: {jnp.mean(group.biases):.4f}, min: {jnp.min(group.biases):.4f}, max: {jnp.max(group.biases):.4f}, sum: {jnp.sum(group.biases):.4f}\n"
+        return s
+
 
 class TranscriptionAgentGroup:
     def __init__(self, key: jax.random.PRNGKey, num_agents: int, chunk_size: int, embedding_size: int, verbose: bool = False):
@@ -137,7 +145,7 @@ class TranscriptionAgentGroup:
         self.agents.add_deltas(deltas, with_random_scales=True)
 
 
-agents = TranscriptionAgentGroup(
+trainer = TranscriptionAgentGroup(
     key,
     num_agents=NUM_AGENTS,
     chunk_size=CHUNK_SIZE,
@@ -145,10 +153,10 @@ agents = TranscriptionAgentGroup(
 )
 
 print("character dictionary")
-print(agents.env.character_dictionary)
+print(trainer.env.character_dictionary)
 
 for episode_i in range(NUM_EPISODES):
-    episodic_rewards = agents.episode()
+    episodic_rewards = trainer.episode()
     
     # print max, min, and mean episodic rewards
     max_reward = jnp.max(episodic_rewards)
@@ -156,8 +164,8 @@ for episode_i in range(NUM_EPISODES):
     mean_reward = jnp.mean(episodic_rewards)
 
     # print the number that cloned
-    print()
-    print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(agents.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
-    print(f"Best complete percent: {max_reward/len(agents.env.current_transcription_target)*100:.2f}%")
+    print(trainer.agents)
+    print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(trainer.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
+    print(f"Best complete percent: {max_reward/len(trainer.env.current_transcription_target)*100:.2f}%")
 
-    agents.update_parameters()
+    trainer.update_parameters()
