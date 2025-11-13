@@ -22,13 +22,13 @@ class Agent(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(embedding_size, embedding_size),
             torch.nn.ReLU(),
-            torch.nn.Linear(embedding_size, embedding_size * 2),
+            torch.nn.Linear(embedding_size, embedding_size),
             torch.nn.ReLU(),
         )
 
         num_possible_characters = len(env.character_dictionary) + 1  # +1 for no-op
         self.action_head = torch.nn.Sequential(
-            torch.nn.Linear(embedding_size * 2, embedding_size),
+            torch.nn.Linear(embedding_size, embedding_size),
             torch.nn.ReLU(),
             torch.nn.Linear(embedding_size, num_possible_characters),
         )
@@ -43,12 +43,12 @@ class Agent(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    VERBOSE = True
+    VERBOSE = False
     
     # Create environment with just 1 sample for testing
     env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=512)
     agent = Agent(env, chunk_size=env.chunk_size)
-    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-6)
     
     for episode_i in range(NUM_EPISODES := 100):
         obs, info = env.reset()
@@ -57,6 +57,9 @@ if __name__ == "__main__":
         # env.play_current_sample_audio()
 
         total_rewards = 0
+        total_entropy = 0
+        total_steps = 0
+
         while not env.done:
             # Random action - pick a random UTF-8 character from the massive space
             # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
@@ -85,6 +88,8 @@ if __name__ == "__main__":
 
             # print the correct string
             total_rewards += reward
+            total_steps += 1
+            total_entropy += dist.entropy().item()
 
             if VERBOSE:
                 print(env.current_transcription_guess, f"| total reward: {total_rewards:0.4f}", f"| loss: {loss.item():0.4f}")
@@ -92,4 +97,4 @@ if __name__ == "__main__":
             if done:
                 break
 
-        print(f"[{episode_i}]: total reward: {total_rewards:0.4f}, completion: {env.get_completion_percent():0.2f}%")
+        print(f"[{episode_i}]: total reward: {total_rewards:0.2f}, completion: {env.get_completion_percent()*100:0.2f}%, entropy: {total_entropy/total_steps:0.4f}")
