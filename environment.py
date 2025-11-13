@@ -160,6 +160,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.current_transcription_target = selected_sample['json']['text']
         self.current_transcription_guess = ""
         self.current_audio_timestep = 0
+        self.done = False
         
         if self.verbose:
             print(f"Reset with sample: '{self.current_transcription_target}'")
