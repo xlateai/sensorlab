@@ -41,33 +41,39 @@ if __name__ == "__main__":
     agent = Agent()
     optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
 
-    obs, info = env.reset()
-    while env.done is False:
-        optimizer.zero_grad()
-        
-        obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
-        dist = agent.forward(obs_tensor)
+    NUM_EPISODES = 100
 
-        raw_action = dist.sample().squeeze().item()  # Sample and remove batch dimension
-        # convert from [0, 1] range to dict_size range
-        dict_size = len(env.character_dictionary)
-        raw_action = int(max(0, min(dict_size - 1, int(raw_action * dict_size))))
+    for _ in range(NUM_EPISODES):
+        obs, info = env.reset()
+        while env.done is False:
+            optimizer.zero_grad()
+            
+            obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
+            dist = agent.forward(obs_tensor)
 
-        action = env.numeric_to_character(raw_action)
-        obs, reward, done, terminal, info = env.step(action)
+            raw_action = dist.sample().squeeze().item()  # Sample and remove batch dimension
+            # convert from [0, 1] range to dict_size range
+            dict_size = len(env.character_dictionary)
+            raw_action = int(max(0, min(dict_size - 1, int(raw_action * dict_size))))
 
-        expected_character = info.get("expected", None)
-        expected_char_int = env.character_dictionary.index(expected_character)
+            action = env.numeric_to_character(raw_action)
+            obs, reward, done, terminal, info = env.step(action)
 
-        # print(raw_action, action, reward, expected_character)
+            expected_character = info.get("expected", None)
+            expected_char_int = env.character_dictionary.index(expected_character)
 
-        # [0, 1] range for log prob of Beta distribution
-        expected_raw_distributional_value = torch.tensor([[expected_char_int / dict_size]], dtype=torch.float32)
-        target_log_prob = dist.log_prob(expected_raw_distributional_value)
-        # print(dist.concentration1, dist.concentration0)
-        # print(target_log_prob.item(), expected_raw_distributional_value.item())
+            # print(raw_action, action, reward, expected_character)
 
-        # print(f"Action: {action}, Reward: {reward}, Done: {done}")
-        loss = -target_log_prob
-        loss.backward()
-        optimizer.step()
+            # [0, 1] range for log prob of Beta distribution
+            expected_raw_distributional_value = torch.tensor([[expected_char_int / dict_size]], dtype=torch.float32)
+            target_log_prob = dist.log_prob(expected_raw_distributional_value)
+            # print(dist.concentration1, dist.concentration0)
+            # print(target_log_prob.item(), expected_raw_distributional_value.item())
+
+            # print(f"Action: {action}, Reward: {reward}, Done: {done}")
+            loss = -target_log_prob
+            # skip if loss is nan or inf
+            if torch.isnan(loss) or torch.isinf(loss):
+                continue
+            loss.backward()
+            optimizer.step()
