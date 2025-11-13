@@ -1,3 +1,4 @@
+import wandb
 from environment import TranscriptionEnvironmentSingleInstance
 import torch
 import numpy as np
@@ -43,6 +44,7 @@ class Agent(torch.nn.Module):
 
 
 if __name__ == "__main__":
+    USE_WANDB = True
     VERBOSE = False
     
     # Create environment with just 1 sample for testing
@@ -54,43 +56,27 @@ if __name__ == "__main__":
     agent = Agent(env, chunk_size=env.chunk_size)
     optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
     
+    if USE_WANDB:
+        wandb.init(project="audiolab-rl-transcription")
+
     for episode_i in range(NUM_EPISODES := 10_000):
         obs, info = env.reset()
-
-        # can play audio like this
-        # env.play_current_sample_audio()
 
         total_rewards = 0
         total_entropy = 0
         total_steps = 0
 
         while not env.done:
-            # Random action - pick a random UTF-8 character from the massive space
-            # UTF-8 can represent ~1.1 million characters, let's sample from a reasonable range
-            # random_unicode_point = random.randint(32, 65535)  # Basic Multilingual Plane (most common chars)
-            # choose from character dictionary indices
-            # dict_size = len(env.character_dictionary)
-            # random_char = env.numeric_to_character(random_index)
-
             dist = agent.forward(obs)
-            # print(dist.probs)
             char_index = dist.sample()
-            action = char_index.item()  # Pass integer action directly
+            action = char_index.item()
             obs, reward, done, truncated, info = env.step(action)
-
-            # For display, show the character if not a no-op
-            # if action == 0:
-                # action_str = "<NO-OP>"
-            # else:
-                # action_str = env.numeric_to_character(action)
-            # print(action_str, reward, info.get("expected", ""))
 
             loss = -dist.log_prob(char_index) * reward  # Policy gradient loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # print the correct string
             total_rewards += reward
             total_steps += 1
             total_entropy += dist.entropy().item()
@@ -101,4 +87,21 @@ if __name__ == "__main__":
             if done:
                 break
 
-        print(f"[{episode_i}]: cumrw: {total_rewards:0.2f}, compl: {env.get_completion_percent()*100:0.2f}%, entr: {total_entropy/total_steps:0.4f}, noops: {env.total_noop_actions}, incorr: {env.total_incorrect_actions}")
+        compl = env.get_completion_percent()*100
+        entr = total_entropy/total_steps if total_steps > 0 else 0.0
+        noops = env.total_noop_actions
+        incorr = env.total_incorrect_actions
+        print(f"[{episode_i}]: cumrw: {total_rewards:0.2f}, compl: {compl:0.2f}%, entr: {entr:0.4f}, noops: {noops}, incorr: {incorr}")
+
+        if USE_WANDB:
+            wandb.log({
+                "episode": episode_i,
+                "cum_reward": total_rewards,
+                "completion_percent": compl,
+                "avg_entropy": entr,
+                "total_noop_actions": noops,
+                "total_incorrect_actions": incorr,
+            })
+
+    if USE_WANDB:
+        wandb.finish()
