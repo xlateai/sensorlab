@@ -33,6 +33,8 @@ class Agents:
             LinearLayerParamGroup(key, num_agents, embedding_size, 1),
         ]
 
+        self.normalize_all_parameters()
+
 
     def forward(self, obs):
         out = obs
@@ -44,15 +46,23 @@ class Agents:
     
     def add_deltas(self, deltas, with_random_scales: bool = True, frozen_agent_i: int = None):
         # Add the deltas to each group, skipping the frozen agent (best_i)
-        self.key, skey = jax.random.split(self.key, 2)
+        self.key, skey1, skey2 = jax.random.split(self.key, 3)
         for group, (delta_weights, delta_biases) in zip(self.groups, deltas):
+            # 50% chance to flip sign for each agent
+            flip_signs = jax.random.bernoulli(skey1, 0.5, (self.num_agents,))
+            sign_factors = 1.0 - 2.0 * flip_signs  # 1 or -1
+            sign_factors_w = sign_factors[:, None, None]
+            sign_factors_b = sign_factors[:, None]
+            delta_weights = delta_weights * sign_factors_w
+            delta_biases = delta_biases * sign_factors_b
+
             if with_random_scales:
                 scales_weights = jax.random.uniform(
-                    skey,
+                    skey2,
                     (self.num_agents, group.input_size, group.output_size),
                 ) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
                 scales_biases = jax.random.uniform(
-                    skey,
+                    skey2,
                     (self.num_agents, group.output_size),
                 ) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
                 weight_updates = delta_weights * scales_weights
@@ -66,6 +76,20 @@ class Agents:
                 bias_updates = bias_updates * mask[:, None]
             group.weights = group.weights + weight_updates
             group.biases = group.biases + bias_updates
+
+        self.normalize_all_parameters()
+
+    def normalize_all_parameters(self):
+        # TODO: make it so that the max value is 1.0 and min value is -1.0 for each layer
+        # but still maintaining relative weight values (internal to each agent)
+        for group in self.groups:
+            weight_max = jnp.max(group.weights, axis=(1,2), keepdims=True)
+            weight_min = jnp.min(group.weights, axis=(1,2), keepdims=True)
+            bias_max = jnp.max(group.biases, axis=1, keepdims=True)
+            bias_min = jnp.min(group.biases, axis=1, keepdims=True)
+
+            group.weights = (group.weights - weight_min) / (weight_max - weight_min + 1e-8) * 2.0 - 1.0
+            group.biases = (group.biases - bias_min) / (bias_max - bias_min + 1e-8) * 2.0 - 1.0
 
     def __str__(self):
         s = ""
