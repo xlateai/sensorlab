@@ -73,6 +73,20 @@ class Agents:
 
     def __str__(self):
         s = ""
+
+        # start by describing the average distance between agents by finding
+        # the average weights and then computing the distance of each agent to that average
+        # and then averaging those distances
+        total_parameter_distance = 0.0
+        for i, group in enumerate(self.groups):
+            avg_weights = jnp.mean(group.weights, axis=0)
+            avg_biases = jnp.mean(group.biases, axis=0)
+            weight_dists = jnp.linalg.norm(group.weights - avg_weights, axis=(1,2))
+            bias_dists = jnp.linalg.norm(group.biases - avg_biases, axis=1)
+            mean_weight_dist = jnp.mean(weight_dists)
+            mean_bias_dist = jnp.mean(bias_dists)
+            total_parameter_distance += mean_weight_dist + mean_bias_dist
+        s += f"Average parameter distance between agents: {total_parameter_distance:.4f}\n"
         for i, group in enumerate(self.groups):
             s += f"Layer {i+1}:\n"
             s += f"  Weights - mean: {jnp.mean(group.weights):.4f}, min: {jnp.min(group.weights):.4f}, max: {jnp.max(group.weights):.4f}, sum: {jnp.sum(group.weights):.4f}\n"
