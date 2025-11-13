@@ -42,9 +42,8 @@ class Agents:
         out = jnp.clip(out, 0.0, 1.0)
         return out
     
-    def add_deltas(self, deltas, with_random_scales: bool = True):
-        # let's add the deltas to each group (ignoring best_i since it won't need to change)
-        # the idea is let's generate weight-value sepcific scales to apply to each delta
+    def add_deltas(self, deltas, with_random_scales: bool = True, frozen_agent_i: int = None):
+        # Add the deltas to each group, skipping the frozen agent (best_i)
         self.key, skey = jax.random.split(self.key, 2)
         for group, (delta_weights, delta_biases) in zip(self.groups, deltas):
             if with_random_scales:
@@ -56,11 +55,17 @@ class Agents:
                     skey,
                     (self.num_agents, group.output_size),
                 ) * (MAX_SCALE - MIN_SCALE) + MIN_SCALE
-                group.weights = group.weights + delta_weights * scales_weights
-                group.biases = group.biases + delta_biases * scales_biases
+                weight_updates = delta_weights * scales_weights
+                bias_updates = delta_biases * scales_biases
             else:
-                group.weights = group.weights + delta_weights
-                group.biases = group.biases + delta_biases
+                weight_updates = delta_weights
+                bias_updates = delta_biases
+            if frozen_agent_i is not None:
+                mask = jnp.arange(self.num_agents) != frozen_agent_i
+                weight_updates = weight_updates * mask[:, None, None]
+                bias_updates = bias_updates * mask[:, None]
+            group.weights = group.weights + weight_updates
+            group.biases = group.biases + bias_updates
 
     def __str__(self):
         s = ""
@@ -158,8 +163,9 @@ class TranscriptionAgentGroup:
             delta_biases = avg_biases[None, ...] - group.biases
             deltas.append((delta_weights, delta_biases))
 
-        # 4. Add deltas with random scales
-        self.agents.add_deltas(deltas, with_random_scales=True)
+        # 4. Add deltas with random scales, freeze best agent
+        best_i = int(jnp.argmax(rewards))
+        self.agents.add_deltas(deltas, with_random_scales=True, frozen_agent_i=best_i)
 
 
 trainer = TranscriptionAgentGroup(
