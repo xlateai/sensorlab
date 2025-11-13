@@ -69,11 +69,15 @@ if __name__ == "__main__":
         dist = agent.forward(obs)
         # print(dist.probs)
         char_index = dist.sample()
-        # print(char_index)
-        action = env.numeric_to_character(char_index.item())
+        action = char_index.item()  # Pass integer action directly
         obs, reward, done, truncated, info = env.step(action)
 
-        print(action, reward, info["expected"])
-        
+        # For display, show the character if not a no-op
+        if action == 0:
+            action_str = "<NO-OP>"
+        else:
+            action_str = env.numeric_to_character(action)
+        print(action_str, reward, info.get("expected", ""))
+
         if done:
             break
