@@ -5,10 +5,10 @@ from vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
 
-NUM_AGENTS = 64
+NUM_AGENTS = 128
 
-CHUNK_SIZE = 512
-EMBEDDING_SIZE = 64
+CHUNK_SIZE = 256
+EMBEDDING_SIZE = 16
 
 REPULSE_PERCENT = 0.5
 
@@ -32,7 +32,7 @@ class Agents:
         self.groups = [
             LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size),
             LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
-            LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
+            # LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
             LinearLayerParamGroup(key, num_agents, embedding_size, 1),
         ]
 
