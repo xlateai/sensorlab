@@ -5,6 +5,8 @@
 */expo-env.d.ts
 # @end expo-cli
 
+wandb/
+
 # node modules
 **/node_modules/
 node_modules/
