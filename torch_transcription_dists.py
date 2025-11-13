@@ -5,7 +5,7 @@ from torch.distributions import Beta
 
 MAX_SAMPLES = 1
 CHUNK_SIZE = 256
-EMBEDDING_SIZE = 8
+EMBEDDING_SIZE = 32
 
 
 class Agent(torch.nn.Module):
@@ -18,6 +18,8 @@ class Agent(torch.nn.Module):
         # sequential that predicts alpha and beta parameters from chunked input
         self.model = torch.nn.Sequential(
             torch.nn.Linear(CHUNK_SIZE, EMBEDDING_SIZE),
+            torch.nn.ReLU(),
+            torch.nn.Linear(EMBEDDING_SIZE, EMBEDDING_SIZE),
             torch.nn.ReLU(),
             torch.nn.Linear(EMBEDDING_SIZE, 2),  # Predict alpha and beta parameters
             torch.nn.Softplus(),
@@ -52,6 +54,12 @@ if __name__ == "__main__":
             dist = agent.forward(obs_tensor)
 
             raw_action = dist.sample().squeeze().item()  # Sample and remove batch dimension
+
+            # greedy action sample
+            # raw_action = dist.mean.squeeze().item()
+            # print("mean =", raw_action)
+            # print("mode =", dist.mode.squeeze().item())
+
             # convert from [0, 1] range to dict_size range
             dict_size = len(env.character_dictionary)
             raw_action = int(max(0, min(dict_size - 1, int(raw_action * dict_size))))
