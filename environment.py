@@ -14,7 +14,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
     character.
     """
     
-    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = False):
+    def __init__(self, max_samples: int=4, chunk_size: int=512, verbose: bool = False, incorrect_reward: float = 0.0, correct_reward: float = 1.0):
         self.max_samples = max_samples
         self.chunk_size = chunk_size
         self.verbose = verbose
@@ -24,6 +24,9 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
         self.current_transcription_target = ""
         self.current_transcription_guess = ""
         self.current_audio_timestep = 0
+
+        self.incorrect_reward = incorrect_reward
+        self.correct_reward = correct_reward
         
         # Load dataset and prepare available samples
         self._load_dataset()
@@ -84,7 +87,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
             if action == expected_char:
                 # Correct prediction
                 self.current_transcription_guess += action
-                reward = 1
+                reward = self.correct_reward
                 transcription_complete = len(self.current_transcription_guess) >= len(self.current_transcription_target)
                 info = {"correct": True, "expected": expected_char, "predicted": action}
                 
@@ -93,7 +96,7 @@ class TranscriptionEnvironmentSingleInstance(gym.Env):
                 # print(f"✓ Step {self.current_audio_timestep + 1}: Correct! '{action}' | Current guess: '{self.current_transcription_guess}' | Progress: {len(self.current_transcription_guess)}/{len(self.current_transcription_target)}")
             else:
                 # Incorrect prediction - don't append to guess
-                reward = 0
+                reward = self.incorrect_reward
                 info = {"correct": False, "expected": expected_char, "predicted": action}
         else:
             # Transcription already complete, no more characters to predict

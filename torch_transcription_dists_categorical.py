@@ -5,7 +5,7 @@ from torch.distributions import Categorical
 
 MAX_SAMPLES = 1
 CHUNK_SIZE = 256
-EMBEDDING_SIZE = 32
+EMBEDDING_SIZE = 8
 
 
 
@@ -34,11 +34,12 @@ if __name__ == "__main__":
         max_samples=MAX_SAMPLES,
         chunk_size=CHUNK_SIZE,
         verbose=False,
+        incorrect_reward=-0.1,
     )
 
     dict_size = len(env.character_dictionary)
     agent = Agent(dict_size)
-    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
 
     NUM_EPISODES = 100
 
@@ -50,7 +51,13 @@ if __name__ == "__main__":
             obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
             dist = agent.forward(obs_tensor)
 
-            action_idx = dist.sample().squeeze().item()  # Sample index
+            # random action
+            raw_action = dist.sample()
+            action_idx = raw_action.squeeze().item()  # Sample index
+
+            # greedy action
+            # action_idx = dist.probs.argmax(dim=-1).squeeze().item()
+
             action = env.numeric_to_character(action_idx)
             obs, reward, done, terminal, info = env.step(action)
 
@@ -58,8 +65,10 @@ if __name__ == "__main__":
             if expected_character is not None:
                 expected_char_int = env.character_dictionary.index(expected_character)
                 target = torch.tensor([expected_char_int], dtype=torch.long)
-                target_log_prob = dist.log_prob(target)
-                loss = -target_log_prob
+                # target_log_prob = dist.log_prob(target)
+                # loss = -target_log_prob
+                guess_log_prob = dist.log_prob(raw_action)
+                loss = -guess_log_prob * reward
                 if torch.isnan(loss) or torch.isinf(loss):
                     continue
                 loss.backward()
