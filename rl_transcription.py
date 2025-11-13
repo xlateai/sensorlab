@@ -24,7 +24,7 @@ class Agent:
             torch.nn.ReLU(),
         )
 
-        num_possible_characters = len(env.character_dictionary)
+        num_possible_characters = len(env.character_dictionary)# + 1  # +1 for no-op
         self.action_head = torch.nn.Sequential(
             torch.nn.Linear(embedding_size * 2, embedding_size),
             torch.nn.ReLU(),
@@ -67,8 +67,13 @@ if __name__ == "__main__":
         # random_char = env.numeric_to_character(random_index)
 
         dist = agent.forward(obs)
-        exit()
-        obs, reward, done, truncated, info = env.step(random_char)
+        # print(dist.probs)
+        char_index = dist.sample()
+        # print(char_index)
+        action = env.numeric_to_character(char_index.item())
+        obs, reward, done, truncated, info = env.step(action)
+
+        print(action, reward, info["expected"])
         
         if done:
             break
