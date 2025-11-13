@@ -5,13 +5,15 @@ from typing import Union
 from torch.distributions import Categorical
 
 
-class Agent:
+class Agent(torch.nn.Module):
     def __init__(
         self,
         env: TranscriptionEnvironmentSingleInstance,
         chunk_size: int,
         embedding_size: int = 32,
     ):
+        super(Agent, self).__init__()
+
         self.chunk_size = chunk_size
         
         # let's initialize a sequential model
@@ -46,6 +48,7 @@ if __name__ == "__main__":
     # Create environment with just 1 sample for testing
     env = TranscriptionEnvironmentSingleInstance(max_samples=1, chunk_size=512, verbose=False)
     agent = Agent(env, chunk_size=env.chunk_size)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
     
     # Reset to get a sample
     obs, info = env.reset()
@@ -81,9 +84,14 @@ if __name__ == "__main__":
             # action_str = env.numeric_to_character(action)
         # print(action_str, reward, info.get("expected", ""))
 
+        loss = -dist.log_prob(char_index) * reward  # Policy gradient loss
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
         # print the correct string
         total_rewards += reward
-        print(env.current_transcription_guess, "| total reward:", total_rewards)
+        print(env.current_transcription_guess, f"| total reward: {total_rewards:0.4f}", f"| loss: {loss.item():0.4f}")
 
         if done:
             break
