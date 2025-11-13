@@ -30,7 +30,6 @@ class Agents:
         self.groups = [
             LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size),
             LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
-            LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
             LinearLayerParamGroup(key, num_agents, embedding_size, 1),
         ]
 
