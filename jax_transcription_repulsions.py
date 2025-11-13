@@ -5,10 +5,12 @@ from vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
 
-NUM_AGENTS = 32
+NUM_AGENTS = 64
 
 CHUNK_SIZE = 512
-EMBEDDING_SIZE = 32
+EMBEDDING_SIZE = 64
+
+REPULSE_PERCENT = 0.5
 
 MAX_SAMPLES = 1
 
@@ -30,6 +32,7 @@ class Agents:
         self.groups = [
             LinearLayerParamGroup(key, num_agents, chunk_size, embedding_size),
             LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
+            LinearLayerParamGroup(key, num_agents, embedding_size, embedding_size),
             LinearLayerParamGroup(key, num_agents, embedding_size, 1),
         ]
 
@@ -49,8 +52,7 @@ class Agents:
         self.key, skey1, skey2 = jax.random.split(self.key, 3)
         for group, (delta_weights, delta_biases) in zip(self.groups, deltas):
             # 25% chance to flip sign
-            percentage_to_negate = 0.1
-            flip_signs = jax.random.bernoulli(skey1, percentage_to_negate, (self.num_agents,))
+            flip_signs = jax.random.bernoulli(skey1, REPULSE_PERCENT, (self.num_agents,))
             sign_factors = 1.0 - 2.0 * flip_signs  # 1 or -1
             sign_factors_w = sign_factors[:, None, None]
             sign_factors_b = sign_factors[:, None]
