@@ -51,7 +51,8 @@ if __name__ == "__main__":
     env = TranscriptionEnvironmentSingleInstance(
         max_samples=1,
         chunk_size=512,
-        incorrect_reward=-0.1,
+        incorrect_reward=0.0,
+        # incorrect_reward=-0.1,
     )
     agent = Agent(env, chunk_size=env.chunk_size)
     optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
