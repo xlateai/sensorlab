@@ -62,9 +62,6 @@ class LinearLayerParamGroup:
         self.biases = self.biases.at[mutation_indices].add(bias_mutations)
 
     def distances(self, parent_indices: jnp.ndarray):
-        parent_weights = self.weights[parent_indices]
-        parent_biases = self.biases[parent_indices]
-
         # For each agent, compare its weights/biases to its paired agent
         # parent_indices should be shape (num_agents,)
         # For each i, compare weights[i] to weights[pair_indices[i]]
