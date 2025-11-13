@@ -3,9 +3,9 @@ import torch
 from torch.distributions import Categorical
 
 
-MAX_SAMPLES = 1
+MAX_SAMPLES = 8
 CHUNK_SIZE = 256
-EMBEDDING_SIZE = 8
+EMBEDDING_SIZE = 16
 
 
 
@@ -43,6 +43,8 @@ if __name__ == "__main__":
 
     NUM_EPISODES = 100
 
+    GREEDY = False
+
     for episode_i in range(NUM_EPISODES):
         obs, info = env.reset()
         while env.done is False:
@@ -51,12 +53,11 @@ if __name__ == "__main__":
             obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
             dist = agent.forward(obs_tensor)
 
-            # random action
-            raw_action = dist.sample()
-            action_idx = raw_action.squeeze().item()  # Sample index
-
-            # greedy action
-            # action_idx = dist.probs.argmax(dim=-1).squeeze().item()
+            if GREEDY:
+                action_idx = dist.probs.argmax(dim=-1).squeeze().item()
+            else:
+                raw_action = dist.sample()
+                action_idx = raw_action.squeeze().item()  # Sample index
 
             action = env.numeric_to_character(action_idx)
             obs, reward, done, terminal, info = env.step(action)
@@ -65,10 +66,14 @@ if __name__ == "__main__":
             if expected_character is not None:
                 expected_char_int = env.character_dictionary.index(expected_character)
                 target = torch.tensor([expected_char_int], dtype=torch.long)
-                # target_log_prob = dist.log_prob(target)
-                # loss = -target_log_prob
-                guess_log_prob = dist.log_prob(raw_action)
-                loss = -guess_log_prob * reward
+                
+                if GREEDY:
+                    target_log_prob = dist.log_prob(target)
+                    loss = -target_log_prob
+                else:
+                    guess_log_prob = dist.log_prob(raw_action)
+                    loss = -guess_log_prob * reward
+
                 if torch.isnan(loss) or torch.isinf(loss):
                     continue
                 loss.backward()
