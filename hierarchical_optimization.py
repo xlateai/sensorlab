@@ -9,7 +9,7 @@ from theta_star_study import Agents
 NUM_AGENTS = 16
 CHUNK_SIZE = 256
 EMBEDDING_SIZE = 16
-DEPTH = 1
+DEPTH = 3
 
 from theta_star_study import TranscriptionAgentGroup
 
@@ -27,6 +27,7 @@ def hierarchical_theta_star(depth, key, trainer):
         trainer.agents = agents
         rewards = trainer.episode()  # Use trainer to get agent rewards
         theta_star_params = agents.evaluate_theta_star(rewards)
+        print(f"Depth {depth}: rewards = {rewards}")
         return theta_star_params, rewards
     # Recursive stacking: each agent is itself a theta-star from previous layer
     theta_star_params_list = []
@@ -49,6 +50,7 @@ def hierarchical_theta_star(depth, key, trainer):
         avg_weights = jnp.tensordot(rewards_norm, weights_stack, axes=1)
         avg_biases = jnp.tensordot(rewards_norm, biases_stack, axes=1)
         final_theta_star.append((avg_weights, avg_biases))
+    print(f"Depth {depth}: rewards = {rewards}")
     return final_theta_star, rewards
 
 
@@ -60,12 +62,13 @@ def main(depth=DEPTH):
         chunk_size=CHUNK_SIZE,
         embedding_size=EMBEDDING_SIZE,
     )
+
     final_theta_star, raw_rewards = hierarchical_theta_star(depth, key, trainer)
     # print(f"Final theta-star parameters and raw performances at depth {depth}:")
     # for i, (weights, biases) in enumerate(final_theta_star):
         # print(f"Layer {i+1} theta-star weights shape: {weights.shape}")
         # print(f"Layer {i+1} theta-star biases shape: {biases.shape}")
-    print(f"Raw rewards used for composition: {raw_rewards}")
+    # print(f"Raw rewards used for composition: {raw_rewards}")
 
 if __name__ == "__main__":
     main(DEPTH)
