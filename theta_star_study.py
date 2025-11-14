@@ -1,3 +1,4 @@
+
 import jax
 import jax.numpy as jnp
 from audiolab.rl.parameter_group import LinearLayerParamGroup
@@ -6,12 +7,9 @@ from audiolab.rl.transcription.env.vec_environment import TranscriptionVecEnv
 key = jax.random.PRNGKey(0)
 
 MAX_SAMPLES = 1
-
 NUM_AGENTS = 16
-
 CHUNK_SIZE = 256
 EMBEDDING_SIZE = 16
-
 NUM_EPISODES = 1000
 
 
@@ -158,63 +156,91 @@ print("sentence being transcribed:", trainer.env.current_transcription_target)
 print("character dictionary")
 print(trainer.env.character_dictionary)
 
-# Hardcoded experiment: collect theta stars from k random networks
 
-# Refactored experiment: two trainers, granular reward collection, single theta-star evaluation
-k = NUM_AGENTS
-random_episode_rewards_matrix = []  # shape: [k, NUM_AGENTS]
-theta_star_performances = []        # shape: [k]
+# Fractal dynamic programming style evaluation
+def evaluate_theta_star_fractal(depth: int = 1, key: jax.random.PRNGKey = jax.random.PRNGKey(0)):
+    """
+    Recursively evaluates theta-star agents in a fractal hierarchy.
+    At each depth, generates NUM_AGENTS random networks, evaluates them,
+    and produces NUM_AGENTS theta-star agents for the next layer.
+    Only prints theta-star performance at the final layer.
+    """
+    k = NUM_AGENTS
+    random_stats = []
+    theta_star_agents = []
+    # At depth 1, generate random agents and evaluate
+    if depth == 1:
+        for i in range(k):
+            agent_key = jax.random.PRNGKey(i)
+            trainer = TranscriptionAgentGroup(
+                agent_key,
+                num_agents=NUM_AGENTS,
+                chunk_size=CHUNK_SIZE,
+                embedding_size=EMBEDDING_SIZE,
+            )
+            episodic_rewards = trainer.episode()
+            random_stats.append(episodic_rewards)
+            theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
+            theta_star_agents.append(theta_star_params)
+        # Print stats for random networks
+        all_rewards = jnp.array(random_stats).flatten()
+        print(f"Layer 1 random agent stats: min={jnp.min(all_rewards):.2f}, max={jnp.max(all_rewards):.2f}, mean={jnp.mean(all_rewards):.2f}")
+        return theta_star_agents
+    else:
+        # Recursively get previous layer's theta-star agents
+        prev_theta_stars = evaluate_theta_star_fractal(depth - 1, key)
+        for i in range(k):
+            # Use previous layer's theta-star parameters to initialize agents
+            agent_key = jax.random.PRNGKey(i + depth * 1000)
+            trainer = TranscriptionAgentGroup(
+                agent_key,
+                num_agents=NUM_AGENTS,
+                chunk_size=CHUNK_SIZE,
+                embedding_size=EMBEDDING_SIZE,
+            )
+            # Set agent parameters to previous layer's theta-star
+            for group_idx, (weights, biases) in enumerate(prev_theta_stars[i]):
+                trainer.agents.groups[group_idx].weights = jnp.tile(weights[None, :, :], (NUM_AGENTS, 1, 1))
+                trainer.agents.groups[group_idx].biases = jnp.tile(biases[None, :], (NUM_AGENTS, 1))
+            episodic_rewards = trainer.episode()
+            random_stats.append(episodic_rewards)
+            theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
+            theta_star_agents.append(theta_star_params)
+        # Print stats for random networks at this layer
+        all_rewards = jnp.array(random_stats).flatten()
+        print(f"Layer {depth} random agent stats: min={jnp.min(all_rewards):.2f}, max={jnp.max(all_rewards):.2f}, mean={jnp.mean(all_rewards):.2f}")
+        return theta_star_agents
 
-# Create two trainers
-trainer = TranscriptionAgentGroup(
-    key,
-    num_agents=NUM_AGENTS,
-    chunk_size=CHUNK_SIZE,
-    embedding_size=EMBEDDING_SIZE,
-)
-zero_key = jax.random.PRNGKey(42)
-trainer_star = TranscriptionAgentGroup(
-    zero_key,
-    num_agents=NUM_AGENTS,
-    chunk_size=CHUNK_SIZE,
-    embedding_size=EMBEDDING_SIZE,
-)
-# Zero out trainer_star agents
-for group in trainer_star.agents.groups:
-    group.weights = jnp.zeros_like(group.weights)
-    group.biases = jnp.zeros_like(group.biases)
 
-print("Generating theta stars:")
-for i in range(k):
-    # Progress bar
-    bar_len = 30
-    progress = int(bar_len * (i + 1) / k)
-    bar = '[' + '#' * progress + '-' * (bar_len - progress) + f'] {i+1}/{k}'
-    print(f'\r{bar}', end='')
+if __name__ == "__main__":
+    trainer = TranscriptionAgentGroup(
+        key,
+        num_agents=NUM_AGENTS,
+        chunk_size=CHUNK_SIZE,
+        embedding_size=EMBEDDING_SIZE,
+    )
+    trainer.env.reset()
+    print("sentence being transcribed:", trainer.env.current_transcription_target)
+    print("character dictionary")
+    print(trainer.env.character_dictionary)
 
-    # Randomize trainer agents
-    new_key = jax.random.PRNGKey(i)
-    trainer.agents = Agents(key=new_key, num_agents=NUM_AGENTS, chunk_size=CHUNK_SIZE, embedding_size=EMBEDDING_SIZE)
-    # Run episode and collect granular rewards
-    episodic_rewards = trainer.episode()  # shape: [NUM_AGENTS]
-    random_episode_rewards_matrix.append(episodic_rewards)
-    # Calculate theta_star
-    theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
-    # Store theta_star in trainer_star at index i
-    for group_idx, (weights, biases) in enumerate(theta_star_params):
-        trainer_star.agents.groups[group_idx].weights = trainer_star.agents.groups[group_idx].weights.at[i].set(weights)
-        trainer_star.agents.groups[group_idx].biases = trainer_star.agents.groups[group_idx].biases.at[i].set(biases)
-print()  # Newline after progress bar
+    # Run fractal evaluation
+    DEPTH = 2  # Change this to desired depth
+    print(f"\nEvaluating theta-star fractal with depth={DEPTH}...")
+    theta_star_agents = evaluate_theta_star_fractal(depth=DEPTH, key=key)
 
-
-    # ...existing code...
-
-# Print results
-print("\nRandom network episode performances (per agent, k x n):")
-for i, rewards in enumerate(random_episode_rewards_matrix):
-    print(f"RandomNet {i}: {rewards}")
-
-# Final evaluation: run one episode for all theta-star agents
-final_theta_star_rewards = trainer_star.episode()
-print("\nFinal theta-star evaluation (episodic rewards per agent):")
-print(final_theta_star_rewards)
+    # Final evaluation: run one episode for all theta-star agents at final depth
+    # Use the first theta-star agent group for evaluation
+    final_trainer = TranscriptionAgentGroup(
+        key,
+        num_agents=NUM_AGENTS,
+        chunk_size=CHUNK_SIZE,
+        embedding_size=EMBEDDING_SIZE,
+    )
+    # Set agent parameters to the first theta-star agent at final depth
+    for group_idx, (weights, biases) in enumerate(theta_star_agents[0]):
+        final_trainer.agents.groups[group_idx].weights = jnp.tile(weights[None, :, :], (NUM_AGENTS, 1, 1))
+        final_trainer.agents.groups[group_idx].biases = jnp.tile(biases[None, :], (NUM_AGENTS, 1))
+    final_theta_star_rewards = final_trainer.episode()
+    print("\nFinal theta-star evaluation (episodic rewards per agent):")
+    print(final_theta_star_rewards)
