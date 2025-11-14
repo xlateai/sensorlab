@@ -37,20 +37,29 @@ def hierarchical_theta_star(depth, key, trainer):
         params, raw_rewards = hierarchical_theta_star(depth - 1, subkey, trainer)
         theta_star_params_list.append(params)
         rewards_list.append(raw_rewards)
-    # For each layer, stack the weights and biases from all agents, then average
-    final_theta_star = []
-    for layer_idx in range(len(theta_star_params_list[0])):
-        weights_stack = jnp.stack([params[layer_idx][0] for params in theta_star_params_list])
-        biases_stack = jnp.stack([params[layer_idx][1] for params in theta_star_params_list])
-        # Use trainer to get agent rewards for this layer
-        agents = Agents(key, NUM_AGENTS, CHUNK_SIZE, EMBEDDING_SIZE)
-        trainer.agents = agents
-        rewards = trainer.episode()
-        rewards_norm = rewards / (jnp.sum(rewards) + 1e-8)
-        avg_weights = jnp.tensordot(rewards_norm, weights_stack, axes=1)
-        avg_biases = jnp.tensordot(rewards_norm, biases_stack, axes=1)
-        final_theta_star.append((avg_weights, avg_biases))
+    # Stack weights and biases for all layers
+    num_layers = len(theta_star_params_list[0])
+    weights_stacks = [jnp.stack([params[layer_idx][0] for params in theta_star_params_list]) for layer_idx in range(num_layers)]
+    biases_stacks = [jnp.stack([params[layer_idx][1] for params in theta_star_params_list]) for layer_idx in range(num_layers)]
+
+    # Create agents and update all layers' parameters before evaluation
+    agents = Agents(key, NUM_AGENTS, CHUNK_SIZE, EMBEDDING_SIZE)
+    for layer_idx in range(num_layers):
+        for i in range(NUM_AGENTS):
+            agents.layers[layer_idx][0] = weights_stacks[layer_idx][i]
+            agents.layers[layer_idx][1] = biases_stacks[layer_idx][i]
+    trainer.agents = agents
+    rewards = trainer.episode()
     print(f"Depth {depth}: rewards = {rewards}")
+
+    # Now construct the final theta-star using the rewards
+    rewards_norm = rewards / (jnp.sum(rewards) + 1e-8)
+    final_theta_star = []
+    for layer_idx in range(num_layers):
+        avg_weights = jnp.tensordot(rewards_norm, weights_stacks[layer_idx], axes=1)
+        avg_biases = jnp.tensordot(rewards_norm, biases_stacks[layer_idx], axes=1)
+        final_theta_star.append((avg_weights, avg_biases))
+        
     return final_theta_star, rewards
 
 
