@@ -1,5 +1,5 @@
 import wandb
-from environment import TranscriptionEnvironmentSingleInstance
+from audiolab.rl.transcription.env.environment import TranscriptionEnvironmentSingleInstance
 import torch
 import numpy as np
 from typing import Union

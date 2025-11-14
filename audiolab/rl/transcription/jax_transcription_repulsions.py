@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 from parameter_group import LinearLayerParamGroup
-from vec_environment import TranscriptionVecEnv
+from env.vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
 
