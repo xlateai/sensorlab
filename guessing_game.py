@@ -1,6 +1,9 @@
 
 from guessing_game_env import GuessingGameVecEnv
 import random
+from colorama import Fore, Style, init
+
+init(autoreset=True)
 
 NUM_AGENTS = 8
 TARGET_SENTENCE = "Hello there, have you cracked the code?"
@@ -32,15 +35,17 @@ while not all(done):
         break
 
 
-# Print table of guesses in integer form
 char_to_int = {c: i for i, c in enumerate(sorted(set(TARGET_SENTENCE)))}
-guesses_table = []
-for agent_guess in env.current_guesses:
-    guesses_table.append(" ".join([str(char_to_int.get(c, -1)) for c in agent_guess]))
-
-print("Guesses table (integers):")
-for row in guesses_table:
-    print(row)
+print("Guesses table (integers, green=correct):")
+for agent_idx, agent_guess in enumerate(env.current_guesses):
+    row = []
+    for pos, c in enumerate(agent_guess):
+        val = str(char_to_int.get(c, -1))
+        if pos < len(TARGET_SENTENCE) and c == TARGET_SENTENCE[pos]:
+            row.append(Fore.GREEN + val + Style.RESET_ALL)
+        else:
+            row.append(val)
+    print(" ".join(row))
 
 print("Target sentence:", TARGET_SENTENCE, "Len:", len(TARGET_SENTENCE))
 print("Total reward vector:", total_rewards)
