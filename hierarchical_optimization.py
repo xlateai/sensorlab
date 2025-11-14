@@ -46,8 +46,8 @@ def hierarchical_theta_star(depth, key, trainer):
     agents = Agents(key, NUM_AGENTS, CHUNK_SIZE, EMBEDDING_SIZE)
     for layer_idx in range(num_layers):
         for i in range(NUM_AGENTS):
-            agents.layers[layer_idx][0] = weights_stacks[layer_idx][i]
-            agents.layers[layer_idx][1] = biases_stacks[layer_idx][i]
+            agents.groups[layer_idx].weights = agents.groups[layer_idx].weights.at[i].set(weights_stacks[layer_idx][i])
+            agents.groups[layer_idx].biases = agents.groups[layer_idx].biases.at[i].set(biases_stacks[layer_idx][i])
     trainer.agents = agents
     rewards = trainer.episode()
     print(f"Depth {depth}: rewards = {rewards}")
@@ -59,7 +59,7 @@ def hierarchical_theta_star(depth, key, trainer):
         avg_weights = jnp.tensordot(rewards_norm, weights_stacks[layer_idx], axes=1)
         avg_biases = jnp.tensordot(rewards_norm, biases_stacks[layer_idx], axes=1)
         final_theta_star.append((avg_weights, avg_biases))
-        
+
     return final_theta_star, rewards
 
 
