@@ -156,7 +156,7 @@ print(trainer.env.character_dictionary)
 
 # Hardcoded experiment: collect theta stars from k random networks
 k = NUM_AGENTS
-random_episode_performances = [[] for _ in range(k)]
+random_episode_performances = []
 theta_star_performances = []
 
 print("Generating next_agents (theta stars):")
@@ -167,15 +167,15 @@ for i in range(k):
     bar = '[' + '#' * progress + '-' * (bar_len - progress) + f'] {i+1}/{k}'
     print(f'\r{bar}', end='')
 
-    # For each theta star, generate k random networks and collect their episode rewards
-    for j in range(k):
-        new_key = jax.random.PRNGKey(i * k + j)
-        trainer.agents = Agents(key=new_key, num_agents=NUM_AGENTS, chunk_size=CHUNK_SIZE, embedding_size=EMBEDDING_SIZE)
-        episodic_rewards = trainer.episode()
-        random_episode_performances[i].append(float(jnp.sum(episodic_rewards)))
-
-    # Now use the last random net to calculate theta_star for this slot
+    # Randomly reinitialize agents
+    new_key = jax.random.PRNGKey(i)
+    trainer.agents = Agents(key=new_key, num_agents=NUM_AGENTS, chunk_size=CHUNK_SIZE, embedding_size=EMBEDDING_SIZE)
+    # Run episode
+    episodic_rewards = trainer.episode()
+    random_episode_performances.append(jnp.sum(episodic_rewards))
+    # Calculate theta_star
     theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
+    # Store theta_star in next_agents at index i
     for group_idx, (weights, biases) in enumerate(theta_star_params):
         trainer.next_agents.groups[group_idx].weights = trainer.next_agents.groups[group_idx].weights.at[i].set(weights)
         trainer.next_agents.groups[group_idx].biases = trainer.next_agents.groups[group_idx].biases.at[i].set(biases)
@@ -193,8 +193,8 @@ for i in range(k):
 
 # Print results
 print("\nRandom network episode performances (sum over agents):")
-for i, perf_list in enumerate(random_episode_performances):
-    print(f"RandomNet {i}: {perf_list}")
+for i, perf in enumerate(random_episode_performances):
+    print(f"RandomNet {i}: {perf}")
 print("\nTheta star performances (sum over agents):")
 for i, perf in enumerate(theta_star_performances):
     print(f"ThetaStar {i}: {perf}")
