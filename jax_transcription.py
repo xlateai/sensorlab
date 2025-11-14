@@ -195,27 +195,28 @@ class TranscriptionAgentGroup:
         self.agents.add_deltas(deltas, with_random_scales=True, frozen_agent_i=best_i)
 
 
-trainer = TranscriptionAgentGroup(
-    key,
-    num_agents=NUM_AGENTS,
-    chunk_size=CHUNK_SIZE,
-    embedding_size=EMBEDDING_SIZE,
-)
+if __name__ == "__main__":
+    trainer = TranscriptionAgentGroup(
+        key,
+        num_agents=NUM_AGENTS,
+        chunk_size=CHUNK_SIZE,
+        embedding_size=EMBEDDING_SIZE,
+    )
 
-print("character dictionary")
-print(trainer.env.character_dictionary)
+    print("character dictionary")
+    print(trainer.env.character_dictionary)
 
-for episode_i in range(NUM_EPISODES):
-    episodic_rewards = trainer.episode()
-    
-    # print max, min, and mean episodic rewards
-    max_reward = jnp.max(episodic_rewards)
-    min_reward = jnp.min(episodic_rewards)
-    mean_reward = jnp.mean(episodic_rewards)
+    for episode_i in range(NUM_EPISODES):
+        episodic_rewards = trainer.episode()
+        
+        # print max, min, and mean episodic rewards
+        max_reward = jnp.max(episodic_rewards)
+        min_reward = jnp.min(episodic_rewards)
+        mean_reward = jnp.mean(episodic_rewards)
 
-    # print the number that cloned
-    print(trainer.agents)
-    print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(trainer.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
-    print(f"Best complete percent: {max_reward/len(trainer.env.current_transcription_target)*100:.2f}%")
+        # print the number that cloned
+        print(trainer.agents)
+        print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(trainer.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
+        print(f"Best complete percent: {max_reward/len(trainer.env.current_transcription_target)*100:.2f}%")
 
-    trainer.update_parameters()
+        trainer.update_parameters()

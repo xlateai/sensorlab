@@ -143,79 +143,80 @@ class TranscriptionAgentGroup:
             self.episodic_rewards += rewards * (~dones)
 
         return self.episodic_rewards
+    
+if __name__ == "__main__":
+    trainer = TranscriptionAgentGroup(
+        key,
+        num_agents=NUM_AGENTS,
+        chunk_size=CHUNK_SIZE,
+        embedding_size=EMBEDDING_SIZE,
+    )
 
-trainer = TranscriptionAgentGroup(
-    key,
-    num_agents=NUM_AGENTS,
-    chunk_size=CHUNK_SIZE,
-    embedding_size=EMBEDDING_SIZE,
-)
-
-trainer.env.reset()
-print("sentence being transcribed:", trainer.env.current_transcription_target)
-
-
-print("character dictionary")
-print(trainer.env.character_dictionary)
-
-# Hardcoded experiment: collect theta stars from k random networks
-
-# Refactored experiment: two trainers, granular reward collection, single theta-star evaluation
-k = NUM_AGENTS
-random_episode_rewards_matrix = []  # shape: [k, NUM_AGENTS]
-theta_star_performances = []        # shape: [k]
-
-# Create two trainers
-trainer = TranscriptionAgentGroup(
-    key,
-    num_agents=NUM_AGENTS,
-    chunk_size=CHUNK_SIZE,
-    embedding_size=EMBEDDING_SIZE,
-)
-
-zero_key = jax.random.PRNGKey(42)
-trainer_star = TranscriptionAgentGroup(
-    zero_key,
-    num_agents=NUM_AGENTS,
-    chunk_size=CHUNK_SIZE,
-    embedding_size=EMBEDDING_SIZE,
-)
-# Zero out trainer_star agents
-for group in trainer_star.agents.groups:
-    group.weights = jnp.zeros_like(group.weights)
-    group.biases = jnp.zeros_like(group.biases)
-
-print("Generating theta stars:")
-for i in range(k):
-    # Progress bar
-    bar_len = 30
-    progress = int(bar_len * (i + 1) / k)
-    bar = '[' + '#' * progress + '-' * (bar_len - progress) + f'] {i+1}/{k}'
-    print(f'\r{bar}', end='')
-
-    # Randomize trainer agents
-    new_key = jax.random.PRNGKey(i)
-    trainer.agents = Agents(key=new_key, num_agents=NUM_AGENTS, chunk_size=CHUNK_SIZE, embedding_size=EMBEDDING_SIZE)
-    # Run episode and collect granular rewards
-    episodic_rewards = trainer.episode()  # shape: [NUM_AGENTS]
-    random_episode_rewards_matrix.append(episodic_rewards)
-    # Calculate theta_star
-    theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
-    # Store theta_star in trainer_star at index i
-    for group_idx, (weights, biases) in enumerate(theta_star_params):
-        trainer_star.agents.groups[group_idx].weights = trainer_star.agents.groups[group_idx].weights.at[i].set(weights)
-        trainer_star.agents.groups[group_idx].biases = trainer_star.agents.groups[group_idx].biases.at[i].set(biases)
-print()  # Newline after progress bar
+    trainer.env.reset()
+    print("sentence being transcribed:", trainer.env.current_transcription_target)
 
 
-    # ...existing code...
+    print("character dictionary")
+    print(trainer.env.character_dictionary)
 
-# Print results
-print("\nRandom network episode performances (per agent, k x n):")
-for i, rewards in enumerate(random_episode_rewards_matrix):
-    print(f"RandomNet {i}: {rewards}")
+    # Hardcoded experiment: collect theta stars from k random networks
 
-# Final evaluation: run one episode for all theta-star agents
-final_theta_star_rewards = trainer_star.episode()
-print("\nFinal theta-star evaluation (episodic rewards per agent):")
-print(final_theta_star_rewards)
+    # Refactored experiment: two trainers, granular reward collection, single theta-star evaluation
+    k = NUM_AGENTS
+    random_episode_rewards_matrix = []  # shape: [k, NUM_AGENTS]
+    theta_star_performances = []        # shape: [k]
+
+    # Create two trainers
+    trainer = TranscriptionAgentGroup(
+        key,
+        num_agents=NUM_AGENTS,
+        chunk_size=CHUNK_SIZE,
+        embedding_size=EMBEDDING_SIZE,
+    )
+
+    zero_key = jax.random.PRNGKey(42)
+    trainer_star = TranscriptionAgentGroup(
+        zero_key,
+        num_agents=NUM_AGENTS,
+        chunk_size=CHUNK_SIZE,
+        embedding_size=EMBEDDING_SIZE,
+    )
+    # Zero out trainer_star agents
+    for group in trainer_star.agents.groups:
+        group.weights = jnp.zeros_like(group.weights)
+        group.biases = jnp.zeros_like(group.biases)
+
+    print("Generating theta stars:")
+    for i in range(k):
+        # Progress bar
+        bar_len = 30
+        progress = int(bar_len * (i + 1) / k)
+        bar = '[' + '#' * progress + '-' * (bar_len - progress) + f'] {i+1}/{k}'
+        print(f'\r{bar}', end='')
+
+        # Randomize trainer agents
+        new_key = jax.random.PRNGKey(i)
+        trainer.agents = Agents(key=new_key, num_agents=NUM_AGENTS, chunk_size=CHUNK_SIZE, embedding_size=EMBEDDING_SIZE)
+        # Run episode and collect granular rewards
+        episodic_rewards = trainer.episode()  # shape: [NUM_AGENTS]
+        random_episode_rewards_matrix.append(episodic_rewards)
+        # Calculate theta_star
+        theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
+        # Store theta_star in trainer_star at index i
+        for group_idx, (weights, biases) in enumerate(theta_star_params):
+            trainer_star.agents.groups[group_idx].weights = trainer_star.agents.groups[group_idx].weights.at[i].set(weights)
+            trainer_star.agents.groups[group_idx].biases = trainer_star.agents.groups[group_idx].biases.at[i].set(biases)
+    print()  # Newline after progress bar
+
+
+        # ...existing code...
+
+    # Print results
+    print("\nRandom network episode performances (per agent, k x n):")
+    for i, rewards in enumerate(random_episode_rewards_matrix):
+        print(f"RandomNet {i}: {rewards}")
+
+    # Final evaluation: run one episode for all theta-star agents
+    final_theta_star_rewards = trainer_star.episode()
+    print("\nFinal theta-star evaluation (episodic rewards per agent):")
+    print(final_theta_star_rewards)
