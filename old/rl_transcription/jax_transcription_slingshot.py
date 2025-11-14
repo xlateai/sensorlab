@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from audiolab.rl.transcription.parameter_group import LinearLayerParamGroup
+from audiolab.rl.parameter_group import LinearLayerParamGroup
 from audiolab.rl.transcription.vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
