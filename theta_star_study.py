@@ -151,7 +151,9 @@ trainer = TranscriptionAgentGroup(
     embedding_size=EMBEDDING_SIZE,
 )
 
+trainer.env.reset()
 print("sentence being transcribed:", trainer.env.current_transcription_target)
+
 
 print("character dictionary")
 print(trainer.env.character_dictionary)
