@@ -7,7 +7,7 @@ key = jax.random.PRNGKey(0)
 
 MAX_SAMPLES = 1
 
-NUM_AGENTS = 128
+NUM_AGENTS = 16
 
 CHUNK_SIZE = 256
 EMBEDDING_SIZE = 16
@@ -93,6 +93,12 @@ class TranscriptionAgentGroup:
         self.key, skey = jax.random.split(key, 2)
         self.verbose = verbose
         self.agents = Agents(key=skey, num_agents=num_agents, chunk_size=chunk_size, embedding_size=embedding_size)
+        # Initialize next_agents with all weights and biases set to zero
+        zero_key = jax.random.PRNGKey(42)
+        self.next_agents = Agents(key=zero_key, num_agents=num_agents, chunk_size=chunk_size, embedding_size=embedding_size)
+        for group in self.next_agents.groups:
+            group.weights = jnp.zeros_like(group.weights)
+            group.biases = jnp.zeros_like(group.biases)
         self.env = TranscriptionVecEnv(num_agents=num_agents, chunk_size=chunk_size, max_samples=MAX_SAMPLES)
 
     def reset(self):
@@ -148,15 +154,47 @@ trainer = TranscriptionAgentGroup(
 print("character dictionary")
 print(trainer.env.character_dictionary)
 
-for episode_i in range(NUM_EPISODES):
-    episodic_rewards = trainer.episode()
-    
-    # print max, min, and mean episodic rewards
-    max_reward = jnp.max(episodic_rewards)
-    min_reward = jnp.min(episodic_rewards)
-    mean_reward = jnp.mean(episodic_rewards)
+# Hardcoded experiment: collect theta stars from k random networks
+k = NUM_AGENTS
+random_episode_performances = []
+theta_star_performances = []
 
-    # print the number that cloned
-    print(trainer.agents)
-    print(f"Episode {episode_i}: Max Reward: {max_reward}/{len(trainer.env.current_transcription_target)}, Min Reward: {min_reward}, Mean Reward: {mean_reward}")
-    print(f"Best complete percent: {max_reward/len(trainer.env.current_transcription_target)*100:.2f}%")
+print("Generating next_agents (theta stars):")
+for i in range(k):
+    # Simple progress bar
+    bar_len = 30
+    progress = int(bar_len * (i + 1) / k)
+    bar = '[' + '#' * progress + '-' * (bar_len - progress) + f'] {i+1}/{k}'
+    print(f'\r{bar}', end='')
+
+    # Randomly reinitialize agents
+    new_key = jax.random.PRNGKey(i)
+    trainer.agents = Agents(key=new_key, num_agents=NUM_AGENTS, chunk_size=CHUNK_SIZE, embedding_size=EMBEDDING_SIZE)
+    # Run episode
+    episodic_rewards = trainer.episode()
+    random_episode_performances.append(jnp.sum(episodic_rewards))
+    # Calculate theta_star
+    theta_star_params = trainer.agents.evaluate_theta_star(episodic_rewards)
+    # Store theta_star in next_agents at index i
+    for group_idx, (weights, biases) in enumerate(theta_star_params):
+        trainer.next_agents.groups[group_idx].weights = trainer.next_agents.groups[group_idx].weights.at[i].set(weights)
+        trainer.next_agents.groups[group_idx].biases = trainer.next_agents.groups[group_idx].biases.at[i].set(biases)
+print()  # Newline after progress bar
+
+# Evaluate all theta stars
+for i in range(k):
+    # Set agents to theta_star agent from next_agents
+    for group_idx, group in enumerate(trainer.agents.groups):
+        group.weights = jnp.tile(trainer.next_agents.groups[group_idx].weights[i][None, :, :], (NUM_AGENTS, 1, 1))
+        group.biases = jnp.tile(trainer.next_agents.groups[group_idx].biases[i][None, :], (NUM_AGENTS, 1))
+    # Run episode
+    episodic_rewards = trainer.episode()
+    theta_star_performances.append(jnp.sum(episodic_rewards))
+
+# Print results
+print("\nRandom network episode performances (sum over agents):")
+for i, perf in enumerate(random_episode_performances):
+    print(f"RandomNet {i}: {perf}")
+print("\nTheta star performances (sum over agents):")
+for i, perf in enumerate(theta_star_performances):
+    print(f"ThetaStar {i}: {perf}")
