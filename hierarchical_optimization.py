@@ -9,7 +9,7 @@ from theta_star_study import Agents
 NUM_AGENTS = 16
 CHUNK_SIZE = 256
 EMBEDDING_SIZE = 16
-DEPTH = 3
+DEPTH = 2  # going above 2 is insanely slow
 
 from theta_star_study import TranscriptionAgentGroup
 
