@@ -172,6 +172,7 @@ trainer = TranscriptionAgentGroup(
     chunk_size=CHUNK_SIZE,
     embedding_size=EMBEDDING_SIZE,
 )
+
 zero_key = jax.random.PRNGKey(42)
 trainer_star = TranscriptionAgentGroup(
     zero_key,
@@ -218,3 +219,24 @@ for i, rewards in enumerate(random_episode_rewards_matrix):
 final_theta_star_rewards = trainer_star.episode()
 print("\nFinal theta-star evaluation (episodic rewards per agent):")
 print(final_theta_star_rewards)
+
+# --- Third Layer: trainer_star_star ---
+# Create trainer_star_star with 1 agent
+trainer_star_star = TranscriptionAgentGroup(
+    jax.random.PRNGKey(123),
+    num_agents=1,
+    chunk_size=CHUNK_SIZE,
+    embedding_size=EMBEDDING_SIZE,
+)
+# Average theta star parameters from trainer_star and set to trainer_star_star
+for group_idx in range(len(trainer_star_star.agents.groups)):
+    # Average weights and biases across 16 theta stars
+    avg_weights = jnp.mean(trainer_star.agents.groups[group_idx].weights, axis=0)
+    avg_biases = jnp.mean(trainer_star.agents.groups[group_idx].biases, axis=0)
+    trainer_star_star.agents.groups[group_idx].weights = trainer_star_star.agents.groups[group_idx].weights.at[0].set(avg_weights)
+    trainer_star_star.agents.groups[group_idx].biases = trainer_star_star.agents.groups[group_idx].biases.at[0].set(avg_biases)
+
+# Evaluate the single star star agent
+star_star_rewards = trainer_star_star.episode()
+print("\nStar-Star agent evaluation (episodic reward):")
+print(star_star_rewards)
