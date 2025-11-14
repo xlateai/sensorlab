@@ -31,6 +31,7 @@ while not all(done):
     if step_idx >= len(TARGET_SENTENCE):
         break
 
+print("Target sentence:", TARGET_SENTENCE, "Len:", len(TARGET_SENTENCE))
 print("Total reward vector:", total_rewards)
 
 
