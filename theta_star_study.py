@@ -61,6 +61,31 @@ class Agents:
             s += f"  Biases  - mean: {jnp.mean(group.biases):.4f}, min: {jnp.min(group.biases):.4f}, max: {jnp.max(group.biases):.4f}, sum: {jnp.sum(group.biases):.4f}\n"
         
         return s
+    
+    def evaluate_theta_star(self, episodic_rewards: jnp.ndarray):
+        """The "theta-star" of a set of agents is a single agent formed
+        by averaging the parameters of all agents in the group, weighted by
+        their episodic rewards.
+        """
+
+        # let's begin by normalizing the episodic rewards to sum to 1.0
+        reward_sum = jnp.sum(episodic_rewards) + 1e-8
+        normalized_rewards = episodic_rewards / reward_sum
+
+        theta_star_parameters = []
+
+        for group in self.groups:
+            # compute the weighted average of the weights and biases
+            weighted_avg_weights = jnp.tensordot(normalized_rewards, group.weights, axes=1)
+            weighted_avg_biases = jnp.tensordot(normalized_rewards, group.biases, axes=1)
+
+            # set all agents' weights and biases to the weighted average
+            group.weights = jnp.tile(weighted_avg_weights[None, :, :], (self.num_agents, 1, 1))
+            group.biases = jnp.tile(weighted_avg_biases[None, :], (self.num_agents, 1))
+
+            theta_star_parameters.append((weighted_avg_weights, weighted_avg_biases))
+
+        return theta_star_parameters
 
 
 class TranscriptionAgentGroup:
