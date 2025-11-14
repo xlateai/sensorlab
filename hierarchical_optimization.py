@@ -6,10 +6,10 @@ from audiolab.rl.transcription.env.vec_environment import TranscriptionVecEnv
 from theta_star_study import Agents
 
 # Hierarchical stacking of theta-star parameter averaging
-NUM_AGENTS = 16
+NUM_AGENTS = 4
 CHUNK_SIZE = 256
 EMBEDDING_SIZE = 16
-DEPTH = 2  # going above 2 is insanely slow
+DEPTH = 3  # going above 2 is insanely slow
 
 from theta_star_study import TranscriptionAgentGroup
 
@@ -23,7 +23,8 @@ def hierarchical_theta_star(depth, key, trainer):
         raise ValueError("depth must be >= 1")
     # Base layer: random agents
     if depth == 1:
-        agents = Agents(key, NUM_AGENTS, CHUNK_SIZE, EMBEDDING_SIZE)
+        key, skey = jax.random.split(key)
+        agents = Agents(skey, NUM_AGENTS, CHUNK_SIZE, EMBEDDING_SIZE)
         trainer.agents = agents
         rewards = trainer.episode()  # Use trainer to get agent rewards
         theta_star_params = agents.evaluate_theta_star(rewards)
@@ -32,9 +33,9 @@ def hierarchical_theta_star(depth, key, trainer):
     # Recursive stacking: each agent is itself a theta-star from previous layer
     theta_star_params_list = []
     rewards_list = []
+    subkeys = jax.random.split(key, NUM_AGENTS)
     for i in range(NUM_AGENTS):
-        subkey = jax.random.PRNGKey(i + depth * 100)
-        params, raw_rewards = hierarchical_theta_star(depth - 1, subkey, trainer)
+        params, raw_rewards = hierarchical_theta_star(depth - 1, subkeys[i], trainer)
         theta_star_params_list.append(params)
         rewards_list.append(raw_rewards)
     # Stack weights and biases for all layers
