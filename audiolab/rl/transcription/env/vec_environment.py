@@ -50,7 +50,7 @@ class TranscriptionVecEnv:
 
     def step(self, actions):
         """
-        actions: array-like of character predictions, length = num_agents
+        actions: array-like of integer indices, length = num_agents
         Returns:
             obs: jnp.ndarray (num_agents, chunk_size)
             rewards: jnp.ndarray (num_agents,)
@@ -63,20 +63,24 @@ class TranscriptionVecEnv:
         current_pos = np.vectorize(len)(guesses)
         transcription_complete = current_pos >= len(self.current_transcription_target)
 
-        # Get expected chars for all agents
-        expected_chars = np.array([
-            self.current_transcription_target[pos] if not complete else ""
-            for pos, complete in zip(current_pos, transcription_complete)
-        ], dtype=object)
+        # Get expected indices for all agents (no list comprehension)
+        expected_indices = np.full(self.num_agents, -1, dtype=int)
+        not_complete = ~transcription_complete
+        valid_pos = current_pos[not_complete]
+        expected_indices[not_complete] = self.current_transcription_target_indices_encoded[valid_pos]
 
-        actions = np.array(actions, dtype=object)
+        actions = np.array(actions)
 
         # Determine which agents are correct
-        correct = (actions == expected_chars) & (~transcription_complete)
+        correct = (actions == expected_indices) & not_complete
         rewards = correct.astype(int)
 
-        # Update guesses
-        new_guesses = np.where(correct, guesses + actions, guesses)
+        # Update guesses (append character for correct agents, no list comprehension)
+        dictionary = self.character_dictionary
+        new_chars = np.empty(self.num_agents, dtype=object)
+        new_chars[:] = ''
+        new_chars[correct] = np.array(dictionary)[actions[correct]]
+        new_guesses = np.where(correct, guesses + new_chars, guesses)
 
         audio_finished = self.current_audio_timestep + self.chunk_size >= len(self.current_audio_array)
         done = audio_finished | (np.vectorize(len)(new_guesses) >= len(self.current_transcription_target))
@@ -90,6 +94,16 @@ class TranscriptionVecEnv:
         dones = jnp.array(done)
 
         return obs, rewards, dones
+    @property
+    def current_transcription_target_indices_encoded(self):
+        if not hasattr(self, '_current_transcription_target_indices_encoded_cache') or \
+           getattr(self, '_last_transcription_target', None) != self.current_transcription_target:
+            dictionary = self.character_dictionary
+            char_to_index = {c: i for i, c in enumerate(dictionary)}
+            indices = np.fromiter((char_to_index[c] for c in self.current_transcription_target), dtype=int, count=len(self.current_transcription_target))
+            self._current_transcription_target_indices_encoded_cache = indices
+            self._last_transcription_target = self.current_transcription_target
+        return self._current_transcription_target_indices_encoded_cache
 
     def _get_observation(self):
         """Get the current audio chunk as observation."""

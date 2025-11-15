@@ -86,9 +86,7 @@ class TranscriptionAgentGroup:
         obs = self.reset()
         step_count = 0
         dones = jnp.array([False] * NUM_AGENTS)
-        dictionary = self.env.character_dictionary
-        dict_size = len(dictionary)
-        dictionary = np.array(dictionary)
+        dict_size = len(self.env.character_dictionary)
         while not jnp.all(dones):
             out = self.forward(obs)
             # Convert model output to integer indices, then to characters using the dictionary
@@ -102,13 +100,13 @@ class TranscriptionAgentGroup:
                 indices = jnp.argmax(out, axis=1)
                 raise ValueError("Output shape not recommended (yet)")
 
-            actions = dictionary[np.array(indices)]
-            obs, rewards, dones = self.step(actions)
+            # Pass indices directly as actions
+            obs, rewards, dones = self.step(indices)
             step_count += 1
 
             if self.verbose:
                 print(f"Step {step_count}")
-                print("actions:", actions)
+                print("actions (indices):", indices)
                 print("rewards:", rewards)
                 print("dones:", dones)
 
