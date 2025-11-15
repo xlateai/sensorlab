@@ -1,14 +1,14 @@
 import jax
 import jax.numpy as jnp
 from audiolab.rl.parameter_group import LinearLayerParamGroup
-from audiolab.rl.transcription.vec_environment import TranscriptionVecEnv
+from audiolab.rl.transcription.env.vec_environment import TranscriptionVecEnv
 
 key = jax.random.PRNGKey(0)
 
-NUM_AGENTS = 32
+NUM_AGENTS = 128
 
-CHUNK_SIZE = 512
-EMBEDDING_SIZE = 8
+CHUNK_SIZE = 256
+EMBEDDING_SIZE = 16
 
 MAX_SAMPLES = 1
 

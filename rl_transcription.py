@@ -49,18 +49,18 @@ class Agent(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    USE_WANDB = False
+    USE_WANDB = True
     VERBOSE = False
     
     # Create environment with just 1 sample for testing
     env = TranscriptionEnvironmentSingleInstance(
         max_samples=1,
         chunk_size=256,
-        # incorrect_reward=0.0,
-        incorrect_reward=-0.1,
+        incorrect_reward=0.0,
+        # incorrect_reward=-0.1,
     )
     agent = Agent(env, chunk_size=env.chunk_size)
-    optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
     
     if USE_WANDB:
         wandb.init(project="audiolab-rl-transcription")
