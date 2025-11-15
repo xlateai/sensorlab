@@ -25,6 +25,12 @@ class Agent(torch.nn.Module):
             torch.nn.ReLU(),
         )
 
+        self.last_embedding = torch.zeros((embedding_size,), dtype=torch.float32)
+        self.memory_cell_combiner = torch.nn.Sequential(
+            torch.nn.Linear(embedding_size * 2, embedding_size),
+            torch.nn.ReLU(),
+        )
+
         num_possible_characters = len(env.character_dictionary) + 1  # +1 for no-op
         self.action_head = torch.nn.Sequential(
             torch.nn.Linear(embedding_size, num_possible_characters),
@@ -35,7 +41,10 @@ class Agent(torch.nn.Module):
             observation_chunk = torch.tensor(observation_chunk, dtype=torch.float32)
         assert observation_chunk.squeeze().shape == (self.chunk_size,), f"Expected observation chunk shape ({self.chunk_size},), got: {observation_chunk.squeeze().shape}"
         embedding = self.embedding_model(observation_chunk)
-        action_logits = self.action_head(embedding)
+        combined_embedding = torch.cat([embedding, self.last_embedding], dim=-1)
+        combined_embedding = self.memory_cell_combiner(combined_embedding)
+        self.last_embedding = combined_embedding.detach()
+        action_logits = self.action_head(combined_embedding)
         return Categorical(logits=action_logits)
 
 
