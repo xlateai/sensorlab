@@ -11,7 +11,7 @@ class Agent(torch.nn.Module):
         self,
         env: TranscriptionEnvironmentSingleInstance,
         chunk_size: int,
-        embedding_size: int = 32,
+        embedding_size: int = 4,
     ):
         super(Agent, self).__init__()
 
@@ -19,18 +19,14 @@ class Agent(torch.nn.Module):
         
         # let's initialize a sequential model
         self.embedding_model = torch.nn.Sequential(
-            torch.nn.Linear(chunk_size, embedding_size),
+            torch.nn.Linear(chunk_size, chunk_size // 2),
             torch.nn.ReLU(),
-            torch.nn.Linear(embedding_size, embedding_size),
-            torch.nn.ReLU(),
-            torch.nn.Linear(embedding_size, embedding_size),
+            torch.nn.Linear(chunk_size // 2, embedding_size),
             torch.nn.ReLU(),
         )
 
         num_possible_characters = len(env.character_dictionary) + 1  # +1 for no-op
         self.action_head = torch.nn.Sequential(
-            torch.nn.Linear(embedding_size, embedding_size),
-            torch.nn.ReLU(),
             torch.nn.Linear(embedding_size, num_possible_characters),
         )
 
@@ -44,15 +40,15 @@ class Agent(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    USE_WANDB = True
+    USE_WANDB = False
     VERBOSE = False
     
     # Create environment with just 1 sample for testing
     env = TranscriptionEnvironmentSingleInstance(
         max_samples=1,
-        chunk_size=512,
-        incorrect_reward=0.0,
-        # incorrect_reward=-0.1,
+        chunk_size=256,
+        # incorrect_reward=0.0,
+        incorrect_reward=-0.1,
     )
     agent = Agent(env, chunk_size=env.chunk_size)
     optimizer = torch.optim.Adam(agent.parameters(), lr=0.0001)
