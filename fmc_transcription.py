@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 from audiolab.rl.parameter_group import LinearLayerParamGroup
 from audiolab.rl.transcription.env.vec_environment import TranscriptionVecEnv
 
@@ -12,7 +13,7 @@ EMBEDDING_SIZE = 16
 
 MAX_SAMPLES = 1
 
-NUM_EPISODES = 1000
+NUM_EPISODES = 10_000
 FMC_BALANCE = 1.0
 KEEP_TOP_PERCENT = 0.1
 
@@ -87,6 +88,7 @@ class TranscriptionAgentGroup:
         dones = jnp.array([False] * NUM_AGENTS)
         dictionary = self.env.character_dictionary
         dict_size = len(dictionary)
+        dictionary = np.array(dictionary)
         while not jnp.all(dones):
             out = self.forward(obs)
             # Convert model output to integer indices, then to characters using the dictionary
@@ -99,9 +101,8 @@ class TranscriptionAgentGroup:
                 # Vector output: use argmax
                 indices = jnp.argmax(out, axis=1)
                 raise ValueError("Output shape not recommended (yet)")
-            
-            actions = [self.env.numeric_to_character(idx) for idx in indices]
-            # print(actions)
+
+            actions = dictionary[np.array(indices)]
             obs, rewards, dones = self.step(actions)
             step_count += 1
 

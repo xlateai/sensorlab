@@ -21,7 +21,7 @@ class TranscriptionVecEnv:
         self.available_samples = []
         self.current_audio_array = None
         self.current_transcription_target = ""
-        self.current_transcription_guesses = ["" for _ in range(num_agents)]
+        self.current_transcription_guesses = np.array(["" for _ in range(num_agents)], dtype=object)
         self.current_audio_timestep = 0
         self._load_dataset()
 
@@ -59,32 +59,27 @@ class TranscriptionVecEnv:
         if self.current_transcription_target is None:
             raise ValueError("Environment not reset. Call reset() first.")
 
-        rewards = []
-        dones = []
-        new_guesses = []
+        guesses = self.current_transcription_guesses
+        current_pos = np.vectorize(len)(guesses)
+        transcription_complete = current_pos >= len(self.current_transcription_target)
+
+        # Get expected chars for all agents
+        expected_chars = np.array([
+            self.current_transcription_target[pos] if not complete else ""
+            for pos, complete in zip(current_pos, transcription_complete)
+        ], dtype=object)
+
+        actions = np.array(actions, dtype=object)
+
+        # Determine which agents are correct
+        correct = (actions == expected_chars) & (~transcription_complete)
+        rewards = correct.astype(int)
+
+        # Update guesses
+        new_guesses = np.where(correct, guesses + actions, guesses)
 
         audio_finished = self.current_audio_timestep + self.chunk_size >= len(self.current_audio_array)
-
-        for i in range(self.num_agents):
-            guess = self.current_transcription_guesses[i]
-            current_pos = len(guess)
-            transcription_complete = current_pos >= len(self.current_transcription_target)
-
-            if not transcription_complete:
-                expected_char = self.current_transcription_target[current_pos]
-                action = actions[i]
-                if action == expected_char:
-                    guess += action
-                    reward = 1
-                else:
-                    reward = 0
-            else:
-                reward = 0
-
-            new_guesses.append(guess)
-            done = audio_finished or (len(guess) >= len(self.current_transcription_target))
-            dones.append(done)
-            rewards.append(reward)
+        done = audio_finished | (np.vectorize(len)(new_guesses) >= len(self.current_transcription_target))
 
         self.current_transcription_guesses = new_guesses
         self.current_audio_timestep += self.chunk_size
@@ -92,7 +87,7 @@ class TranscriptionVecEnv:
         obs = self._get_observation()
         obs = jnp.tile(jnp.array(obs), (self.num_agents, 1))
         rewards = jnp.array(rewards)
-        dones = jnp.array(dones)
+        dones = jnp.array(done)
 
         return obs, rewards, dones
 
@@ -123,7 +118,7 @@ class TranscriptionVecEnv:
         selected_sample = random.choice(self.available_samples)
         self.current_audio_array = selected_sample['mp3']['array']
         self.current_transcription_target = selected_sample['json']['text']
-        self.current_transcription_guesses = ["" for _ in range(self.num_agents)]
+        self.current_transcription_guesses = np.array(["" for _ in range(self.num_agents)], dtype=object)
         self.current_audio_timestep = 0
         if self.verbose:
             print(f"Reset with sample: '{self.current_transcription_target}'")
