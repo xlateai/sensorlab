@@ -9,8 +9,6 @@ np.random.seed(SEED)
 
 def run_convolution_artwork():
 	# Parameters
-	initial_width, initial_height = 512, 512
-	width, height = initial_width, initial_height
 	channels = 3
 	kernel_size = 7
 	device = 'cpu'
@@ -20,12 +18,14 @@ def run_convolution_artwork():
 	torch.nn.init.normal_(conv.weight, mean=0.0, std=0.5)
 	conv = conv.to(device)
 
-	# Start with light gray noise
-	img = torch.rand(1, channels, height, width, device=device) * 0.5 + 0.25
-
 	pygame.init()
+	info = pygame.display.Info()
+	width, height = info.current_w, info.current_h
 	screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 	clock = pygame.time.Clock()
+
+	# Start with light gray noise
+	img = torch.rand(1, channels, height, width, device=device) * 0.5 + 0.25
 
 	reinforce_lr = 0.0001  # learning rate for positive feedback
 	penalize_lr = 0.001   # learning rate for negative feedback
@@ -39,20 +39,23 @@ def run_convolution_artwork():
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				running = False
-			elif event.type == pygame.VIDEORESIZE:
-				# Handle resizing
-				new_width, new_height = event.w, event.h
-				# Crop or pad the image
-				if new_width < img.shape[-1] or new_height < img.shape[-2]:
-					# Crop
-					img = img[..., :new_height, :new_width]
-				else:
-					# Pad with new random noise
-					pad_img = torch.rand(1, channels, new_height, new_width, device=device) * 0.5 + 0.25
-					pad_img[..., :img.shape[-2], :img.shape[-1]] = img
-					img = pad_img
-				width, height = new_width, new_height
-				screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+			elif event.type == pygame.VIDEORESIZE or (event.type == pygame.KEYDOWN and event.key == pygame.K_f):
+				# Handle resizing or fullscreen toggle
+				if event.type == pygame.VIDEORESIZE:
+					new_width, new_height = event.w, event.h
+				elif event.type == pygame.KEYDOWN and event.key == pygame.K_f:
+					info = pygame.display.Info()
+					new_width, new_height = info.current_w, info.current_h
+				# Always resize image to fit window
+				if new_width != width or new_height != height:
+					# Resize image: crop or pad as needed
+					new_img = torch.rand(1, channels, new_height, new_width, device=device) * 0.5 + 0.25
+					copy_h = min(img.shape[-2], new_height)
+					copy_w = min(img.shape[-1], new_width)
+					new_img[..., :copy_h, :copy_w] = img[..., :copy_h, :copy_w]
+					img = new_img
+					width, height = new_width, new_height
+					screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 
 		mouse_x, mouse_y = pygame.mouse.get_pos()
 
@@ -86,7 +89,13 @@ def run_convolution_artwork():
 
 		# Convert to numpy and display
 		arr = (img.squeeze().permute(1,2,0).cpu().numpy() * 255).astype(np.uint8)
+		# Ensure shape is (width, height, 3) for make_surface
+		if arr.shape[0] != width or arr.shape[1] != height:
+			arr = np.transpose(arr, (1, 0, 2))
 		surf = pygame.surfarray.make_surface(arr)
+		# Scale surface to window size in case of mismatch
+		if surf.get_width() != width or surf.get_height() != height:
+			surf = pygame.transform.scale(surf, (width, height))
 		screen.blit(surf, (0,0))
 
 		# Draw feedback circles
