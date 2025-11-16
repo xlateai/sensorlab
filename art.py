@@ -13,10 +13,12 @@ def run_convolution_artwork():
 	kernel_size = 7
 	device = 'cpu'
 
-	# Random convolution kernel
-	conv = torch.nn.Conv2d(channels, channels, kernel_size, padding=kernel_size//2, bias=False)
-	torch.nn.init.normal_(conv.weight, mean=0.0, std=0.5)
-	conv = conv.to(device)
+	def make_conv():
+		conv = torch.nn.Conv2d(channels, channels, kernel_size, padding=kernel_size//2, bias=False)
+		torch.nn.init.normal_(conv.weight, mean=0.0, std=0.5)
+		return conv.to(device)
+
+	conv = make_conv()
 
 	pygame.init()
 	info = pygame.display.Info()
@@ -24,8 +26,10 @@ def run_convolution_artwork():
 	screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 	clock = pygame.time.Clock()
 
-	# Start with light gray noise
-	img = torch.rand(1, channels, height, width, device=device) * 0.5 + 0.25
+	def make_img():
+		return torch.rand(1, channels, height, width, device=device) * 0.5 + 0.25
+
+	img = make_img()
 
 	reinforce_lr = 0.0001  # learning rate for positive feedback
 	penalize_lr = 0.001   # learning rate for negative feedback
@@ -33,6 +37,13 @@ def run_convolution_artwork():
 
 	# Feedback circle parameters
 	circle_radius = 40
+
+	# Reset button parameters
+	reset_width, reset_height = 120, 40
+	reset_rect = pygame.Rect((width // 2 - reset_width // 2, 10, reset_width, reset_height))
+	reset_color = (200, 200, 255)
+	reset_text_color = (0, 0, 80)
+	font = pygame.font.SysFont(None, 32)
 
 	running = True
 	while running:
@@ -49,13 +60,20 @@ def run_convolution_artwork():
 				# Always resize image to fit window
 				if new_width != width or new_height != height:
 					# Resize image: crop or pad as needed
-					new_img = torch.rand(1, channels, new_height, new_width, device=device) * 0.5 + 0.25
-					copy_h = min(img.shape[-2], new_height)
-					copy_w = min(img.shape[-1], new_width)
-					new_img[..., :copy_h, :copy_w] = img[..., :copy_h, :copy_w]
-					img = new_img
+					def make_img_resize():
+						new_img = torch.rand(1, channels, new_height, new_width, device=device) * 0.5 + 0.25
+						copy_h = min(img.shape[-2], new_height)
+						copy_w = min(img.shape[-1], new_width)
+						new_img[..., :copy_h, :copy_w] = img[..., :copy_h, :copy_w]
+						return new_img
+					img = make_img_resize()
 					width, height = new_width, new_height
+					reset_rect = pygame.Rect((width // 2 - reset_width // 2, 10, reset_width, reset_height))
 					screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+			elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+				if reset_rect.collidepoint(event.pos):
+					conv = make_conv()
+					img = make_img()
 
 		mouse_x, mouse_y = pygame.mouse.get_pos()
 
@@ -101,6 +119,12 @@ def run_convolution_artwork():
 		# Draw feedback circles
 		pygame.draw.circle(screen, (0,255,0), green_center, circle_radius, 0)
 		pygame.draw.circle(screen, (255,0,0), red_center, circle_radius, 0)
+
+		# Draw reset button
+		pygame.draw.rect(screen, reset_color, reset_rect, border_radius=10)
+		reset_text = font.render("Reset", True, reset_text_color)
+		text_rect = reset_text.get_rect(center=reset_rect.center)
+		screen.blit(reset_text, text_rect)
 
 		pygame.display.flip()
 		clock.tick(30)
