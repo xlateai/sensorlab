@@ -27,7 +27,7 @@ def run_convolution_artwork():
 	clock = pygame.time.Clock()
 
 
-	reinforce_lr = 0.001  # learning rate for positive feedback
+	reinforce_lr = 0.0001  # learning rate for positive feedback
 	penalize_lr = 0.001   # learning rate for negative feedback
 	noise_std = 0.01      # noise for penalization
 
