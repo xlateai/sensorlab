@@ -83,13 +83,13 @@ if __name__ == "__main__":
     from colorama import Fore, Style, init
 
     # --- Hyperparameters ---
-    NUM_AGENTS = 8
+    NUM_AGENTS = 16
     TARGET_SENTENCE = "Hello there, have you cracked the code?"
     CHUNK_SIZE = 1  # obs shape is (num_agents, 1)
-    EMBEDDING_SIZE = 16
-    NUM_EPISODES = 100
+    EMBEDDING_SIZE = 32
+    NUM_EPISODES = 10_000
     FMC_BALANCE = 1.0
-    KEEP_TOP_PERCENT = 0.25
+    KEEP_TOP_PERCENT = 0.1
 
     # --- Environment ---
     env = GuessingGameVecEnv(num_agents=NUM_AGENTS, target_sentence=TARGET_SENTENCE, verbose=False)
@@ -110,10 +110,11 @@ if __name__ == "__main__":
 
         def forward(self, obs):
             h1 = self.layer1.forward(obs)
-            h1 = jax.nn.relu(h1)
+            h1 = jax.nn.sigmoid(h1)
             h2 = self.layer2.forward(h1)
-            h2 = jax.nn.relu(h2)
+            h2 = jax.nn.sigmoid(h2)
             out = self.layer3.forward(h2)
+            out = jax.nn.tanh(out)
             return out
 
         def random_distances(self):

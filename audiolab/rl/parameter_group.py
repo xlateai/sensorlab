@@ -16,8 +16,8 @@ class LinearLayerParamGroup:
         num_agents: int,
         input_size: int,
         output_size: int,
-        mutation_rate: float = 0.1,
-        mutation_amplitude: float = 0.25,
+        mutation_rate: float = 0.25,
+        mutation_amplitude: float = 1.0,
     ):
         self.key = key
 
@@ -42,7 +42,7 @@ class LinearLayerParamGroup:
     @staticmethod
     def _forward_single(x, weights, bias):
         # z = jax.nn.sigmoid(jnp.dot(x, weights) + bias)
-        z = jax.nn.relu(jnp.dot(x, weights) + bias)
+        z = jnp.dot(x, weights) + bias
         return z
     
     def mutate(self, mutation_indices: jnp.ndarray):
