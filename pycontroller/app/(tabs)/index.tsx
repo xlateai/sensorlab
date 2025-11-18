@@ -8,11 +8,13 @@ export default function HomeScreen() {
   const handlePositionalReOrigin = () => {
     if (motionData && originRef.current) {
       originRef.current.position = motionData.accelerationIncludingGravity;
+      setPosition({ x: 0, y: 0, z: 0 });
     } else if (motionData) {
       originRef.current = {
         position: motionData.accelerationIncludingGravity,
         orientation: motionData.rotation,
       };
+      setPosition({ x: 0, y: 0, z: 0 });
     }
   };
 
@@ -68,21 +70,15 @@ export default function HomeScreen() {
   // Tracked position state
   const [position, setPosition] = useState({ x: 0, y: 0, z: 0 });
 
-  // Update tracked position over time using dx, dy, dz
+  // Update tracked position by adding dx, dy, dz each measurement
   useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
     if (motionData && originRef.current) {
-      interval = setInterval(() => {
-        setPosition(prev => ({
-          x: prev.x + dx * 0.1,
-          y: prev.y + dy * 0.1,
-          z: prev.z + dz * 0.1,
-        }));
-      }, 100);
+      setPosition(prev => ({
+        x: prev.x + dx,
+        y: prev.y + dy,
+        z: prev.z + dz,
+      }));
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
   }, [dx, dy, dz]);
 
   return (
@@ -100,6 +96,7 @@ export default function HomeScreen() {
   <Text style={styles.value}>y: {position.y.toFixed(2)}</Text>
   <Text style={styles.value}>z: {position.z.toFixed(2)}</Text>
       <Text style={styles.instructions}>Move your device to see changes. Origin is set at app start.</Text>
+  <Text style={styles.instructions}>Note: dx, dy, dz may fluctuate due to sensor noise even when the phone is still.</Text>
       <Button title="Positional Re-Origin" onPress={handlePositionalReOrigin} />
       <Button title="Rotational Re-Origin" onPress={handleRotationalReOrigin} />
     </View>
