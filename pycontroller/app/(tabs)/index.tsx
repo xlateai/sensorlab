@@ -31,7 +31,7 @@ export default function HomeScreen() {
     const subscription = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
       setMotionData(data);
     });
-  DeviceMotion.setUpdateInterval(1); // Fastest update interval (about 60Hz)
+  DeviceMotion.setUpdateInterval(15); // Fastest update interval (about 60Hz)
     return () => {
       subscription && subscription.remove();
     };
@@ -79,7 +79,7 @@ export default function HomeScreen() {
     function animate() {
       setSmoothYaw(prev => {
         // Interpolate toward targetYawRef.current
-        const lerp = 0.8; // increased smoothing factor for faster animation
+        const lerp = 1.0; // increased smoothing factor for faster animation
         const diff = targetYawRef.current - prev;
         // Handle wrap-around for angles
         let delta = diff;
