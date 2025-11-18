@@ -21,8 +21,10 @@ export default function PositionScreen() {
   const [recording, setRecording] = useState(false);
   const [accelHistory, setAccelHistory] = useState<Array<{ t: number; z: number }>>([]);
   const [deltaHistory, setDeltaHistory] = useState<Array<{ t: number; dz: number }>>([]);
-  // Pairwise sum history (sum of each consecutive pair of z accel values)
+    // Pairwise sum history (velocity estimation: sum of each consecutive pair of z accel values)
   const [pairwiseSumHistory, setPairwiseSumHistory] = useState<Array<{ t: number; sum: number }>>([]);
+    // Double sum history (position estimation: sum of each consecutive pair of velocity estimation values)
+    const [positionEstimationHistory, setPositionEstimationHistory] = useState<Array<{ t: number; sum: number }>>([]);
   const startTimeRef = useRef<number | null>(null);
   // Removed averaging buffer
 
@@ -114,6 +116,7 @@ export default function PositionScreen() {
   // Prepare data for plots
   const accelPoints = getPolylinePoints(accelHistory.map(d => ({ t: d.t, v: d.z })));
   const pairwiseSumPoints = getPolylinePoints(pairwiseSumHistory.map(d => ({ t: d.t, v: d.sum })));
+    const positionEstimationPoints = getPolylinePoints(positionEstimationHistory.map(d => ({ t: d.t, v: d.sum })));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -158,6 +161,20 @@ export default function PositionScreen() {
             <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
           </Svg>
         </View>
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 4 }}>position estimation</Text>
+            <Svg width={plotWidth} height={plotHeight} style={{ backgroundColor: '#222', borderRadius: 8 }}>
+              <Polyline
+                points={positionEstimationPoints}
+                fill="none"
+                stroke="#0fa"
+                strokeWidth="2"
+              />
+              {/* Axes */}
+              <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
+              <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
+            </Svg>
+          </View>
       </ScrollView>
       {/* Record button at bottom center */}
       <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
@@ -179,6 +196,7 @@ export default function PositionScreen() {
             setAccelHistory([]);
             setDeltaHistory([]);
             setPairwiseSumHistory([]);
+              setPositionEstimationHistory([]);
             startTimeRef.current = null;
           }}
           onPressOut={() => {
