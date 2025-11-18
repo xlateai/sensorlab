@@ -108,17 +108,17 @@ export default function HomeScreen() {
   // Calculate opacity based on distance between red dot and finger
   const redDotRadius = 6;
   let dotOpacity = 0.3;
-  let lineOpacity = 0.3;
+  let lineOpacity = 0.1;
   if (showRedDot && redDotPos && fingerPos) {
     const dx = fingerPos.x - redDotPos.x;
     const dy = fingerPos.y - redDotPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 5 * redDotRadius) {
+    if (dist > 5 * redDotRadius * 2) { // 5 diameters
       dotOpacity = 1;
       lineOpacity = 1;
     } else {
-      dotOpacity = 0.3;
-      lineOpacity = 0.3;
+  dotOpacity = 0.3;
+      lineOpacity = 0.1;
     }
   }
 
@@ -148,17 +148,17 @@ export default function HomeScreen() {
             cx={redDotPos.x}
             cy={redDotPos.y}
             r={6}
-        fill="red"
-        opacity={dotOpacity}
+            fill="red"
+            opacity={dotOpacity}
           />
           <Line
             x1={redDotPos.x}
             y1={redDotPos.y}
             x2={fingerPos.x}
             y2={fingerPos.y}
-        stroke="red"
-        strokeWidth={2}
-        opacity={lineOpacity}
+            stroke="red"
+            strokeWidth={2}
+            opacity={lineOpacity}
           />
         </Svg>
       )}
