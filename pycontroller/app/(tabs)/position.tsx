@@ -5,6 +5,10 @@ import { View, Text } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
 export default function PositionScreen() {
+  // Bias estimation state
+  const [biasMode, setBiasMode] = useState(false);
+  const [biasSamples, setBiasSamples] = useState<Array<{accel: [number, number, number], rotAdj: [number, number, number]}>>([]);
+  const [bias, setBias] = useState<{accel: [number, number, number], rotAdj: [number, number, number]} | null>(null);
   const [accel, setAccel] = useState<{x: number, y: number, z: number} | null>(null);
   const [rotAdjAccel, setRotAdjAccel] = useState<{x: number, y: number, z: number} | null>(null);
   const [pos, setPos] = useState<{x: number, y: number, z: number}>({x: 0, y: 0, z: 0});
@@ -20,8 +24,6 @@ export default function PositionScreen() {
       });
 
       // Rotation adjustment (normalize accel to world axes)
-      // DeviceMotion rotation: alpha (z), beta (x), gamma (y) in radians
-      // We'll apply ZYX rotation order (yaw, pitch, roll)
       const rot = data.rotation;
       let rotAdj = null;
       if (a && rot) {
@@ -33,27 +35,22 @@ export default function PositionScreen() {
         const gamma = rot.gamma ?? 0; // y (roll)
 
         // Build rotation matrices
-        // Rotation around Z (yaw)
         const Rz = [
           [Math.cos(alpha), -Math.sin(alpha), 0],
           [Math.sin(alpha),  Math.cos(alpha), 0],
           [0, 0, 1],
         ];
-        // Rotation around Y (roll)
         const Ry = [
           [Math.cos(gamma), 0, Math.sin(gamma)],
           [0, 1, 0],
           [-Math.sin(gamma), 0, Math.cos(gamma)],
         ];
-        // Rotation around X (pitch)
         const Rx = [
           [1, 0, 0],
           [0, Math.cos(beta), -Math.sin(beta)],
           [0, Math.sin(beta), Math.cos(beta)],
         ];
 
-        // Apply rotation: worldAccel = Rz * Ry * Rx * accel
-        // Matrix multiply: v' = Rz * Ry * Rx * v
         function matMul(m: number[][], v: number[]): number[] {
           return [
             m[0][0]*v[0] + m[0][1]*v[1] + m[0][2]*v[2],
@@ -77,12 +74,35 @@ export default function PositionScreen() {
         y: prev.y + (rotAdj ? rotAdj.y : 0),
         z: prev.z + (rotAdj ? rotAdj.z : 0),
       }));
+
+      // Bias estimation logic
+      if (biasMode && a && rotAdj) {
+        setBiasSamples(samples => [...samples, {
+          accel: [a.x ?? 0, a.y ?? 0, a.z ?? 0],
+          rotAdj: [rotAdj.x, rotAdj.y, rotAdj.z],
+        }]);
+      }
     });
     DeviceMotion.setUpdateInterval(50);
     return () => {
       sub && sub.remove();
     };
-  }, []);
+  }, [biasMode]);
+
+  // Compute bias when samples change
+  useEffect(() => {
+    if (biasSamples.length > 0) {
+      const n = biasSamples.length;
+      const sumAccel = biasSamples.reduce((acc, s) => [acc[0]+s.accel[0], acc[1]+s.accel[1], acc[2]+s.accel[2]], [0,0,0]);
+      const sumRotAdj = biasSamples.reduce((acc, s) => [acc[0]+s.rotAdj[0], acc[1]+s.rotAdj[1], acc[2]+s.rotAdj[2]], [0,0,0]);
+      setBias({
+        accel: [sumAccel[0]/n, sumAccel[1]/n, sumAccel[2]/n],
+        rotAdj: [sumRotAdj[0]/n, sumRotAdj[1]/n, sumRotAdj[2]/n],
+      });
+    } else {
+      setBias(null);
+    }
+  }, [biasSamples]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
@@ -124,11 +144,59 @@ export default function PositionScreen() {
             fontSize: 18,
             textAlign: 'center',
             overflow: 'hidden',
+            marginBottom: 16,
           }}
         >
           Set Origin
         </Text>
+        <Text
+          onPress={() => {
+            if (!biasMode) {
+              setBiasSamples([]);
+              setBias(null);
+            }
+            setBiasMode(b => !b);
+          }}
+          style={{
+            backgroundColor: biasMode ? '#e53935' : '#222',
+            color: '#fff',
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 16,
+            fontWeight: 'bold',
+            fontSize: 18,
+            textAlign: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          {biasMode ? 'Stop Bias Estimation' : 'Play Bias Estimation'}
+        </Text>
       </View>
+      {bias && (
+        <View style={{ marginTop: 24 }}>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', fontWeight: 'bold' }}>
+            Estimated Bias (avg delta × 1e4, scaling factor)
+          </Text>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+            accel x: {(bias.accel[0] * 1e4).toFixed(1)}
+          </Text>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+            accel y: {(bias.accel[1] * 1e4).toFixed(1)}
+          </Text>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+            accel z: {(bias.accel[2] * 1e4).toFixed(1)}
+          </Text>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', marginTop: 8 }}>
+            rot adj accel x: {(bias.rotAdj[0] * 1e4).toFixed(1)}
+          </Text>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+            rot adj accel y: {(bias.rotAdj[1] * 1e4).toFixed(1)}
+          </Text>
+          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+            rot adj accel z: {(bias.rotAdj[2] * 1e4).toFixed(1)}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
