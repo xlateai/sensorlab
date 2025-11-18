@@ -57,35 +57,6 @@ export default function DevScreen() {
     }
   }, [motionData]);
 
-  // Calculate offset and orientation
-  let dx = 0, dy = 0, dz = 0;
-  let yaw = 0, pitch = 0, roll = 0;
-  if (motionData && originRef.current) {
-    const acc = motionData.accelerationIncludingGravity;
-    const originAcc = originRef.current.position;
-    dx = acc.x - originAcc.x;
-    dy = acc.y - originAcc.y;
-    dz = acc.z - originAcc.z;
-    const rot = motionData.rotation;
-    yaw = rot.alpha;
-    pitch = rot.beta;
-    roll = rot.gamma;
-  }
-
-  // Tracked position state
-  const [position, setPosition] = useState({ x: 0, y: 0, z: 0 });
-
-  // Update tracked position by adding dx, dy, dz each measurement
-  useEffect(() => {
-    if (motionData && originRef.current) {
-      setPosition(prev => ({
-        x: prev.x + dx,
-        y: prev.y + dy,
-        z: prev.z + dz,
-      }));
-    }
-  }, [dx, dy, dz]);
-
   return (
       <View style={styles.container}>
         <Text style={styles.header}>Device Motion Sensor Table</Text>
@@ -99,7 +70,7 @@ export default function DevScreen() {
           </View>
           {/* Acceleration */}
           <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Acceleration</Text>
+            <Text style={styles.tableMeasurementCell}>acc</Text>
             <Text style={styles.tableCell}>{motionData?.acceleration?.x?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>{motionData?.acceleration?.y?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>{motionData?.acceleration?.z?.toFixed(3) ?? '-'}</Text>
@@ -107,47 +78,31 @@ export default function DevScreen() {
           </View>
           {/* Acceleration Including Gravity */}
           <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Acceleration+Gravity</Text>
+            <Text style={styles.tableMeasurementCell}>acc+grav</Text>
             <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.x?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.y?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.z?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>m/s²</Text>
           </View>
-          {/* Rotation Rate */}
-          <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Rotation Rate</Text>
-            <Text style={styles.tableCell}>{motionData?.rotationRate?.alpha?.toFixed(3) ?? '-'}</Text>
-            <Text style={styles.tableCell}>{motionData?.rotationRate?.beta?.toFixed(3) ?? '-'}</Text>
-            <Text style={styles.tableCell}>{motionData?.rotationRate?.gamma?.toFixed(3) ?? '-'}</Text>
-            <Text style={styles.tableCell}>deg/s</Text>
-          </View>
           {/* Rotation (Orientation) */}
           <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Rotation (Orientation)</Text>
+            <Text style={styles.tableMeasurementCell}>rot</Text>
             <Text style={styles.tableCell}>{motionData?.rotation?.alpha?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>{motionData?.rotation?.beta?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>{motionData?.rotation?.gamma?.toFixed(3) ?? '-'}</Text>
             <Text style={styles.tableCell}>deg</Text>
           </View>
-          {/* Tracked Position */}
+          {/* Rotation Rate */}
           <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Tracked Position</Text>
-            <Text style={styles.tableCell}>{position.x.toFixed(2)}</Text>
-            <Text style={styles.tableCell}>{position.y.toFixed(2)}</Text>
-            <Text style={styles.tableCell}>{position.z.toFixed(2)}</Text>
-            <Text style={styles.tableCell}>Δm/s²</Text>
-          </View>
-          {/* Delta Acceleration (dx, dy, dz) */}
-          <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Δ Acceleration</Text>
-            <Text style={styles.tableCell}>{dx.toFixed(2)}</Text>
-            <Text style={styles.tableCell}>{dy.toFixed(2)}</Text>
-            <Text style={styles.tableCell}>{dz.toFixed(2)}</Text>
-            <Text style={styles.tableCell}>Δm/s²</Text>
+            <Text style={styles.tableMeasurementCell}>rotΔ</Text>
+            <Text style={styles.tableCell}>{motionData?.rotationRate?.alpha?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.rotationRate?.beta?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.rotationRate?.gamma?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>deg/s</Text>
           </View>
           {/* Interval */}
           <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>Interval</Text>
+            <Text style={styles.tableMeasurementCell}>Interval</Text>
             <Text style={styles.tableCell}>{motionData?.interval ?? '-'}</Text>
             <Text style={styles.tableCell}>-</Text>
             <Text style={styles.tableCell}>-</Text>
@@ -162,6 +117,12 @@ export default function DevScreen() {
 }
 
 const styles = StyleSheet.create({
+  tableMeasurementCell: {
+    flex: 1,
+    color: '#fff',
+    textAlign: 'center',
+    padding: 2,
+  },
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -191,6 +152,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#222',
     paddingVertical: 4,
     paddingHorizontal: 2,
+    minHeight: 32,
+    alignItems: 'center',
   },
   tableHeader: {
     flex: 1,
