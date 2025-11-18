@@ -50,14 +50,28 @@ export default function PositionScreen() {
           const now = Date.now();
           if (startTimeRef.current === null) startTimeRef.current = now;
           const t = (now - startTimeRef.current) / 1000;
-          setAccelHistory(prev => {
-            const newArr = [...prev, { t, z: currentAccel }];
-            // Pairwise sum calculation
-            if (newArr.length >= 2) {
-              const prevZ = newArr[newArr.length - 2].z;
-              setPairwiseSumHistory(psh => [...psh, { t, sum: prevZ + currentAccel }]);
+          // Update accel history
+          setAccelHistory(prev => [...prev, { t, z: currentAccel }]);
+          // Update velocity estimation (pairwise sum)
+          setPairwiseSumHistory(prev => {
+            if (prev.length >= 1) {
+              const prevV = prev[prev.length - 1].sum;
+              return [...prev, { t, sum: prevV + currentAccel }];
+            } else {
+              return [{ t, sum: currentAccel }];
             }
-            return newArr;
+          });
+          // Update position estimation (double sum)
+          setPositionEstimationHistory(prev => {
+            if (prev.length >= 1 && pairwiseSumHistory.length >= 1) {
+              const prevP = prev[prev.length - 1].sum;
+              const currV = pairwiseSumHistory[pairwiseSumHistory.length - 1].sum;
+              return [...prev, { t, sum: prevP + currV }];
+            } else if (pairwiseSumHistory.length >= 1) {
+              return [{ t, sum: pairwiseSumHistory[pairwiseSumHistory.length - 1].sum }];
+            } else {
+              return prev;
+            }
           });
         }
       });
@@ -142,6 +156,8 @@ export default function PositionScreen() {
               stroke="#4af"
               strokeWidth="2"
             />
+            {/* Zero line */}
+            <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
             {/* Axes */}
             <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
             <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
@@ -156,6 +172,8 @@ export default function PositionScreen() {
               stroke="#fa4"
               strokeWidth="2"
             />
+            {/* Zero line */}
+            <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
             {/* Axes */}
             <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
             <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
@@ -170,6 +188,8 @@ export default function PositionScreen() {
                 stroke="#0fa"
                 strokeWidth="2"
               />
+              {/* Zero line */}
+              <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
               {/* Axes */}
               <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
               <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
