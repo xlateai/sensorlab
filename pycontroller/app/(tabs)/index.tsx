@@ -52,6 +52,21 @@ export default function HomeScreen() {
     }
   }, [motionData]);
 
+  // Track if initial re-origin has occurred
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (motionData && !isLoaded) {
+      setIsLoaded(true);
+    }
+  }, [motionData, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      handleReOrigin();
+    }
+  }, [isLoaded]);
+
   // Calculate offset and orientation
   let dx = 0, dy = 0, dz = 0;
   let yaw = 0, pitch = 0, roll = 0;
@@ -89,12 +104,6 @@ export default function HomeScreen() {
   // As the device rotates, the dot moves around the circumference, always pointing to the original orientation
   // Initial yaw (origin) is set when the app starts
   const initialYawRef = useRef<number | null>(null);
-  // Set origin on first load
-  useEffect(() => {
-    if (motionData && initialYawRef.current === null) {
-      initialYawRef.current = yaw;
-    }
-  }, [motionData, yaw]);
 
   // Re-origin handler
   const handleReOrigin = () => {
@@ -102,6 +111,13 @@ export default function HomeScreen() {
       initialYawRef.current = yaw;
     }
   };
+
+  // Set origin on first load
+  useEffect(() => {
+    if (motionData && initialYawRef.current === null) {
+      initialYawRef.current = yaw;
+    }
+  }, [motionData]);
 
   // Calculate relative angle from initial orientation
   const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
