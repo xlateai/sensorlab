@@ -74,9 +74,13 @@ export default function PositionScreen() {
         setRotAdjAccel(null);
       }
 
-      // Accumulate position by adding accel z directly
+      // Accumulate position by adding accel z with jerk's sign
       if (a?.z !== undefined && a?.z !== null) {
-        setPos(prev => prev + Math.round(a.z));
+        let signedAccel = a.z;
+        if (jerk !== null) {
+          signedAccel = Math.abs(a.z) * Math.sign(jerk);
+        }
+        setPos(prev => prev + Math.round(signedAccel));
       }
     });
     DeviceMotion.setUpdateInterval(150);
