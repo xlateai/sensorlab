@@ -63,7 +63,8 @@ export default function HomeScreen() {
   // Calculate relative angle from initial orientation
   let relativeYaw = 0;
   if (motionData && initialYawRef.current !== null) {
-    relativeYaw = motionData.rotation.alpha - initialYawRef.current;
+    // Reverse the rotational direction
+    relativeYaw = -(motionData.rotation.alpha - initialYawRef.current);
   }
 
   // Compass visualization
@@ -76,7 +77,8 @@ export default function HomeScreen() {
   const circleCenterX = center;
   const circleCenterY = center;
   // Dot rotates around the edge
-  const dotAngle = relativeYaw;
+  // Add 180 degree (π radians) bias to the dot's rotation
+  const dotAngle = relativeYaw + Math.PI;
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
