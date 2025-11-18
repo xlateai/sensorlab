@@ -137,24 +137,38 @@ export default function HomeScreen() {
     if (trueBearingDeg < 0) trueBearingDeg += 360;
   }
 
-  // Touch handlers
+  // Double tap to enable reorigin drag/line
+  const DOUBLE_TAP_DELAY = 300; // ms
+  const [readyForDrag, setReadyForDrag] = useState(false);
+
   const handlePressIn = (event: any) => {
-    const { pageX, pageY } = event.nativeEvent;
-    setRedDotPos({ x: pageX, y: pageY });
-    setFingerPos({ x: pageX, y: pageY });
-    setShowRedDot(true);
+    const now = Date.now();
+    if (lastTapRef.current && now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      setReadyForDrag(true);
+      const { pageX, pageY } = event.nativeEvent;
+      setRedDotPos({ x: pageX, y: pageY });
+      setFingerPos({ x: pageX, y: pageY });
+      setShowRedDot(true);
+    } else {
+      setReadyForDrag(false);
+      setShowRedDot(false);
+      setRedDotPos(null);
+      setFingerPos(null);
+    }
+    lastTapRef.current = now;
     if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
   };
 
   const handlePressMove = (event: any) => {
-    if (showRedDot) {
+    if (readyForDrag && showRedDot) {
       const { pageX, pageY } = event.nativeEvent;
       setFingerPos({ x: pageX, y: pageY });
     }
   };
 
   const handlePressOut = () => {
-    if (showRedDot) {
+    if (readyForDrag && showRedDot) {
       // Only re-origin if finger is past faded distance
       if (redDotPos && fingerPos) {
         const dx = fingerPos.x - redDotPos.x;
@@ -176,6 +190,7 @@ export default function HomeScreen() {
       setShowRedDot(false);
       setRedDotPos(null);
       setFingerPos(null);
+      setReadyForDrag(false);
     }
   };
 
