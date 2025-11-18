@@ -85,19 +85,31 @@ export default function HomeScreen() {
   const compassSize = 200;
   const center = compassSize / 2;
   const dotRadius = 8;
-  // Place dot at outer edge of circle (0 degrees, rightmost point)
-  const dotAngle = 0; // radians, can be changed for rotation
-  const dotX = center + (center - dotRadius) * Math.cos(dotAngle);
-  const dotY = center + (center - dotRadius) * Math.sin(dotAngle);
+  // The dot should start at the top center (0 radians = top)
+  // As the device rotates, the dot moves around the circumference, always pointing to the original orientation
+  // Initial yaw (origin) is set when the app starts
+  const initialYawRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (motionData && initialYawRef.current === null) {
+      initialYawRef.current = yaw;
+    }
+  }, [motionData, yaw]);
+
+  // Calculate relative angle from initial orientation
+  const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
+  // Dot angle: 0 radians is top, positive is clockwise
+  const dotAngle = -relativeYaw; // negative to match compass direction
+  const dotX = center + (center - dotRadius) * Math.sin(dotAngle);
+  const dotY = center - (center - dotRadius) * Math.cos(dotAngle);
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Compass</Text>
       <View style={{ width: compassSize, height: compassSize, borderRadius: compassSize / 2, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', marginBottom: 24 }}>
-        {/* Neon green dot at circumference */}
+        {/* Neon green dot at circumference, moves with device rotation */}
         <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
       </View>
-      <Text style={styles.instructions}>Neon green dot at the edge of the circle.</Text>
+      <Text style={styles.instructions}>Dot always points to original orientation. Rotate your device to see it move.</Text>
     </View>
   );
 }
