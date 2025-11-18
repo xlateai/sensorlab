@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Button, View, Pressable } from 'react-native';
+import { Dimensions, Button, View, Pressable, Text } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
-import Svg, { Circle, Line } from 'react-native-svg';
+import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 
 type Origin = {
   position: DeviceMotionMeasurement['accelerationIncludingGravity'];
@@ -111,6 +111,29 @@ export default function HomeScreen() {
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
+  // North and South indicator dots (true north/south using device heading)
+  const indicatorRadius = 6;
+  let northX = circleCenterX;
+  let northY = circleCenterY;
+  let southX = circleCenterX;
+  let southY = circleCenterY;
+  if (motionData) {
+    // Subtract 90 degrees (Math.PI/2) so north is at top
+    const northAngle = motionData.rotation.alpha - Math.PI / 2;
+    const southAngle = motionData.rotation.alpha + Math.PI - Math.PI / 2;
+    northX = circleCenterX + ringRadius * Math.sin(northAngle);
+    northY = circleCenterY - ringRadius * Math.cos(northAngle);
+    southX = circleCenterX + ringRadius * Math.sin(southAngle);
+    southY = circleCenterY - ringRadius * Math.cos(southAngle);
+  }
+
+  // True bearing calculation (0 = North, 90 = East, etc.)
+  let trueBearingDeg = 0;
+  if (motionData) {
+    trueBearingDeg = (motionData.rotation.alpha * 180 / Math.PI) % 360;
+    if (trueBearingDeg < 0) trueBearingDeg += 360;
+  }
+
   // Touch handlers
   const handlePressIn = (event: any) => {
     const { pageX, pageY } = event.nativeEvent;
@@ -183,6 +206,10 @@ export default function HomeScreen() {
         style={{ position: 'absolute', left: (screenWidth - compassSize) / 2, top: (screenHeight - compassSize) / 2, backgroundColor: 'transparent' }}
       >
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+        {/* North and South indicator dots */}
+        <Circle cx={northX} cy={northY} r={indicatorRadius} fill="#fff" />
+        <Circle cx={southX} cy={southY} r={indicatorRadius} fill="red" />
+        {/* Main green dot */}
         <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
         {/* White direction line from center */}
         {showRedDot && redDotPos && fingerPos && (
