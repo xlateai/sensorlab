@@ -8,12 +8,26 @@ export default function PositionScreen() {
   const [accel, setAccel] = useState<number | null>(null);
   const [rotAdjAccel, setRotAdjAccel] = useState<number | null>(null);
   const [pos, setPos] = useState<number>(0);
-  const lastUpdateRef = useRef<number>(Date.now());
+  const prevAccelRef = useRef<number | null>(null);
+  const prevPrevAccelRef = useRef<number | null>(null);
+  const [jerk, setJerk] = useState<number | null>(null);
+  // Removed averaging buffer
 
   useEffect(() => {
     const sub = DeviceMotion.addListener(data => {
       const a = data.acceleration;
-      setAccel(a?.z ?? 0);
+      const currentAccel = a?.z ?? 0;
+      setAccel(currentAccel);
+
+      // Calculate jerk (delta delta accel z)
+      if (prevAccelRef.current !== null && prevPrevAccelRef.current !== null) {
+        const jerkVal = currentAccel - 2 * prevAccelRef.current + prevPrevAccelRef.current;
+        setJerk(jerkVal);
+      } else {
+        setJerk(null);
+      }
+      prevPrevAccelRef.current = prevAccelRef.current;
+      prevAccelRef.current = currentAccel;
 
       // Rotation adjustment (normalize accel to world axes)
       const rot = data.rotation;
@@ -60,12 +74,12 @@ export default function PositionScreen() {
         setRotAdjAccel(null);
       }
 
-      // Estimate position by accumulating rot adj accel (no bias subtraction)
-      setPos(prev => prev + (rotAdj !== null ? rotAdj : 0));
-
-      // Bias estimation logic
+      // Accumulate position by adding accel z directly
+      if (a?.z !== undefined && a?.z !== null) {
+        setPos(prev => prev + Math.round(a.z));
+      }
     });
-    DeviceMotion.setUpdateInterval(50);
+    DeviceMotion.setUpdateInterval(150);
     return () => {
       sub && sub.remove();
     };
@@ -92,6 +106,15 @@ export default function PositionScreen() {
           }}
         >
           accel z: {accel !== null ? accel.toFixed(1) : '-'}
+        </Text>
+        <Text
+          style={{
+            color: jerk !== null && jerk > 0 ? '#39ff14' : jerk !== null && jerk < 0 ? '#e53935' : '#888',
+            fontSize: 14,
+            textAlign: 'center',
+          }}
+        >
+          jerk z: {jerk !== null ? jerk.toFixed(3) : '-'}
         </Text>
       </View>
       <View style={{ marginTop: 8 }}>
