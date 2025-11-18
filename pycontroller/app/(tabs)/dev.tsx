@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Button } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
+import type { DeviceMotionMeasurement } from 'expo-sensors';
+
+type OriginType = {
+  position: DeviceMotionMeasurement['accelerationIncludingGravity'];
+  orientation: DeviceMotionMeasurement['rotation'];
+};
 
 export default function DevScreen() {
   // Handler to reset positional origin only
@@ -28,8 +34,8 @@ export default function DevScreen() {
       };
     }
   };
-  const [motionData, setMotionData] = useState(null);
-  const originRef = useRef(null);
+  const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
+  const originRef = useRef<OriginType | null>(null);
 
   useEffect(() => {
     let subscription = DeviceMotion.addListener(data => {
@@ -81,24 +87,77 @@ export default function DevScreen() {
   }, [dx, dy, dz]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Device Motion Reader</Text>
-      <Text style={styles.label}>Yaw: {yaw.toFixed(2)}</Text>
-      <Text style={styles.label}>Pitch: {pitch.toFixed(2)}</Text>
-      <Text style={styles.label}>Roll: {roll.toFixed(2)}</Text>
-      <Text style={styles.label}>Acceleration (dx, dy, dz):</Text>
-      <Text style={styles.value}>dx: {dx.toFixed(2)}</Text>
-      <Text style={styles.value}>dy: {dy.toFixed(2)}</Text>
-      <Text style={styles.value}>dz: {dz.toFixed(2)}</Text>
-      <Text style={styles.label}>Tracked Position (x, y, z):</Text>
-      <Text style={styles.value}>x: {position.x.toFixed(2)}</Text>
-      <Text style={styles.value}>y: {position.y.toFixed(2)}</Text>
-      <Text style={styles.value}>z: {position.z.toFixed(2)}</Text>
-      <Text style={styles.instructions}>Move your device to see changes. Origin is set at app start.</Text>
-      <Text style={styles.instructions}>Note: dx, dy, dz may fluctuate due to sensor noise even when the phone is still.</Text>
-      <Button title="Positional Re-Origin" onPress={handlePositionalReOrigin} />
-      <Button title="Rotational Re-Origin" onPress={handleRotationalReOrigin} />
-    </View>
+      <View style={styles.container}>
+        <Text style={styles.header}>Device Motion Sensor Table</Text>
+        <View style={styles.tableContainer}>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableHeader}>Measurement</Text>
+            <Text style={styles.tableHeader}>X</Text>
+            <Text style={styles.tableHeader}>Y</Text>
+            <Text style={styles.tableHeader}>Z</Text>
+            <Text style={styles.tableHeader}>Other</Text>
+          </View>
+          {/* Acceleration */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Acceleration</Text>
+            <Text style={styles.tableCell}>{motionData?.acceleration?.x?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.acceleration?.y?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.acceleration?.z?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>m/s²</Text>
+          </View>
+          {/* Acceleration Including Gravity */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Acceleration+Gravity</Text>
+            <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.x?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.y?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.z?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>m/s²</Text>
+          </View>
+          {/* Rotation Rate */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Rotation Rate</Text>
+            <Text style={styles.tableCell}>{motionData?.rotationRate?.alpha?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.rotationRate?.beta?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.rotationRate?.gamma?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>deg/s</Text>
+          </View>
+          {/* Rotation (Orientation) */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Rotation (Orientation)</Text>
+            <Text style={styles.tableCell}>{motionData?.rotation?.alpha?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.rotation?.beta?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>{motionData?.rotation?.gamma?.toFixed(3) ?? '-'}</Text>
+            <Text style={styles.tableCell}>deg</Text>
+          </View>
+          {/* Tracked Position */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Tracked Position</Text>
+            <Text style={styles.tableCell}>{position.x.toFixed(2)}</Text>
+            <Text style={styles.tableCell}>{position.y.toFixed(2)}</Text>
+            <Text style={styles.tableCell}>{position.z.toFixed(2)}</Text>
+            <Text style={styles.tableCell}>Δm/s²</Text>
+          </View>
+          {/* Delta Acceleration (dx, dy, dz) */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Δ Acceleration</Text>
+            <Text style={styles.tableCell}>{dx.toFixed(2)}</Text>
+            <Text style={styles.tableCell}>{dy.toFixed(2)}</Text>
+            <Text style={styles.tableCell}>{dz.toFixed(2)}</Text>
+            <Text style={styles.tableCell}>Δm/s²</Text>
+          </View>
+          {/* Interval */}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Interval</Text>
+            <Text style={styles.tableCell}>{motionData?.interval ?? '-'}</Text>
+            <Text style={styles.tableCell}>-</Text>
+            <Text style={styles.tableCell}>-</Text>
+            <Text style={styles.tableCell}>ms</Text>
+          </View>
+        </View>
+        <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
+        <Button title="Positional Re-Origin" onPress={handlePositionalReOrigin} />
+        <Button title="Rotational Re-Origin" onPress={handleRotationalReOrigin} />
+      </View>
   );
 }
 
@@ -116,14 +175,37 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontWeight: 'bold',
   },
-  label: {
-    fontSize: 18,
-    color: '#fff',
-    marginTop: 8,
+  tableContainer: {
+    borderWidth: 1,
+    borderColor: '#444',
+    borderRadius: 8,
+    marginBottom: 16,
+    backgroundColor: '#111',
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
   },
-  value: {
-    fontSize: 16,
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  tableHeader: {
+    flex: 1,
+    fontWeight: 'bold',
     color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 2,
+  },
+  tableCell: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    textAlign: 'center',
+    padding: 2,
   },
   instructions: {
     fontSize: 14,
