@@ -1,4 +1,7 @@
+// ...existing code...
+// Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
+import type { Subscription } from 'expo-sensors';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView } from 'react-native';
 import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
 import type { DeviceMotionMeasurement } from 'expo-sensors';
@@ -13,30 +16,94 @@ export default function DevScreen() {
   const [magnetometerData, setMagnetometerData] = useState<{x: number, y: number, z: number} | null>(null);
   const [gyroscopeData, setGyroscopeData] = useState<{x: number, y: number, z: number} | null>(null);
   const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
+  const [paused, setPaused] = useState(true); // default to paused
+
+  // Store subscriptions in refs so we can kill them on pause and recreate on play
+  const motionSubRef = useRef<any>(null);
+  const magSubRef = useRef<any>(null);
+  const gyroSubRef = useRef<any>(null);
+  const baroSubRef = useRef<any>(null);
+
+  // Helper to kill all listeners
+  const killAllListeners = () => {
+  motionSubRef.current && motionSubRef.current.remove();
+  magSubRef.current && magSubRef.current.remove();
+  gyroSubRef.current && gyroSubRef.current.remove();
+  baroSubRef.current && baroSubRef.current.remove();
+  motionSubRef.current = null;
+  magSubRef.current = null;
+  gyroSubRef.current = null;
+  baroSubRef.current = null;
+  // Explicitly remove all listeners at native level
+  try { DeviceMotion.removeAllListeners(); } catch {}
+  try { Magnetometer.removeAllListeners(); } catch {}
+  try { Gyroscope.removeAllListeners(); } catch {}
+  try { Barometer.removeAllListeners(); } catch {}
+    // Explicitly remove all listeners at native level
+    try { DeviceMotion.removeAllListeners(); } catch {}
+    try { Magnetometer.removeAllListeners(); } catch {}
+    try { Gyroscope.removeAllListeners(); } catch {}
+    try { Barometer.removeAllListeners(); } catch {}
+  };
 
   useEffect(() => {
-    const motionSub = DeviceMotion.addListener(setMotionData);
-    const magSub = Magnetometer.addListener(setMagnetometerData);
-    const gyroSub = Gyroscope.addListener(setGyroscopeData);
-    const baroSub = Barometer.addListener(setBarometerData);
+    if (!paused) {
+      killAllListeners(); // Always kill before creating new
+      motionSubRef.current = DeviceMotion.addListener(setMotionData);
+      magSubRef.current = Magnetometer.addListener(setMagnetometerData);
+      gyroSubRef.current = Gyroscope.addListener(setGyroscopeData);
+      baroSubRef.current = Barometer.addListener(setBarometerData);
 
-    DeviceMotion.setUpdateInterval(100);
-    Magnetometer.setUpdateInterval(100);
-    Gyroscope.setUpdateInterval(100);
-    Barometer.setUpdateInterval(500);
-
+      DeviceMotion.setUpdateInterval(100);
+      Magnetometer.setUpdateInterval(100);
+      Gyroscope.setUpdateInterval(100);
+      Barometer.setUpdateInterval(500);
+    } else {
+      killAllListeners();
+      // Clear sensor data state to stop background updates
+      setMotionData(null);
+      setMagnetometerData(null);
+      setGyroscopeData(null);
+      setBarometerData(null);
+    }
+    // Clean up on unmount or tab switch
     return () => {
-      motionSub && motionSub.remove();
-      magSub && magSub.remove();
-      gyroSub && gyroSub.remove();
-      baroSub && baroSub.remove();
+      killAllListeners();
+      setMotionData(null);
+      setMagnetometerData(null);
+      setGyroscopeData(null);
+      setBarometerData(null);
     };
-  }, []);
+  }, [paused]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
+          {/* Modern Play/Pause Toggle Button */}
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            <Text
+              onPress={() => setPaused(p => !p)}
+              style={{
+                backgroundColor: paused ? '#222' : '#e53935',
+                color: '#fff',
+                paddingHorizontal: 36,
+                paddingVertical: 14,
+                borderRadius: 32,
+                fontWeight: '600',
+                fontSize: 20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 2,
+                letterSpacing: 1,
+                marginBottom: 0,
+              }}
+            >
+              {paused ? '▶ Play' : '⏸ Pause'}
+            </Text>
+          </View>
           <Text style={styles.header}>Device Motion Sensor Table</Text>
           {/* Motion Data Table */}
           <View style={[styles.tableContainer, styles.motionTable]}>

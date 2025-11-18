@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Dimensions, Button, View, Pressable, Text } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
@@ -27,15 +28,17 @@ export default function HomeScreen() {
   const lastTapRef = useRef<number | null>(null);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const subscription = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
-      setMotionData(data);
-    });
-  DeviceMotion.setUpdateInterval(15); // Fastest update interval (about 60Hz)
-    return () => {
-      subscription && subscription.remove();
-    };
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const subscription = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
+        setMotionData(data);
+      });
+      DeviceMotion.setUpdateInterval(15); // Fastest update interval (about 60Hz)
+      return () => {
+        subscription && subscription.remove();
+      };
+    }, [])
+  );
 
   // Set origin on first data
   useEffect(() => {
