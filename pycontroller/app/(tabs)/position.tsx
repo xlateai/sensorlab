@@ -5,10 +5,6 @@ import { View, Text } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
 export default function PositionScreen() {
-  // Bias estimation state
-  const [biasMode, setBiasMode] = useState(false);
-  const [biasSamples, setBiasSamples] = useState<Array<{accel: [number, number, number], rotAdj: [number, number, number]}>>([]);
-  const [bias, setBias] = useState<{accel: [number, number, number], rotAdj: [number, number, number]} | null>(null);
   const [accel, setAccel] = useState<number | null>(null);
   const [rotAdjAccel, setRotAdjAccel] = useState<number | null>(null);
   const [pos, setPos] = useState<number>(0);
@@ -64,41 +60,17 @@ export default function PositionScreen() {
         setRotAdjAccel(null);
       }
 
-      // Estimate position by accumulating rot adj accel minus bias (if available and not currently estimating)
-      let bz = 0;
-      if (!biasMode && bias && bias.rotAdj) {
-        bz = bias.rotAdj[2];
-      }
-      setPos(prev => prev + (rotAdj !== null ? rotAdj - bz : 0));
+      // Estimate position by accumulating rot adj accel (no bias subtraction)
+      setPos(prev => prev + (rotAdj !== null ? rotAdj : 0));
 
       // Bias estimation logic
-      if (biasMode && a && rotAdj !== null) {
-        setBiasSamples(samples => [...samples, {
-          accel: [0, 0, a.z ?? 0],
-          rotAdj: [0, 0, rotAdj],
-        }]);
-      }
     });
     DeviceMotion.setUpdateInterval(50);
     return () => {
       sub && sub.remove();
     };
-  }, [biasMode]);
+  }, []);
 
-  // Compute bias when samples change
-  useEffect(() => {
-    if (biasSamples.length > 0) {
-      const n = biasSamples.length;
-      const sumAccel = biasSamples.reduce((acc, s) => acc + s.accel[2], 0);
-      const sumRotAdj = biasSamples.reduce((acc, s) => acc + s.rotAdj[2], 0);
-      setBias({
-        accel: [0, 0, sumAccel/n],
-        rotAdj: [0, 0, sumRotAdj/n],
-      });
-    } else {
-      setBias(null);
-    }
-  }, [biasSamples]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
@@ -146,60 +118,11 @@ export default function PositionScreen() {
             fontSize: 18,
             textAlign: 'center',
             overflow: 'hidden',
-            marginBottom: 16,
           }}
         >
           Set Origin
         </Text>
-        <Text
-          onPress={() => {
-            if (!biasMode) {
-              setBiasSamples([]);
-              setBias(null);
-            }
-            setBiasMode(b => !b);
-          }}
-          style={{
-            backgroundColor: biasMode ? '#e53935' : '#222',
-            color: '#fff',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 16,
-            fontWeight: 'bold',
-            fontSize: 18,
-            textAlign: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          {biasMode ? 'Stop Bias Estimation' : 'Play Bias Estimation'}
-        </Text>
       </View>
-      {bias && (
-        <View style={{ marginTop: 24 }}>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', fontWeight: 'bold' }}>
-            Estimated Bias (avg delta × 1e4, scaling factor)
-          </Text>
-          <Text
-            style={{
-              color: bias.accel[2] * 1e4 > 1 ? '#39ff14' : bias.accel[2] * 1e4 < -1 ? '#e53935' : '#888',
-              fontSize: 14,
-              textAlign: 'center',
-            }}
-          >
-            accel z: {(bias.accel[2] * 1e4).toFixed(1)}
-          </Text>
-          <Text
-            style={{
-              color: bias.rotAdj[2] * 1e4 > 1 ? '#39ff14' : bias.rotAdj[2] * 1e4 < -1 ? '#e53935' : '#888',
-              fontSize: 14,
-              textAlign: 'center',
-              marginTop: 8,
-            }}
-          >
-            rot adj accel z: {(bias.rotAdj[2] * 1e4).toFixed(1)}
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
