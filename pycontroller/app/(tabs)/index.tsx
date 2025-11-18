@@ -4,31 +4,6 @@ import { StyleSheet, View, Text, Button } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
 export default function HomeScreen() {
-  // Handler to reset positional origin only
-  const handlePositionalReOrigin = () => {
-    if (motionData && originRef.current) {
-      originRef.current.position = motionData.accelerationIncludingGravity;
-      setPosition({ x: 0, y: 0, z: 0 });
-    } else if (motionData) {
-      originRef.current = {
-        position: motionData.accelerationIncludingGravity,
-        orientation: motionData.rotation,
-      };
-      setPosition({ x: 0, y: 0, z: 0 });
-    }
-  };
-
-  // Handler to reset rotational origin only
-  const handleRotationalReOrigin = () => {
-    if (motionData && originRef.current) {
-      originRef.current.orientation = motionData.rotation;
-    } else if (motionData) {
-      originRef.current = {
-        position: motionData.accelerationIncludingGravity,
-        orientation: motionData.rotation,
-      };
-    }
-  };
   const [motionData, setMotionData] = useState(null);
   const originRef = useRef(null);
 
