@@ -6,11 +6,9 @@ import { DeviceMotion } from 'expo-sensors';
 
 export default function PositionScreen() {
   const [accel, setAccel] = useState<number | null>(null);
-  const [rotAdjAccel, setRotAdjAccel] = useState<number | null>(null);
   const [pos, setPos] = useState<number>(0);
-  const prevAccelRef = useRef<number | null>(null);
-  const prevPrevAccelRef = useRef<number | null>(null);
-  const [jerk, setJerk] = useState<number | null>(null);
+  const prevPosRef = useRef<number | null>(null);
+  const [delta, setDelta] = useState<number>(0);
   // Removed averaging buffer
 
   useEffect(() => {
@@ -18,72 +16,19 @@ export default function PositionScreen() {
       const a = data.acceleration;
       const currentAccel = a?.z ?? 0;
       setAccel(currentAccel);
-
-      // Calculate jerk (delta delta accel z)
-      if (prevAccelRef.current !== null && prevPrevAccelRef.current !== null) {
-        const jerkVal = currentAccel - 2 * prevAccelRef.current + prevPrevAccelRef.current;
-        setJerk(jerkVal);
-      } else {
-        setJerk(null);
-      }
-      prevPrevAccelRef.current = prevAccelRef.current;
-      prevAccelRef.current = currentAccel;
-
-      // Rotation adjustment (normalize accel to world axes)
-      const rot = data.rotation;
-      let rotAdj = null;
-      if (a && rot) {
-        const ax = a.x ?? 0;
-        const ay = a.y ?? 0;
-        const az = a.z ?? 0;
-        const alpha = rot.alpha ?? 0; // z (yaw)
-        const beta = rot.beta ?? 0;  // x (pitch)
-        const gamma = rot.gamma ?? 0; // y (roll)
-
-        // Build rotation matrices
-        const Rz = [
-          [Math.cos(alpha), -Math.sin(alpha), 0],
-          [Math.sin(alpha),  Math.cos(alpha), 0],
-          [0, 0, 1],
-        ];
-        const Ry = [
-          [Math.cos(gamma), 0, Math.sin(gamma)],
-          [0, 1, 0],
-          [-Math.sin(gamma), 0, Math.cos(gamma)],
-        ];
-        const Rx = [
-          [1, 0, 0],
-          [0, Math.cos(beta), -Math.sin(beta)],
-          [0, Math.sin(beta), Math.cos(beta)],
-        ];
-
-        function matMul(m: number[][], v: number[]): number[] {
-          return [
-            m[0][0]*v[0] + m[0][1]*v[1] + m[0][2]*v[2],
-            m[1][0]*v[0] + m[1][1]*v[1] + m[1][2]*v[2],
-            m[2][0]*v[0] + m[2][1]*v[1] + m[2][2]*v[2],
-          ];
+      setPos(prev => {
+        const newPos = prev + currentAccel;
+        // Calculate delta (rate of change)
+        if (prevPosRef.current !== null) {
+          setDelta(newPos - prevPosRef.current);
+        } else {
+          setDelta(0);
         }
-        let v = [ax, ay, az];
-        v = matMul(Rx, v);
-        v = matMul(Ry, v);
-        v = matMul(Rz, v);
-        rotAdj = v[2];
-        setRotAdjAccel(rotAdj);
-      } else {
-        setRotAdjAccel(null);
-      }
-
-      // Accumulate position by adding accel z with jerk's sign
-      if (a?.z !== undefined && a?.z !== null) {
-        let signedAccel = a.z;
-        if (jerk !== null) {
-          signedAccel = Math.abs(a.z) * Math.sign(jerk);
-        }
-        setPos(prev => prev + Math.round(signedAccel));
-      }
+        prevPosRef.current = newPos;
+        return newPos;
+      });
     });
-    DeviceMotion.setUpdateInterval(150);
+    DeviceMotion.setUpdateInterval(24);
     return () => {
       sub && sub.remove();
     };
@@ -92,64 +37,49 @@ export default function PositionScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <Text
-        style={{
-          color: pos > 0 ? '#39ff14' : pos < 0 ? '#e53935' : '#888',
-          fontSize: 28,
-          fontWeight: 'bold',
-        }}
-      >
-        z: {pos.toFixed(2)}
-      </Text>
-      <View style={{ marginTop: 24 }}>
-        <Text
-          style={{
-            color: accel !== null && accel > 0 ? '#39ff14' : accel !== null && accel < 0 ? '#e53935' : '#888',
-            fontSize: 14,
-            textAlign: 'center',
-          }}
-        >
-          accel z: {accel !== null ? accel.toFixed(1) : '-'}
-        </Text>
-        <Text
-          style={{
-            color: jerk !== null && jerk > 0 ? '#39ff14' : jerk !== null && jerk < 0 ? '#e53935' : '#888',
-            fontSize: 14,
-            textAlign: 'center',
-          }}
-        >
-          jerk z: {jerk !== null ? jerk.toFixed(3) : '-'}
-        </Text>
-      </View>
-      <View style={{ marginTop: 8 }}>
-        <Text
-          style={{
-            color: rotAdjAccel !== null && rotAdjAccel > 0 ? '#39ff14' : rotAdjAccel !== null && rotAdjAccel < 0 ? '#e53935' : '#888',
-            fontSize: 14,
-            textAlign: 'center',
-          }}
-        >
-          rot adj accel z: {rotAdjAccel !== null ? rotAdjAccel.toFixed(1) : '-'}
-        </Text>
-      </View>
-      <View style={{ marginTop: 32 }}>
-        <Text
-          onPress={() => setPos(0)}
-          style={{
-            backgroundColor: '#222',
-            color: '#fff',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 16,
-            fontWeight: 'bold',
-            fontSize: 18,
-            textAlign: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          Set Origin
-        </Text>
-      </View>
+      {/* Blended color circle based on z rate of change */}
+      {(() => {
+        // Clamp delta to [-1, 1] for color blending
+        const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+        const normDelta = clamp(delta / 5, -1, 1); // scale factor for sensitivity
+        // Colors: green #39ff14, red #e53935, gray #888
+        // Blend between green and red, pass through gray at zero
+        // We'll interpolate RGB
+        const green = { r: 57, g: 255, b: 20 };
+        const red = { r: 229, g: 57, b: 53 };
+        const gray = { r: 136, g: 136, b: 136 };
+
+        let color;
+        if (Math.abs(normDelta) < 0.05) {
+          // Near zero, use gray
+          color = gray;
+        } else if (normDelta > 0) {
+          // Blend gray to green
+          color = {
+            r: Math.round(gray.r + (green.r - gray.r) * normDelta),
+            g: Math.round(gray.g + (green.g - gray.g) * normDelta),
+            b: Math.round(gray.b + (green.b - gray.b) * normDelta),
+          };
+        } else {
+          // Blend gray to red
+          color = {
+            r: Math.round(gray.r + (red.r - gray.r) * -normDelta),
+            g: Math.round(gray.g + (red.g - gray.g) * -normDelta),
+            b: Math.round(gray.b + (red.b - gray.b) * -normDelta),
+          };
+        }
+        const colorStr = `rgb(${color.r},${color.g},${color.b})`;
+        return (
+          <View
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 60,
+              backgroundColor: colorStr,
+            }}
+          />
+        );
+      })()}
     </View>
   );
 }
