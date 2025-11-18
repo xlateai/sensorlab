@@ -143,9 +143,9 @@ export default function HomeScreen() {
             const dx = fingerPos.x - redDotPos.x;
             const dy = fingerPos.y - redDotPos.y;
             const angle = Math.atan2(dy, dx);
-            // Line length is proportional to distance between red dot and finger, capped at 25% of ringRadius
+            // Line length is proportional to distance between red dot and finger, capped at full ringRadius
             const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxLen = ringRadius * 0.25;
+            const maxLen = ringRadius;
             const len = Math.min(dist, maxLen);
             const x2 = circleCenterX + Math.cos(angle) * len;
             const y2 = circleCenterY + Math.sin(angle) * len;
