@@ -1,14 +1,20 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Button } from 'react-native';
-import { DeviceMotion } from 'expo-sensors';
+import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
+import Svg, { Circle } from 'react-native-svg';
+
+type Origin = {
+  position: DeviceMotionMeasurement['accelerationIncludingGravity'];
+  orientation: DeviceMotionMeasurement['rotation'];
+};
 
 export default function HomeScreen() {
-  const [motionData, setMotionData] = useState(null);
-  const originRef = useRef(null);
+  const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
+  const originRef = useRef<Origin | null>(null);
 
   useEffect(() => {
-    let subscription = DeviceMotion.addListener(data => {
+    const subscription = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
       setMotionData(data);
     });
     DeviceMotion.setUpdateInterval(100);
@@ -75,9 +81,8 @@ export default function HomeScreen() {
   const compassSize = 200;
   const center = compassSize / 2;
   const dotRadius = 8;
-  // The dot should start at the top center (0 radians = top)
-  // As the device rotates, the dot moves around the circumference, always pointing to the original orientation
-  // Initial yaw (origin) is set when the app starts
+  const ringStroke = 2;
+  const ringRadius = center - ringStroke / 2;
   const initialYawRef = useRef<number | null>(null);
 
   // Re-origin handler
@@ -97,13 +102,19 @@ export default function HomeScreen() {
   // Calculate relative angle from initial orientation
   const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
   // Dot angle: 0 radians is top, positive is clockwise
-  const dotAngle = relativeYaw; // invert direction so left turn moves dot rightward
-  const dotX = center + (center - dotRadius) * Math.sin(dotAngle);
-  const dotY = center - (center - dotRadius) * Math.cos(dotAngle);
+  const dotAngle = relativeYaw;
+  // Dot sits exactly on the ring
+  const dotX = center + ringRadius * Math.sin(dotAngle);
+  const dotY = center - ringRadius * Math.cos(dotAngle);
 
   return (
     <View style={styles.container}>
-      <View style={{ width: compassSize, height: compassSize, borderRadius: compassSize / 2, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', marginBottom: 24 }}>
+      <View style={{ width: compassSize, height: compassSize, justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
+        {/* SVG ring for perfect circle, thin border, no fill */}
+        <Svg width={compassSize} height={compassSize} style={{ position: 'absolute', left: 0, top: 0 }}>
+          <Circle cx={center} cy={center} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+        </Svg>
+        {/* Neon green dot at circumference, moves with device rotation */}
         <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
       </View>
       <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
