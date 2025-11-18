@@ -89,11 +89,19 @@ export default function HomeScreen() {
   // As the device rotates, the dot moves around the circumference, always pointing to the original orientation
   // Initial yaw (origin) is set when the app starts
   const initialYawRef = useRef<number | null>(null);
+  // Set origin on first load
   useEffect(() => {
     if (motionData && initialYawRef.current === null) {
       initialYawRef.current = yaw;
     }
   }, [motionData, yaw]);
+
+  // Re-origin handler
+  const handleReOrigin = () => {
+    if (motionData) {
+      initialYawRef.current = yaw;
+    }
+  };
 
   // Calculate relative angle from initial orientation
   const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
@@ -109,7 +117,8 @@ export default function HomeScreen() {
         {/* Neon green dot at circumference, moves with device rotation */}
         <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
       </View>
-      <Text style={styles.instructions}>Dot always points to original orientation. Rotate your device to see it move.</Text>
+      <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
+      <Text style={styles.instructions}>Dot always points to your custom north. Tap Re-Origin to reset north to your current heading.</Text>
     </View>
   );
 }
