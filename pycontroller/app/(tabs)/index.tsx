@@ -78,11 +78,15 @@ export default function HomeScreen() {
   }, [dx, dy, dz]);
 
   // Compass visualization
+  const { width: screenWidth, height: screenHeight } = require('react-native').Dimensions.get('window');
   const compassSize = 200;
   const center = compassSize / 2;
   const dotRadius = 8;
   const ringStroke = 2;
   const ringRadius = center - ringStroke / 2;
+  const svgHeight = compassSize + ringRadius;
+  const circleCenterX = center;
+  const circleCenterY = compassSize;
   const initialYawRef = useRef<number | null>(null);
 
   // Re-origin handler
@@ -101,21 +105,26 @@ export default function HomeScreen() {
 
   // Calculate relative angle from initial orientation
   const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
-  // Dot angle: 0 radians is top, positive is clockwise
+  // Dot angle: 0 radians is straight up from the bottom, positive is clockwise
   const dotAngle = relativeYaw;
-  // Dot sits exactly on the ring
-  const dotX = center + ringRadius * Math.sin(dotAngle);
-  const dotY = center - ringRadius * Math.cos(dotAngle);
+  // Dot sits exactly on the ring, rotating around the bottom center
+  const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
+  const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
   return (
     <View style={styles.container}>
-      <View style={styles.centeredCompassContainer}>
-        <View style={{ width: compassSize, height: compassSize, justifyContent: 'center', alignItems: 'center' }}>
-          {/* SVG ring for perfect circle, thin border, no fill */}
-          <Svg width={compassSize} height={compassSize} style={{ position: 'absolute', left: 0, top: 0 }}>
-            <Circle cx={center} cy={center} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{
+          width: compassSize,
+          height: svgHeight,
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+        }}>
+          <Svg width={compassSize} height={svgHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
+            {/* Circle center is now at the very bottom */}
+            <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
           </Svg>
-          {/* Neon green dot at circumference, moves with device rotation */}
+          {/* Display dot (device heading) */}
           <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
         </View>
       </View>
@@ -138,6 +147,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 0,
+    margin: 0,
   },
   bottomButtonContainer: {
     width: '100%',
