@@ -1,6 +1,7 @@
 
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
@@ -11,28 +12,30 @@ export default function PositionScreen() {
   const [delta, setDelta] = useState<number>(0);
   // Removed averaging buffer
 
-  useEffect(() => {
-    const sub = DeviceMotion.addListener(data => {
-      const a = data.acceleration;
-      const currentAccel = a?.z ?? 0;
-      setAccel(currentAccel);
-      setPos(prev => {
-        const newPos = prev + currentAccel;
-        // Calculate delta (rate of change)
-        if (prevPosRef.current !== null) {
-          setDelta(newPos - prevPosRef.current);
-        } else {
-          setDelta(0);
-        }
-        prevPosRef.current = newPos;
-        return newPos;
+  useFocusEffect(
+    React.useCallback(() => {
+      const sub = DeviceMotion.addListener(data => {
+        const a = data.acceleration;
+        const currentAccel = a?.z ?? 0;
+        setAccel(currentAccel);
+        setPos(prev => {
+          const newPos = prev + currentAccel;
+          // Calculate delta (rate of change)
+          if (prevPosRef.current !== null) {
+            setDelta(newPos - prevPosRef.current);
+          } else {
+            setDelta(0);
+          }
+          prevPosRef.current = newPos;
+          return newPos;
+        });
       });
-    });
-    DeviceMotion.setUpdateInterval(24);
-    return () => {
-      sub && sub.remove();
-    };
-  }, []);
+      DeviceMotion.setUpdateInterval(24);
+      return () => {
+        sub && sub.remove();
+      };
+    }, [])
+  );
 
 
   return (
