@@ -103,13 +103,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Compass</Text>
       <View style={{ width: compassSize, height: compassSize, borderRadius: compassSize / 2, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', marginBottom: 24 }}>
-        {/* Neon green dot at circumference, moves with device rotation */}
         <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
       </View>
       <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
-      <Text style={styles.instructions}>Dot always points to your custom north. Tap Re-Origin to reset north to your current heading.</Text>
     </View>
   );
 }
