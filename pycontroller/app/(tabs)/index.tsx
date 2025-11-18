@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, Button } from 'react-native';
+import { Dimensions, Button, View } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -10,8 +10,10 @@ type Origin = {
 };
 
 export default function HomeScreen() {
+  // Device motion state
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
-  const originRef = useRef<Origin | null>(null);
+  const originRef = useRef<{ position: DeviceMotionMeasurement['accelerationIncludingGravity']; orientation: DeviceMotionMeasurement['rotation']; } | null>(null);
+  const initialYawRef = useRef<number | null>(null);
 
   useEffect(() => {
     const subscription = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
@@ -33,148 +35,56 @@ export default function HomeScreen() {
     }
   }, [motionData]);
 
-  // Track if initial re-origin has occurred
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    if (motionData && !isLoaded) {
-      setIsLoaded(true);
-    }
-  }, [motionData, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      handleReOrigin();
-    }
-  }, [isLoaded]);
-
-  // Calculate offset and orientation
-  let dx = 0, dy = 0, dz = 0;
-  let yaw = 0, pitch = 0, roll = 0;
-  if (motionData && originRef.current) {
-    const acc = motionData.accelerationIncludingGravity;
-    const originAcc = originRef.current.position;
-    dx = acc.x - originAcc.x;
-    dy = acc.y - originAcc.y;
-    dz = acc.z - originAcc.z;
-    const rot = motionData.rotation;
-    yaw = rot.alpha;
-    pitch = rot.beta;
-    roll = rot.gamma;
-  }
-
-  // Tracked position state
-  const [position, setPosition] = useState({ x: 0, y: 0, z: 0 });
-
-  // Update tracked position by adding dx, dy, dz each measurement
-  useEffect(() => {
-    if (motionData && originRef.current) {
-      setPosition(prev => ({
-        x: prev.x + dx,
-        y: prev.y + dy,
-        z: prev.z + dz,
-      }));
-    }
-  }, [dx, dy, dz]);
-
-  // Compass visualization
-  const { width: screenWidth, height: screenHeight } = require('react-native').Dimensions.get('window');
-  const compassSize = 200;
-  const center = compassSize / 2;
-  const dotRadius = 8;
-  const ringStroke = 2;
-  const ringRadius = center - ringStroke / 2;
-  const svgHeight = compassSize + ringRadius;
-  const circleCenterX = center;
-  const circleCenterY = compassSize;
-  const initialYawRef = useRef<number | null>(null);
-
   // Re-origin handler
   const handleReOrigin = () => {
     if (motionData) {
-      initialYawRef.current = yaw;
+      initialYawRef.current = motionData.rotation.alpha;
     }
   };
 
   // Set origin on first load
   useEffect(() => {
     if (motionData && initialYawRef.current === null) {
-      initialYawRef.current = yaw;
+      initialYawRef.current = motionData.rotation.alpha;
     }
   }, [motionData]);
 
   // Calculate relative angle from initial orientation
-  const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
-  // Dot angle: 0 radians is straight up from the bottom, positive is clockwise
+  let relativeYaw = 0;
+  if (motionData && initialYawRef.current !== null) {
+    relativeYaw = motionData.rotation.alpha - initialYawRef.current;
+  }
+
+  // Compass visualization
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const compassSize = Math.min(screenWidth, screenHeight) * 0.8;
+  const center = compassSize / 2;
+  const dotRadius = 12;
+  const ringStroke = 2; // thinner ring
+  const ringRadius = center - ringStroke / 2 - dotRadius;
+  const circleCenterX = center;
+  const circleCenterY = center;
+  // Dot rotates around the edge
   const dotAngle = relativeYaw;
-  // Dot sits exactly on the ring, rotating around the bottom center
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
   return (
-    <View style={styles.container}>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <View style={{
-          width: compassSize,
-          height: svgHeight,
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-        }}>
-          <Svg width={compassSize} height={svgHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
-            {/* Circle center is now at the very bottom */}
-            <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
-          </Svg>
-          {/* Display dot (device heading) */}
-          <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
-        </View>
-      </View>
-      <View style={styles.bottomButtonContainer}>
+    <>
+      <Svg
+        width={compassSize}
+        height={compassSize}
+        style={{ position: 'absolute', left: (screenWidth - compassSize) / 2, top: (screenHeight - compassSize) / 2, backgroundColor: 'transparent' }}
+      >
+        <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+        <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
+      </Svg>
+      <View
+        style={{ position: 'absolute', left: '50%', bottom: 80, transform: [{ translateX: -75 }], width: 150, alignItems: 'center', zIndex: 20 }}
+      >
         <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
       </View>
-    </View>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 0,
-  },
-  centeredCompassContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 0,
-    margin: 0,
-  },
-  bottomButtonContainer: {
-    width: '100%',
-    paddingBottom: 32,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  header: {
-    fontSize: 24,
-    color: '#fff',
-    marginBottom: 16,
-    fontWeight: 'bold',
-  },
-  label: {
-    fontSize: 18,
-    color: '#fff',
-    marginTop: 8,
-  },
-  value: {
-    fontSize: 16,
-    color: '#fff',
-  },
-  instructions: {
-    fontSize: 14,
-    color: '#aaa',
-    marginTop: 24,
-    textAlign: 'center',
-  },
-});
