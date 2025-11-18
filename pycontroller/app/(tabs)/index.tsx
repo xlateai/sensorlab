@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Button, View } from 'react-native';
+import { Dimensions, Button, View, Pressable } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -14,6 +14,12 @@ export default function HomeScreen() {
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
   const originRef = useRef<{ position: DeviceMotionMeasurement['accelerationIncludingGravity']; orientation: DeviceMotionMeasurement['rotation']; } | null>(null);
   const initialYawRef = useRef<number | null>(null);
+
+  // Double-tap state
+  const [showRedDot, setShowRedDot] = useState(false);
+  const [redDotPos, setRedDotPos] = useState<{x: number, y: number} | null>(null);
+  const lastTapRef = useRef<number | null>(null);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const subscription = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
@@ -69,8 +75,32 @@ export default function HomeScreen() {
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
+  // Touch handlers
+  const handlePressIn = (event: any) => {
+    const now = Date.now();
+    if (lastTapRef.current && now - lastTapRef.current < 1000) {
+      // Get tap position relative to the whole screen
+      const { pageX, pageY } = event.nativeEvent;
+      setRedDotPos({ x: pageX, y: pageY });
+      setShowRedDot(true);
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    }
+    lastTapRef.current = now;
+  };
+
+  const handlePressOut = () => {
+    if (showRedDot) {
+      setShowRedDot(false);
+      setRedDotPos(null);
+    }
+  };
+
   return (
-    <>
+    <Pressable
+      style={{ flex: 1 }}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
       <Svg
         width={compassSize}
         height={compassSize}
@@ -79,12 +109,26 @@ export default function HomeScreen() {
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
         <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
       </Svg>
+      {showRedDot && redDotPos && (
+        <View
+          style={{
+            position: 'absolute',
+            left: redDotPos.x - 3,
+            top: redDotPos.y - 3,
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: 'red',
+            zIndex: 100,
+          }}
+        />
+      )}
       <View
         style={{ position: 'absolute', left: '50%', bottom: 80, transform: [{ translateX: -75 }], width: 150, alignItems: 'center', zIndex: 20 }}
       >
         <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
       </View>
-    </>
+    </Pressable>
   );
 }
 
