@@ -106,8 +106,16 @@ export default function HomeScreen() {
         const dy = fingerPos.y - redDotPos.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > 7 * redDotRadius) {
-          const angle = Math.atan2(dy, dx);
-          handleReOrigin(angle);
+          // Calculate angle from drag direction
+          const dragAngle = Math.atan2(dy, dx);
+          // The top of the circle is -Math.PI/2 in SVG coordinates
+          const topOfCircleAngle = -Math.PI / 2;
+          // Offset so that drag up means 'top' (like button)
+          const angleOffset = topOfCircleAngle - dragAngle;
+          // Call re-origin with current rotation plus offset
+          if (motionData) {
+            handleReOrigin(motionData.rotation.alpha + angleOffset);
+          }
         }
       }
       setShowRedDot(false);
