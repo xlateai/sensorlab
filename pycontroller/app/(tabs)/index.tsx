@@ -83,24 +83,21 @@ export default function HomeScreen() {
 
   // Compass visualization
   const compassSize = 200;
-  const needleLength = 80;
   const center = compassSize / 2;
-  const angle = yaw; // radians
-  const needleX = center + needleLength * Math.sin(angle);
-  const needleY = center - needleLength * Math.cos(angle);
+  const dotRadius = 8;
+  // Place dot at outer edge of circle (0 degrees, rightmost point)
+  const dotAngle = 0; // radians, can be changed for rotation
+  const dotX = center + (center - dotRadius) * Math.cos(dotAngle);
+  const dotY = center + (center - dotRadius) * Math.sin(dotAngle);
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Compass</Text>
       <View style={{ width: compassSize, height: compassSize, borderRadius: compassSize / 2, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', marginBottom: 24 }}>
-        <View style={{ position: 'absolute', left: center - 4, top: center - 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
-        <View style={{ position: 'absolute', left: center, top: center, width: 0, height: 0 }}>
-          {/* Needle */}
-          <View style={{ position: 'absolute', left: 0, top: 0, width: needleLength, height: 2, backgroundColor: 'red', transform: [{ rotate: `${angle}rad` }], borderRadius: 1 }} />
-        </View>
+        {/* Neon green dot at circumference */}
+        <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
       </View>
-      <Text style={styles.label}>Yaw: {yaw.toFixed(2)} rad</Text>
-      <Text style={styles.instructions}>Rotate your device to see the compass needle move.</Text>
+      <Text style={styles.instructions}>Neon green dot at the edge of the circle.</Text>
     </View>
   );
 }
