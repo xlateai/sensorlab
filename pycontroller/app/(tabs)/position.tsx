@@ -23,6 +23,7 @@ export default function PositionScreen() {
       // DeviceMotion rotation: alpha (z), beta (x), gamma (y) in radians
       // We'll apply ZYX rotation order (yaw, pitch, roll)
       const rot = data.rotation;
+      let rotAdj = null;
       if (a && rot) {
         const ax = a.x ?? 0;
         const ay = a.y ?? 0;
@@ -64,16 +65,17 @@ export default function PositionScreen() {
         v = matMul(Rx, v);
         v = matMul(Ry, v);
         v = matMul(Rz, v);
-        setRotAdjAccel({ x: v[0], y: v[1], z: v[2] });
+        rotAdj = { x: v[0], y: v[1], z: v[2] };
+        setRotAdjAccel(rotAdj);
       } else {
         setRotAdjAccel(null);
       }
 
-      // Estimate position by dividing accel by 2, rounding, and accumulating
+      // Estimate position by accumulating rot adj accel (no rounding)
       setPos(prev => ({
-        x: prev.x + Math.round((a?.x ?? 0) / 2),
-        y: prev.y + Math.round((a?.y ?? 0) / 2),
-        z: prev.z + Math.round((a?.z ?? 0) / 2),
+        x: prev.x + (rotAdj ? rotAdj.x : 0),
+        y: prev.y + (rotAdj ? rotAdj.y : 0),
+        z: prev.z + (rotAdj ? rotAdj.z : 0),
       }));
     });
     DeviceMotion.setUpdateInterval(50);
@@ -84,29 +86,29 @@ export default function PositionScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>x: {pos.x}</Text>
-      <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>y: {pos.y}</Text>
-      <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>z: {pos.z}</Text>
+  <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>x: {pos.x.toFixed(1)}</Text>
+  <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>y: {pos.y.toFixed(1)}</Text>
+  <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>z: {pos.z.toFixed(1)}</Text>
       <View style={{ marginTop: 24 }}>
         <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          accel x: {accel ? accel.x.toFixed(4) : '-'}
+          accel x: {accel ? accel.x.toFixed(1) : '-'}
         </Text>
         <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          accel y: {accel ? accel.y.toFixed(4) : '-'}
+          accel y: {accel ? accel.y.toFixed(1) : '-'}
         </Text>
         <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          accel z: {accel ? accel.z.toFixed(4) : '-'}
+          accel z: {accel ? accel.z.toFixed(1) : '-'}
         </Text>
       </View>
       <View style={{ marginTop: 8 }}>
         <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          rot adj accel x: {rotAdjAccel ? rotAdjAccel.x.toFixed(4) : '-'}
+          rot adj accel x: {rotAdjAccel ? rotAdjAccel.x.toFixed(1) : '-'}
         </Text>
         <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          rot adj accel y: {rotAdjAccel ? rotAdjAccel.y.toFixed(4) : '-'}
+          rot adj accel y: {rotAdjAccel ? rotAdjAccel.y.toFixed(1) : '-'}
         </Text>
         <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          rot adj accel z: {rotAdjAccel ? rotAdjAccel.z.toFixed(4) : '-'}
+          rot adj accel z: {rotAdjAccel ? rotAdjAccel.z.toFixed(1) : '-'}
         </Text>
       </View>
       <View style={{ marginTop: 32 }}>
