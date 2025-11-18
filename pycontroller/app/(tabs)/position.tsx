@@ -8,6 +8,10 @@ import { View, Text } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
 export default function PositionScreen() {
+  // Plotting dimensions
+  const { width } = Dimensions.get('window');
+  const plotWidth = width - 40;
+  const plotHeight = 120;
   const [accel, setAccel] = useState<number | null>(null);
   const [pos, setPos] = useState<number>(0);
   const prevPosRef = useRef<number | null>(null);
@@ -17,6 +21,8 @@ export default function PositionScreen() {
   const [recording, setRecording] = useState(false);
   const [accelHistory, setAccelHistory] = useState<Array<{ t: number; z: number }>>([]);
   const [deltaHistory, setDeltaHistory] = useState<Array<{ t: number; dz: number }>>([]);
+  // Pairwise sum history (sum of each consecutive pair of z accel values)
+  const [pairwiseSumHistory, setPairwiseSumHistory] = useState<Array<{ t: number; sum: number }>>([]);
   const startTimeRef = useRef<number | null>(null);
   // Removed averaging buffer
 
@@ -42,13 +48,15 @@ export default function PositionScreen() {
           const now = Date.now();
           if (startTimeRef.current === null) startTimeRef.current = now;
           const t = (now - startTimeRef.current) / 1000;
-          setAccelHistory(prev => [...prev, { t, z: currentAccel }]);
-          // Delta calculation
-          if (prevPosRef.current !== null) {
-            setDeltaHistory(prev => [...prev, { t, dz: currentAccel - (prevPosRef.current ?? 0) }]);
-          } else {
-            setDeltaHistory(prev => [...prev, { t, dz: 0 }]);
-          }
+          setAccelHistory(prev => {
+            const newArr = [...prev, { t, z: currentAccel }];
+            // Pairwise sum calculation
+            if (newArr.length >= 2) {
+              const prevZ = newArr[newArr.length - 2].z;
+              setPairwiseSumHistory(psh => [...psh, { t, sum: prevZ + currentAccel }]);
+            }
+            return newArr;
+          });
         }
       });
       DeviceMotion.setUpdateInterval(24);
@@ -90,14 +98,6 @@ export default function PositionScreen() {
       b: Math.round(prev.b + (targetColor.b - prev.b) * step),
     }));
   }, [delta]);
-
-
-  // Plotting dimensions
-  const { width } = Dimensions.get('window');
-  const plotWidth = width - 40;
-  const plotHeight = 120;
-
-  // Helper to scale data for SVG
   function getPolylinePoints(data: Array<{ t: number; v: number }>) {
     if (data.length === 0) return '';
     const tMin = data[0].t;
@@ -113,7 +113,7 @@ export default function PositionScreen() {
 
   // Prepare data for plots
   const accelPoints = getPolylinePoints(accelHistory.map(d => ({ t: d.t, v: d.z })));
-  const deltaPoints = getPolylinePoints(deltaHistory.map(d => ({ t: d.t, v: d.dz })));
+  const pairwiseSumPoints = getPolylinePoints(pairwiseSumHistory.map(d => ({ t: d.t, v: d.sum })));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -145,10 +145,10 @@ export default function PositionScreen() {
           </Svg>
         </View>
         <View style={{ marginBottom: 12 }}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 4 }}>z accel delta over time</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 4 }}>velocity estimation</Text>
           <Svg width={plotWidth} height={plotHeight} style={{ backgroundColor: '#222', borderRadius: 8 }}>
             <Polyline
-              points={deltaPoints}
+              points={pairwiseSumPoints}
               fill="none"
               stroke="#fa4"
               strokeWidth="2"
@@ -178,6 +178,7 @@ export default function PositionScreen() {
             setRecording(true);
             setAccelHistory([]);
             setDeltaHistory([]);
+            setPairwiseSumHistory([]);
             startTimeRef.current = null;
           }}
           onPressOut={() => {
