@@ -9,31 +9,6 @@ type OriginType = {
 };
 
 export default function DevScreen() {
-  // Handler to reset positional origin only
-  const handlePositionalReOrigin = () => {
-    if (motionData && originRef.current) {
-      originRef.current.position = motionData.accelerationIncludingGravity;
-      setPosition({ x: 0, y: 0, z: 0 });
-    } else if (motionData) {
-      originRef.current = {
-        position: motionData.accelerationIncludingGravity,
-        orientation: motionData.rotation,
-      };
-      setPosition({ x: 0, y: 0, z: 0 });
-    }
-  };
-
-  // Handler to reset rotational origin only
-  const handleRotationalReOrigin = () => {
-    if (motionData && originRef.current) {
-      originRef.current.orientation = motionData.rotation;
-    } else if (motionData) {
-      originRef.current = {
-        position: motionData.accelerationIncludingGravity,
-        orientation: motionData.rotation,
-      };
-    }
-  };
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
   const originRef = useRef<OriginType | null>(null);
 
@@ -110,8 +85,6 @@ export default function DevScreen() {
           </View>
         </View>
         <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
-        <Button title="Positional Re-Origin" onPress={handlePositionalReOrigin} />
-        <Button title="Rotational Re-Origin" onPress={handleRotationalReOrigin} />
       </View>
   );
 }
