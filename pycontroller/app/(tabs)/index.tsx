@@ -211,11 +211,6 @@ export default function HomeScreen() {
           )}
         </Svg>
       )}
-      <View
-        style={{ position: 'absolute', left: '50%', bottom: 80, transform: [{ translateX: -75 }], width: 150, alignItems: 'center', zIndex: 20 }}
-      >
-        <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
-      </View>
     </Pressable>
   );
 }
