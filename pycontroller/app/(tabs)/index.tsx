@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, Button, View, Pressable } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Line } from 'react-native-svg';
 
 type Origin = {
   position: DeviceMotionMeasurement['accelerationIncludingGravity'];
@@ -18,6 +18,7 @@ export default function HomeScreen() {
   // Double-tap state
   const [showRedDot, setShowRedDot] = useState(false);
   const [redDotPos, setRedDotPos] = useState<{x: number, y: number} | null>(null);
+  const [fingerPos, setFingerPos] = useState<{x: number, y: number} | null>(null);
   const lastTapRef = useRef<number | null>(null);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -82,24 +83,52 @@ export default function HomeScreen() {
       // Get tap position relative to the whole screen
       const { pageX, pageY } = event.nativeEvent;
       setRedDotPos({ x: pageX, y: pageY });
+      setFingerPos({ x: pageX, y: pageY });
       setShowRedDot(true);
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     }
     lastTapRef.current = now;
   };
 
+  const handlePressMove = (event: any) => {
+    if (showRedDot) {
+      const { pageX, pageY } = event.nativeEvent;
+      setFingerPos({ x: pageX, y: pageY });
+    }
+  };
+
   const handlePressOut = () => {
     if (showRedDot) {
       setShowRedDot(false);
       setRedDotPos(null);
+      setFingerPos(null);
     }
   };
+
+  // Calculate opacity based on distance from compass center
+  let dotOpacity = 0.3;
+  let lineOpacity = 0.3;
+  if (showRedDot && redDotPos && fingerPos) {
+    // Compass center in screen coordinates
+    const compassLeft = (screenWidth - compassSize) / 2;
+    const compassTop = (screenHeight - compassSize) / 2;
+    const centerScreenX = compassLeft + center;
+    const centerScreenY = compassTop + center;
+    const dx = fingerPos.x - centerScreenX;
+    const dy = fingerPos.y - centerScreenY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 5 * 6) { // 5 radii, dot radius is 6
+      dotOpacity = 1;
+      lineOpacity = 1;
+    }
+  }
 
   return (
     <Pressable
       style={{ flex: 1 }}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+  onPressIn={handlePressIn}
+  onPressOut={handlePressOut}
+  onTouchMove={handlePressMove}
     >
       <Svg
         width={compassSize}
@@ -109,19 +138,30 @@ export default function HomeScreen() {
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
         <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
       </Svg>
-      {showRedDot && redDotPos && (
-        <View
-          style={{
-            position: 'absolute',
-            left: redDotPos.x - 3,
-            top: redDotPos.y - 3,
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: 'red',
-            zIndex: 100,
-          }}
-        />
+      {/* Overlay SVG for red dot and line */}
+      {showRedDot && redDotPos && fingerPos && (
+        <Svg
+          width={screenWidth}
+          height={screenHeight}
+          style={{ position: 'absolute', left: 0, top: 0, zIndex: 100 }}
+        >
+          <Circle
+            cx={redDotPos.x}
+            cy={redDotPos.y}
+            r={6}
+            fill={dotOpacity === 1 ? 'red' : 'rgba(255,0,0,0.2)'}
+            opacity={dotOpacity}
+          />
+          <Line
+            x1={redDotPos.x}
+            y1={redDotPos.y}
+            x2={fingerPos.x}
+            y2={fingerPos.y}
+            stroke={lineOpacity === 1 ? 'red' : 'rgba(255,0,0,0.2)'}
+            strokeWidth={2}
+            opacity={lineOpacity}
+          />
+        </Svg>
       )}
       <View
         style={{ position: 'absolute', left: '50%', bottom: 80, transform: [{ translateX: -75 }], width: 150, alignItems: 'center', zIndex: 20 }}
