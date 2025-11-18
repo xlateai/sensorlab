@@ -1,9 +1,18 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Button } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
 export default function HomeScreen() {
+  // Handler to reset origin
+  const handleReOrigin = () => {
+    if (motionData) {
+      originRef.current = {
+        position: motionData.accelerationIncludingGravity,
+        orientation: motionData.rotation,
+      };
+    }
+  };
   const [motionData, setMotionData] = useState(null);
   const originRef = useRef(null);
 
@@ -55,6 +64,7 @@ export default function HomeScreen() {
       <Text style={styles.value}>y: {offset.y.toFixed(2)}</Text>
       <Text style={styles.value}>z: {offset.z.toFixed(2)}</Text>
       <Text style={styles.instructions}>Move your device to see changes. Origin is set at app start.</Text>
+      <Button title="Re-Origin" onPress={handleReOrigin} />
     </View>
   );
 }
