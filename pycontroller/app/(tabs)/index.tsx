@@ -106,7 +106,7 @@ export default function HomeScreen() {
   // Calculate relative angle from initial orientation
   const relativeYaw = initialYawRef.current !== null ? yaw - initialYawRef.current : 0;
   // Dot angle: 0 radians is top, positive is clockwise
-  const dotAngle = -relativeYaw; // negative to match compass direction
+  const dotAngle = relativeYaw; // invert direction so left turn moves dot rightward
   const dotX = center + (center - dotRadius) * Math.sin(dotAngle);
   const dotY = center - (center - dotRadius) * Math.cos(dotAngle);
 
