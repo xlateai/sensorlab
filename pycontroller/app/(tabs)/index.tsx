@@ -105,21 +105,20 @@ export default function HomeScreen() {
     }
   };
 
-  // Calculate opacity based on distance from compass center
+  // Calculate opacity based on distance between red dot and finger
+  const redDotRadius = 6;
   let dotOpacity = 0.3;
   let lineOpacity = 0.3;
   if (showRedDot && redDotPos && fingerPos) {
-    // Compass center in screen coordinates
-    const compassLeft = (screenWidth - compassSize) / 2;
-    const compassTop = (screenHeight - compassSize) / 2;
-    const centerScreenX = compassLeft + center;
-    const centerScreenY = compassTop + center;
-    const dx = fingerPos.x - centerScreenX;
-    const dy = fingerPos.y - centerScreenY;
+    const dx = fingerPos.x - redDotPos.x;
+    const dy = fingerPos.y - redDotPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 5 * 6) { // 5 radii, dot radius is 6
+    if (dist > 5 * redDotRadius) {
       dotOpacity = 1;
       lineOpacity = 1;
+    } else {
+      dotOpacity = 0.3;
+      lineOpacity = 0.3;
     }
   }
 
@@ -149,17 +148,17 @@ export default function HomeScreen() {
             cx={redDotPos.x}
             cy={redDotPos.y}
             r={6}
-            fill={dotOpacity === 1 ? 'red' : 'rgba(255,0,0,0.2)'}
-            opacity={dotOpacity}
+        fill="red"
+        opacity={dotOpacity}
           />
           <Line
             x1={redDotPos.x}
             y1={redDotPos.y}
             x2={fingerPos.x}
             y2={fingerPos.y}
-            stroke={lineOpacity === 1 ? 'red' : 'rgba(255,0,0,0.2)'}
-            strokeWidth={2}
-            opacity={lineOpacity}
+        stroke="red"
+        strokeWidth={2}
+        opacity={lineOpacity}
           />
         </Svg>
       )}
