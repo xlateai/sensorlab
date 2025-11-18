@@ -15,6 +15,11 @@ export default function HomeScreen() {
   const originRef = useRef<{ position: DeviceMotionMeasurement['accelerationIncludingGravity']; orientation: DeviceMotionMeasurement['rotation']; } | null>(null);
   const initialYawRef = useRef<number | null>(null);
 
+  // Smooth compass angle state
+  const [smoothYaw, setSmoothYaw] = useState(0);
+  const targetYawRef = useRef(0);
+  const animationFrameRef = useRef<number | null>(null);
+
   // Double-tap state
   const [showRedDot, setShowRedDot] = useState(false);
   const [redDotPos, setRedDotPos] = useState<{x: number, y: number} | null>(null);
@@ -66,6 +71,30 @@ export default function HomeScreen() {
     // Correct rotational direction
     relativeYaw = motionData.rotation.alpha - initialYawRef.current;
   }
+  // Set targetYawRef for animation
+  targetYawRef.current = relativeYaw;
+
+  // Animation loop for smoothYaw
+  useEffect(() => {
+    function animate() {
+      setSmoothYaw(prev => {
+        // Interpolate toward targetYawRef.current
+        const lerp = 0.15; // smoothing factor
+        const diff = targetYawRef.current - prev;
+        // Handle wrap-around for angles
+        let delta = diff;
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        const next = prev + delta * lerp;
+        return next;
+      });
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
+    animationFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, []);
 
   // Compass visualization
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -77,8 +106,8 @@ export default function HomeScreen() {
   const circleCenterX = center;
   const circleCenterY = center;
   // Dot rotates around the edge
-  // Removed 180 degree (π radians) bias from the dot's rotation
-  const dotAngle = relativeYaw;
+  // Use smoothYaw for super smooth animation
+  const dotAngle = smoothYaw;
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
@@ -144,9 +173,9 @@ export default function HomeScreen() {
   return (
     <Pressable
       style={{ flex: 1 }}
-  onPressIn={handlePressIn}
-  onPressOut={handlePressOut}
-  onTouchMove={handlePressMove}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onTouchMove={handlePressMove}
     >
       <Svg
         width={compassSize}
@@ -158,6 +187,7 @@ export default function HomeScreen() {
         {/* White direction line from center */}
         {showRedDot && redDotPos && fingerPos && (
           (() => {
+            // ...existing code...
             // Calculate direction from red dot to finger
             const dx = fingerPos.x - redDotPos.x;
             const dy = fingerPos.y - redDotPos.y;
