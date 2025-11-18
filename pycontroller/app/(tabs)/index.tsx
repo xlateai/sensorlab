@@ -42,10 +42,14 @@ export default function HomeScreen() {
     }
   }, [motionData]);
 
-  // Re-origin handler
-  const handleReOrigin = () => {
+  // Re-origin handler, optionally set by angle
+  const handleReOrigin = (angle?: number) => {
     if (motionData) {
-      initialYawRef.current = motionData.rotation.alpha;
+      if (typeof angle === 'number') {
+        initialYawRef.current = angle;
+      } else {
+        initialYawRef.current = motionData.rotation.alpha;
+      }
     }
   };
 
@@ -78,16 +82,11 @@ export default function HomeScreen() {
 
   // Touch handlers
   const handlePressIn = (event: any) => {
-    const now = Date.now();
-    if (lastTapRef.current && now - lastTapRef.current < 1000) {
-      // Get tap position relative to the whole screen
-      const { pageX, pageY } = event.nativeEvent;
-      setRedDotPos({ x: pageX, y: pageY });
-      setFingerPos({ x: pageX, y: pageY });
-      setShowRedDot(true);
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-    }
-    lastTapRef.current = now;
+    const { pageX, pageY } = event.nativeEvent;
+    setRedDotPos({ x: pageX, y: pageY });
+    setFingerPos({ x: pageX, y: pageY });
+    setShowRedDot(true);
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
   };
 
   const handlePressMove = (event: any) => {
@@ -99,6 +98,16 @@ export default function HomeScreen() {
 
   const handlePressOut = () => {
     if (showRedDot) {
+      // Only re-origin if finger is past faded distance
+      if (redDotPos && fingerPos) {
+        const dx = fingerPos.x - redDotPos.x;
+        const dy = fingerPos.y - redDotPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 7 * redDotRadius) {
+          const angle = Math.atan2(dy, dx);
+          handleReOrigin(angle);
+        }
+      }
       setShowRedDot(false);
       setRedDotPos(null);
       setFingerPos(null);
@@ -108,17 +117,17 @@ export default function HomeScreen() {
   // Calculate opacity based on distance between red dot and finger
   const redDotRadius = 6;
   let dotOpacity = 0.3;
-  let lineOpacity = 0.1;
+  let lineOpacity = 0.2;
   if (showRedDot && redDotPos && fingerPos) {
     const dx = fingerPos.x - redDotPos.x;
     const dy = fingerPos.y - redDotPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 3 * redDotRadius) { // 3 multiples of radius
+    if (dist > 7 * redDotRadius) { // 7 multiples of radius
       dotOpacity = 1;
       lineOpacity = 1;
     } else {
       dotOpacity = 0.3;
-      lineOpacity = 0.1;
+      lineOpacity = 0.2;
     }
   }
 
@@ -147,6 +156,8 @@ export default function HomeScreen() {
             const dist = Math.sqrt(dx * dx + dy * dy);
             const maxLen = ringRadius;
             const len = Math.min(dist, maxLen);
+            // Opacity logic for white line
+            const whiteLineOpacity = dist > 7 * redDotRadius ? 1 : 0.2;
             const x2 = circleCenterX + Math.cos(angle) * len;
             const y2 = circleCenterY + Math.sin(angle) * len;
             return (
@@ -157,14 +168,14 @@ export default function HomeScreen() {
                 y2={y2}
                 stroke="#fff"
                 strokeWidth={2}
-                opacity={0.8}
+                opacity={whiteLineOpacity}
               />
             );
           })()
         )}
       </Svg>
       {/* Overlay SVG for red dot and line */}
-      {showRedDot && redDotPos && fingerPos && (
+      {showRedDot && redDotPos && (
         <Svg
           width={screenWidth}
           height={screenHeight}
@@ -177,15 +188,17 @@ export default function HomeScreen() {
             fill="red"
             opacity={dotOpacity}
           />
-          <Line
-            x1={redDotPos.x}
-            y1={redDotPos.y}
-            x2={fingerPos.x}
-            y2={fingerPos.y}
-            stroke="red"
-            strokeWidth={2}
-            opacity={lineOpacity}
-          />
+          {fingerPos && (
+            <Line
+              x1={redDotPos.x}
+              y1={redDotPos.y}
+              x2={fingerPos.x}
+              y2={fingerPos.y}
+              stroke="red"
+              strokeWidth={2}
+              opacity={lineOpacity}
+            />
+          )}
         </Svg>
       )}
       <View
