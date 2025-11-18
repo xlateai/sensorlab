@@ -4,9 +4,23 @@ import { StyleSheet, View, Text, Button } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 
 export default function HomeScreen() {
-  // Handler to reset origin
-  const handleReOrigin = () => {
-    if (motionData) {
+  // Handler to reset positional origin only
+  const handlePositionalReOrigin = () => {
+    if (motionData && originRef.current) {
+      originRef.current.position = motionData.accelerationIncludingGravity;
+    } else if (motionData) {
+      originRef.current = {
+        position: motionData.accelerationIncludingGravity,
+        orientation: motionData.rotation,
+      };
+    }
+  };
+
+  // Handler to reset rotational origin only
+  const handleRotationalReOrigin = () => {
+    if (motionData && originRef.current) {
+      originRef.current.orientation = motionData.rotation;
+    } else if (motionData) {
       originRef.current = {
         position: motionData.accelerationIncludingGravity,
         orientation: motionData.rotation,
@@ -37,21 +51,39 @@ export default function HomeScreen() {
   }, [motionData]);
 
   // Calculate offset and orientation
-  let offset = { x: 0, y: 0, z: 0 };
+  let dx = 0, dy = 0, dz = 0;
   let yaw = 0, pitch = 0, roll = 0;
   if (motionData && originRef.current) {
-    const pos = motionData.accelerationIncludingGravity;
-    const originPos = originRef.current.position;
-    offset = {
-      x: pos.x - originPos.x,
-      y: pos.y - originPos.y,
-      z: pos.z - originPos.z,
-    };
+    const acc = motionData.accelerationIncludingGravity;
+    const originAcc = originRef.current.position;
+    dx = acc.x - originAcc.x;
+    dy = acc.y - originAcc.y;
+    dz = acc.z - originAcc.z;
     const rot = motionData.rotation;
     yaw = rot.alpha;
     pitch = rot.beta;
     roll = rot.gamma;
   }
+
+  // Tracked position state
+  const [position, setPosition] = useState({ x: 0, y: 0, z: 0 });
+
+  // Update tracked position over time using dx, dy, dz
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined;
+    if (motionData && originRef.current) {
+      interval = setInterval(() => {
+        setPosition(prev => ({
+          x: prev.x + dx * 0.1,
+          y: prev.y + dy * 0.1,
+          z: prev.z + dz * 0.1,
+        }));
+      }, 100);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [dx, dy, dz]);
 
   return (
     <View style={styles.container}>
@@ -59,12 +91,17 @@ export default function HomeScreen() {
       <Text style={styles.label}>Yaw: {yaw.toFixed(2)}</Text>
       <Text style={styles.label}>Pitch: {pitch.toFixed(2)}</Text>
       <Text style={styles.label}>Roll: {roll.toFixed(2)}</Text>
-      <Text style={styles.label}>Offset from Origin:</Text>
-      <Text style={styles.value}>x: {offset.x.toFixed(2)}</Text>
-      <Text style={styles.value}>y: {offset.y.toFixed(2)}</Text>
-      <Text style={styles.value}>z: {offset.z.toFixed(2)}</Text>
+  <Text style={styles.label}>Acceleration (dx, dy, dz):</Text>
+  <Text style={styles.value}>dx: {dx.toFixed(2)}</Text>
+  <Text style={styles.value}>dy: {dy.toFixed(2)}</Text>
+  <Text style={styles.value}>dz: {dz.toFixed(2)}</Text>
+  <Text style={styles.label}>Tracked Position (x, y, z):</Text>
+  <Text style={styles.value}>x: {position.x.toFixed(2)}</Text>
+  <Text style={styles.value}>y: {position.y.toFixed(2)}</Text>
+  <Text style={styles.value}>z: {position.z.toFixed(2)}</Text>
       <Text style={styles.instructions}>Move your device to see changes. Origin is set at app start.</Text>
-      <Button title="Re-Origin" onPress={handleReOrigin} />
+      <Button title="Positional Re-Origin" onPress={handlePositionalReOrigin} />
+      <Button title="Rotational Re-Origin" onPress={handleRotationalReOrigin} />
     </View>
   );
 }
