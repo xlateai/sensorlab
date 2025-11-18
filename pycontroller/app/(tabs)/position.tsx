@@ -23,8 +23,8 @@ export default function PositionScreen() {
   const [deltaHistory, setDeltaHistory] = useState<Array<{ t: number; dz: number }>>([]);
     // Pairwise sum history (velocity estimation: sum of each consecutive pair of z accel values)
   const [pairwiseSumHistory, setPairwiseSumHistory] = useState<Array<{ t: number; sum: number }>>([]);
-    // Double sum history (position estimation: sum of each consecutive pair of velocity estimation values)
-    const [positionEstimationHistory, setPositionEstimationHistory] = useState<Array<{ t: number; sum: number }>>([]);
+  // Position estimation history (pairwise addition of velocity estimation)
+  const [positionEstimationHistory, setPositionEstimationHistory] = useState<Array<{ t: number; pos: number }>>([]);
   const startTimeRef = useRef<number | null>(null);
   // Removed averaging buffer
 
@@ -52,26 +52,25 @@ export default function PositionScreen() {
           const t = (now - startTimeRef.current) / 1000;
           // Update accel history
           setAccelHistory(prev => [...prev, { t, z: currentAccel }]);
-          // Update velocity estimation (pairwise sum)
-          setPairwiseSumHistory(prev => {
-            if (prev.length >= 1) {
-              const prevV = prev[prev.length - 1].sum;
-              return [...prev, { t, sum: prevV + currentAccel }];
+          // Update velocity and position estimation together
+          setPairwiseSumHistory(prevVel => {
+            let newVel;
+            if (prevVel.length >= 1) {
+              const prevV = prevVel[prevVel.length - 1].sum;
+              newVel = prevV + currentAccel;
             } else {
-              return [{ t, sum: currentAccel }];
+              newVel = currentAccel;
             }
-          });
-          // Update position estimation (double sum)
-          setPositionEstimationHistory(prev => {
-            if (prev.length >= 1 && pairwiseSumHistory.length >= 1) {
-              const prevP = prev[prev.length - 1].sum;
-              const currV = pairwiseSumHistory[pairwiseSumHistory.length - 1].sum;
-              return [...prev, { t, sum: prevP + currV }];
-            } else if (pairwiseSumHistory.length >= 1) {
-              return [{ t, sum: pairwiseSumHistory[pairwiseSumHistory.length - 1].sum }];
-            } else {
-              return prev;
-            }
+            // Update position estimation using newVel
+            setPositionEstimationHistory(prevPos => {
+              if (prevPos.length >= 1) {
+                const prevP = prevPos[prevPos.length - 1].pos;
+                return [...prevPos, { t, pos: prevP + newVel }];
+              } else {
+                return [{ t, pos: newVel }];
+              }
+            });
+            return [...prevVel, { t, sum: newVel }];
           });
         }
       });
@@ -130,7 +129,7 @@ export default function PositionScreen() {
   // Prepare data for plots
   const accelPoints = getPolylinePoints(accelHistory.map(d => ({ t: d.t, v: d.z })));
   const pairwiseSumPoints = getPolylinePoints(pairwiseSumHistory.map(d => ({ t: d.t, v: d.sum })));
-    const positionEstimationPoints = getPolylinePoints(positionEstimationHistory.map(d => ({ t: d.t, v: d.sum })));
+  const positionEstimationPoints = getPolylinePoints(positionEstimationHistory.map(d => ({ t: d.t, v: d.pos })));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
