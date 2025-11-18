@@ -9,19 +9,15 @@ export default function PositionScreen() {
   const [biasMode, setBiasMode] = useState(false);
   const [biasSamples, setBiasSamples] = useState<Array<{accel: [number, number, number], rotAdj: [number, number, number]}>>([]);
   const [bias, setBias] = useState<{accel: [number, number, number], rotAdj: [number, number, number]} | null>(null);
-  const [accel, setAccel] = useState<{x: number, y: number, z: number} | null>(null);
-  const [rotAdjAccel, setRotAdjAccel] = useState<{x: number, y: number, z: number} | null>(null);
-  const [pos, setPos] = useState<{x: number, y: number, z: number}>({x: 0, y: 0, z: 0});
+  const [accel, setAccel] = useState<number | null>(null);
+  const [rotAdjAccel, setRotAdjAccel] = useState<number | null>(null);
+  const [pos, setPos] = useState<number>(0);
   const lastUpdateRef = useRef<number>(Date.now());
 
   useEffect(() => {
     const sub = DeviceMotion.addListener(data => {
       const a = data.acceleration;
-      setAccel({
-        x: a?.x ?? 0,
-        y: a?.y ?? 0,
-        z: a?.z ?? 0,
-      });
+      setAccel(a?.z ?? 0);
 
       // Rotation adjustment (normalize accel to world axes)
       const rot = data.rotation;
@@ -62,24 +58,24 @@ export default function PositionScreen() {
         v = matMul(Rx, v);
         v = matMul(Ry, v);
         v = matMul(Rz, v);
-        rotAdj = { x: v[0], y: v[1], z: v[2] };
+        rotAdj = v[2];
         setRotAdjAccel(rotAdj);
       } else {
         setRotAdjAccel(null);
       }
 
-      // Estimate position by accumulating rot adj accel (no rounding)
-      setPos(prev => ({
-        x: prev.x + (rotAdj ? rotAdj.x : 0),
-        y: prev.y + (rotAdj ? rotAdj.y : 0),
-        z: prev.z + (rotAdj ? rotAdj.z : 0),
-      }));
+      // Estimate position by accumulating rot adj accel minus bias (if available and not currently estimating)
+      let bz = 0;
+      if (!biasMode && bias && bias.rotAdj) {
+        bz = bias.rotAdj[2];
+      }
+      setPos(prev => prev + (rotAdj !== null ? rotAdj - bz : 0));
 
       // Bias estimation logic
-      if (biasMode && a && rotAdj) {
+      if (biasMode && a && rotAdj !== null) {
         setBiasSamples(samples => [...samples, {
-          accel: [a.x ?? 0, a.y ?? 0, a.z ?? 0],
-          rotAdj: [rotAdj.x, rotAdj.y, rotAdj.z],
+          accel: [0, 0, a.z ?? 0],
+          rotAdj: [0, 0, rotAdj],
         }]);
       }
     });
@@ -93,11 +89,11 @@ export default function PositionScreen() {
   useEffect(() => {
     if (biasSamples.length > 0) {
       const n = biasSamples.length;
-      const sumAccel = biasSamples.reduce((acc, s) => [acc[0]+s.accel[0], acc[1]+s.accel[1], acc[2]+s.accel[2]], [0,0,0]);
-      const sumRotAdj = biasSamples.reduce((acc, s) => [acc[0]+s.rotAdj[0], acc[1]+s.rotAdj[1], acc[2]+s.rotAdj[2]], [0,0,0]);
+      const sumAccel = biasSamples.reduce((acc, s) => acc + s.accel[2], 0);
+      const sumRotAdj = biasSamples.reduce((acc, s) => acc + s.rotAdj[2], 0);
       setBias({
-        accel: [sumAccel[0]/n, sumAccel[1]/n, sumAccel[2]/n],
-        rotAdj: [sumRotAdj[0]/n, sumRotAdj[1]/n, sumRotAdj[2]/n],
+        accel: [0, 0, sumAccel/n],
+        rotAdj: [0, 0, sumRotAdj/n],
       });
     } else {
       setBias(null);
@@ -106,34 +102,40 @@ export default function PositionScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-  <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>x: {pos.x.toFixed(1)}</Text>
-  <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>y: {pos.y.toFixed(1)}</Text>
-  <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>z: {pos.z.toFixed(1)}</Text>
+      <Text
+        style={{
+          color: pos > 1 ? '#39ff14' : pos < -1 ? '#e53935' : '#888',
+          fontSize: 28,
+          fontWeight: 'bold',
+        }}
+      >
+        z: {pos.toFixed(2)}
+      </Text>
       <View style={{ marginTop: 24 }}>
-        <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          accel x: {accel ? accel.x.toFixed(1) : '-'}
-        </Text>
-        <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          accel y: {accel ? accel.y.toFixed(1) : '-'}
-        </Text>
-        <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          accel z: {accel ? accel.z.toFixed(1) : '-'}
+        <Text
+          style={{
+            color: accel !== null && accel > 1 ? '#39ff14' : accel !== null && accel < -1 ? '#e53935' : '#888',
+            fontSize: 14,
+            textAlign: 'center',
+          }}
+        >
+          accel z: {accel !== null ? accel.toFixed(1) : '-'}
         </Text>
       </View>
       <View style={{ marginTop: 8 }}>
-        <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          rot adj accel x: {rotAdjAccel ? rotAdjAccel.x.toFixed(1) : '-'}
-        </Text>
-        <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          rot adj accel y: {rotAdjAccel ? rotAdjAccel.y.toFixed(1) : '-'}
-        </Text>
-        <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-          rot adj accel z: {rotAdjAccel ? rotAdjAccel.z.toFixed(1) : '-'}
+        <Text
+          style={{
+            color: rotAdjAccel !== null && rotAdjAccel > 1 ? '#39ff14' : rotAdjAccel !== null && rotAdjAccel < -1 ? '#e53935' : '#888',
+            fontSize: 14,
+            textAlign: 'center',
+          }}
+        >
+          rot adj accel z: {rotAdjAccel !== null ? rotAdjAccel.toFixed(1) : '-'}
         </Text>
       </View>
       <View style={{ marginTop: 32 }}>
         <Text
-          onPress={() => setPos({ x: 0, y: 0, z: 0 })}
+          onPress={() => setPos(0)}
           style={{
             backgroundColor: '#222',
             color: '#fff',
@@ -177,22 +179,23 @@ export default function PositionScreen() {
           <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', fontWeight: 'bold' }}>
             Estimated Bias (avg delta × 1e4, scaling factor)
           </Text>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-            accel x: {(bias.accel[0] * 1e4).toFixed(1)}
-          </Text>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-            accel y: {(bias.accel[1] * 1e4).toFixed(1)}
-          </Text>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+          <Text
+            style={{
+              color: bias.accel[2] * 1e4 > 1 ? '#39ff14' : bias.accel[2] * 1e4 < -1 ? '#e53935' : '#888',
+              fontSize: 14,
+              textAlign: 'center',
+            }}
+          >
             accel z: {(bias.accel[2] * 1e4).toFixed(1)}
           </Text>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center', marginTop: 8 }}>
-            rot adj accel x: {(bias.rotAdj[0] * 1e4).toFixed(1)}
-          </Text>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
-            rot adj accel y: {(bias.rotAdj[1] * 1e4).toFixed(1)}
-          </Text>
-          <Text style={{ color: '#888', fontSize: 14, textAlign: 'center' }}>
+          <Text
+            style={{
+              color: bias.rotAdj[2] * 1e4 > 1 ? '#39ff14' : bias.rotAdj[2] * 1e4 < -1 ? '#e53935' : '#888',
+              fontSize: 14,
+              textAlign: 'center',
+              marginTop: 8,
+            }}
+          >
             rot adj accel z: {(bias.rotAdj[2] * 1e4).toFixed(1)}
           </Text>
         </View>
