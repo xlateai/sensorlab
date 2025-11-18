@@ -109,15 +109,19 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={{ width: compassSize, height: compassSize, justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
-        {/* SVG ring for perfect circle, thin border, no fill */}
-        <Svg width={compassSize} height={compassSize} style={{ position: 'absolute', left: 0, top: 0 }}>
-          <Circle cx={center} cy={center} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
-        </Svg>
-        {/* Neon green dot at circumference, moves with device rotation */}
-        <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
+      <View style={styles.centeredCompassContainer}>
+        <View style={{ width: compassSize, height: compassSize, justifyContent: 'center', alignItems: 'center' }}>
+          {/* SVG ring for perfect circle, thin border, no fill */}
+          <Svg width={compassSize} height={compassSize} style={{ position: 'absolute', left: 0, top: 0 }}>
+            <Circle cx={center} cy={center} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+          </Svg>
+          {/* Neon green dot at circumference, moves with device rotation */}
+          <View style={{ position: 'absolute', left: dotX - dotRadius, top: dotY - dotRadius, width: dotRadius * 2, height: dotRadius * 2, borderRadius: dotRadius, backgroundColor: '#39ff14', shadowColor: '#39ff14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 8 }} />
+        </View>
       </View>
-      <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
+      <View style={styles.bottomButtonContainer}>
+        <Button title="Re-Origin" onPress={handleReOrigin} color="#39ff14" />
+      </View>
     </View>
   );
 }
@@ -128,7 +132,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 0,
+  },
+  centeredCompassContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomButtonContainer: {
+    width: '100%',
+    paddingBottom: 32,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   header: {
     fontSize: 24,
