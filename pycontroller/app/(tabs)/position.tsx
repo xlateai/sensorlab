@@ -46,6 +46,24 @@ export default function PositionScreen() {
           accel z: {accel ? accel.z.toFixed(4) : '-'}
         </Text>
       </View>
+      <View style={{ marginTop: 32 }}>
+        <Text
+          onPress={() => setPos({ x: 0, y: 0, z: 0 })}
+          style={{
+            backgroundColor: '#222',
+            color: '#fff',
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 16,
+            fontWeight: 'bold',
+            fontSize: 18,
+            textAlign: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          Set Origin
+        </Text>
+      </View>
     </View>
   );
 }
