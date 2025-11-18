@@ -84,7 +84,7 @@ export default function DevScreen() {
             </View>
           </View>
           {/* Magnetometer Table */}
-          <Text style={styles.subHeader}>Magnetometer</Text>
+          <Text style={styles.header}>Magnetometer</Text>
           <View style={[styles.tableContainer, styles.magnetometerTable]}>
             <View style={styles.tableRow}>
               <Text style={styles.tableHeader}>Measurement</Text>
@@ -102,7 +102,7 @@ export default function DevScreen() {
             </View>
           </View>
           {/* Gyroscope Table */}
-          <Text style={styles.subHeader}>Gyroscope</Text>
+          <Text style={styles.header}>Gyroscope</Text>
           <View style={[styles.tableContainer, styles.gyroscopeTable]}>
             <View style={styles.tableRow}>
               <Text style={styles.tableHeader}>Measurement</Text>
@@ -120,7 +120,7 @@ export default function DevScreen() {
             </View>
           </View>
           {/* Barometer Table */}
-          <Text style={styles.subHeader}>Barometer</Text>
+          <Text style={styles.header}>Barometer</Text>
           <View style={[styles.tableContainer, styles.barometerTable]}>
             <View style={styles.tableRow}>
               <Text style={styles.tableHeader}>Measurement</Text>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   tableMeasurementCell: {
     flex: 1,
-    color: '#fff',
+    color: '#000',
     textAlign: 'center',
     padding: 2,
   },
@@ -213,14 +213,14 @@ const styles = StyleSheet.create({
   tableHeader: {
     flex: 1,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     fontSize: 14,
     textAlign: 'center',
     padding: 2,
   },
   tableCell: {
     flex: 1,
-    color: '#fff',
+    color: '#000',
     fontSize: 13,
     textAlign: 'center',
     padding: 2,
