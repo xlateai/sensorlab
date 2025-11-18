@@ -76,7 +76,7 @@ export default function PositionScreen() {
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
       <Text
         style={{
-          color: pos > 1 ? '#39ff14' : pos < -1 ? '#e53935' : '#888',
+          color: pos > 0 ? '#39ff14' : pos < 0 ? '#e53935' : '#888',
           fontSize: 28,
           fontWeight: 'bold',
         }}
@@ -86,7 +86,7 @@ export default function PositionScreen() {
       <View style={{ marginTop: 24 }}>
         <Text
           style={{
-            color: accel !== null && accel > 1 ? '#39ff14' : accel !== null && accel < -1 ? '#e53935' : '#888',
+            color: accel !== null && accel > 0 ? '#39ff14' : accel !== null && accel < 0 ? '#e53935' : '#888',
             fontSize: 14,
             textAlign: 'center',
           }}
@@ -97,7 +97,7 @@ export default function PositionScreen() {
       <View style={{ marginTop: 8 }}>
         <Text
           style={{
-            color: rotAdjAccel !== null && rotAdjAccel > 1 ? '#39ff14' : rotAdjAccel !== null && rotAdjAccel < -1 ? '#e53935' : '#888',
+            color: rotAdjAccel !== null && rotAdjAccel > 0 ? '#39ff14' : rotAdjAccel !== null && rotAdjAccel < 0 ? '#e53935' : '#888',
             fontSize: 14,
             textAlign: 'center',
           }}
