@@ -113,11 +113,11 @@ export default function HomeScreen() {
     const dx = fingerPos.x - redDotPos.x;
     const dy = fingerPos.y - redDotPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 5 * redDotRadius * 2) { // 5 diameters
+    if (dist > 3 * redDotRadius) { // 3 multiples of radius
       dotOpacity = 1;
       lineOpacity = 1;
     } else {
-  dotOpacity = 0.3;
+      dotOpacity = 0.3;
       lineOpacity = 0.1;
     }
   }
@@ -136,6 +136,30 @@ export default function HomeScreen() {
       >
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
         <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
+        {/* White direction line from center */}
+        {showRedDot && redDotPos && fingerPos && (
+          (() => {
+            // Calculate direction from red dot to finger
+            const dx = fingerPos.x - redDotPos.x;
+            const dy = fingerPos.y - redDotPos.y;
+            const angle = Math.atan2(dy, dx);
+            // Line starts at center, ends at 25% of ringRadius in that direction
+            const len = ringRadius * 0.25;
+            const x2 = circleCenterX + Math.cos(angle) * len;
+            const y2 = circleCenterY + Math.sin(angle) * len;
+            return (
+              <Line
+                x1={circleCenterX}
+                y1={circleCenterY}
+                x2={x2}
+                y2={y2}
+                stroke="#fff"
+                strokeWidth={2}
+                opacity={0.8}
+              />
+            );
+          })()
+        )}
       </Svg>
       {/* Overlay SVG for red dot and line */}
       {showRedDot && redDotPos && fingerPos && (
