@@ -81,24 +81,26 @@ export default function HomeScreen() {
     }
   }, [dx, dy, dz]);
 
+  // Compass visualization
+  const compassSize = 200;
+  const needleLength = 80;
+  const center = compassSize / 2;
+  const angle = yaw; // radians
+  const needleX = center + needleLength * Math.sin(angle);
+  const needleY = center - needleLength * Math.cos(angle);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Device Motion Reader</Text>
-      <Text style={styles.label}>Yaw: {yaw.toFixed(2)}</Text>
-      <Text style={styles.label}>Pitch: {pitch.toFixed(2)}</Text>
-      <Text style={styles.label}>Roll: {roll.toFixed(2)}</Text>
-  <Text style={styles.label}>Acceleration (dx, dy, dz):</Text>
-  <Text style={styles.value}>dx: {dx.toFixed(2)}</Text>
-  <Text style={styles.value}>dy: {dy.toFixed(2)}</Text>
-  <Text style={styles.value}>dz: {dz.toFixed(2)}</Text>
-  <Text style={styles.label}>Tracked Position (x, y, z):</Text>
-  <Text style={styles.value}>x: {position.x.toFixed(2)}</Text>
-  <Text style={styles.value}>y: {position.y.toFixed(2)}</Text>
-  <Text style={styles.value}>z: {position.z.toFixed(2)}</Text>
-      <Text style={styles.instructions}>Move your device to see changes. Origin is set at app start.</Text>
-  <Text style={styles.instructions}>Note: dx, dy, dz may fluctuate due to sensor noise even when the phone is still.</Text>
-      <Button title="Positional Re-Origin" onPress={handlePositionalReOrigin} />
-      <Button title="Rotational Re-Origin" onPress={handleRotationalReOrigin} />
+      <Text style={styles.header}>Compass</Text>
+      <View style={{ width: compassSize, height: compassSize, borderRadius: compassSize / 2, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center', backgroundColor: '#222', marginBottom: 24 }}>
+        <View style={{ position: 'absolute', left: center - 4, top: center - 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
+        <View style={{ position: 'absolute', left: center, top: center, width: 0, height: 0 }}>
+          {/* Needle */}
+          <View style={{ position: 'absolute', left: 0, top: 0, width: needleLength, height: 2, backgroundColor: 'red', transform: [{ rotate: `${angle}rad` }], borderRadius: 1 }} />
+        </View>
+      </View>
+      <Text style={styles.label}>Yaw: {yaw.toFixed(2)} rad</Text>
+      <Text style={styles.instructions}>Rotate your device to see the compass needle move.</Text>
     </View>
   );
 }
