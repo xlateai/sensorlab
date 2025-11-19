@@ -80,41 +80,6 @@ export default function VideoScreen() {
   }
   const color = `rgb(${r},${g},${b})`;
 
-  // Draggable control bar logic
-  const MENU_MIN_HEIGHT = 32;
-  const MENU_MAX_HEIGHT = 220;
-  const menuHeight = useRef(new Animated.Value(MENU_MIN_HEIGHT)).current;
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gestureState) => {
-      return Math.abs(gestureState.dy) > 4;
-    },
-    onPanResponderMove: (_, gestureState) => {
-      let newHeight = MENU_MIN_HEIGHT - gestureState.dy;
-      if (newHeight < MENU_MIN_HEIGHT) newHeight = MENU_MIN_HEIGHT;
-      if (newHeight > MENU_MAX_HEIGHT) newHeight = MENU_MAX_HEIGHT;
-      menuHeight.setValue(newHeight);
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (MENU_MIN_HEIGHT - gestureState.dy > MENU_MIN_HEIGHT + (MENU_MAX_HEIGHT - MENU_MIN_HEIGHT) / 2) {
-        // Open menu
-        Animated.spring(menuHeight, {
-          toValue: MENU_MAX_HEIGHT,
-          useNativeDriver: false,
-        }).start();
-        setMenuOpen(true);
-      } else {
-        // Close menu
-        Animated.spring(menuHeight, {
-          toValue: MENU_MIN_HEIGHT,
-          useNativeDriver: false,
-        }).start();
-        setMenuOpen(false);
-      }
-    },
-  }), [menuHeight]);
-
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
@@ -125,39 +90,29 @@ export default function VideoScreen() {
           <View key={y} style={{ width: screenWidth, height: pixelSize, backgroundColor: color }} />
         ))}
       </View>
-      {/* Draggable control bar and menu */}
-      <Animated.View
+      {/* Fixed modern menu bar at the bottom */}
+      <View
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          height: menuHeight,
-          backgroundColor: '#222',
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
-          justifyContent: 'flex-start',
+          height: 40,
+          backgroundColor: '#18181c',
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          justifyContent: 'center',
           alignItems: 'center',
           zIndex: 10,
-          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.18,
+          shadowRadius: 8,
+          elevation: 8,
         }}
-        {...panResponder.panHandlers}
       >
-        <View style={{ width: '60%', height: 4, backgroundColor: '#444', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
-        {menuOpen && (
-          <View style={{ width: '90%', height: MENU_MAX_HEIGHT - MENU_MIN_HEIGHT - 16, backgroundColor: '#333', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: 8 }}>
-            <View>
-              <View style={{ marginBottom: 8 }}>
-                <View style={{ width: 32, height: 32, backgroundColor: '#555', borderRadius: 16 }} />
-              </View>
-              <View style={{ marginBottom: 8 }}>
-                <View style={{ width: 64, height: 8, backgroundColor: '#666', borderRadius: 4 }} />
-              </View>
-              <View style={{ width: 96, height: 8, backgroundColor: '#666', borderRadius: 4 }} />
-            </View>
-          </View>
-        )}
-      </Animated.View>
+        <View style={{ width: '18%', height: 4, backgroundColor: '#444', borderRadius: 2, marginTop: 8, marginBottom: 8, opacity: 0.7 }} />
+      </View>
     </View>
   );
 }
