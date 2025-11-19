@@ -24,10 +24,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="position"
+        name="compass"
         options={{
-          title: 'Position',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="location.fill" color={color} />,
+          title: 'Locational',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="dot.scope.laptopcomputer" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="acceleration"
+        options={{
+          title: 'Accel',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="speedometer" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="magnetic"
+        options={{
+          title: 'Magnetic',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="circle" color={color} />,
         }}
       />
       <Tabs.Screen
