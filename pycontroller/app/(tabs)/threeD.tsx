@@ -1,20 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Dimensions } from 'react-native';
-import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
+import { DeviceMotion, DeviceMotionMeasurement, Magnetometer } from 'expo-sensors';
 import Svg, { Circle, Line, Polygon } from 'react-native-svg';
 
 export default function ThreeDScreen() {
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
+  const [magnetometerData, setMagnetometerData] = useState<{x: number, y: number, z: number} | null>(null);
 
-  useEffect(() => {
-    const subscription = DeviceMotion.addListener(data => {
-      setMotionData(data);
-    });
-    DeviceMotion.setUpdateInterval(24);
-    return () => {
-      subscription && subscription.remove();
-    };
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const motionSub = DeviceMotion.addListener(data => {
+        setMotionData(data);
+      });
+      DeviceMotion.setUpdateInterval(24);
+      const magSub = Magnetometer.addListener(data => {
+        setMagnetometerData(data);
+      });
+      Magnetometer.setUpdateInterval(24);
+      return () => {
+        motionSub && motionSub.remove();
+        magSub && magSub.remove();
+      };
+    }, [])
+  );
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const compassSize = Math.min(screenWidth, screenHeight) * 0.8;
@@ -57,23 +66,45 @@ export default function ThreeDScreen() {
   let northArrow = null;
   if (motionData && motionData.rotation) {
     const { alpha = 0 } = motionData.rotation;
-  // North is at angle (alpha - Math.PI/2 + Math.PI)
-  const northAngle = (alpha || 0) - Math.PI / 2 + Math.PI;
-  // Scale arrow length based on pitch (beta)
-  const { beta = 0 } = motionData.rotation;
-  // beta: 0 = flat, ±pi/2 = vertical
-  const minLength = 0; // single point
-  const maxPitch = Math.PI / 2;
-  let pitchNorm = Math.abs(beta) / maxPitch;
-  if (pitchNorm > 1) pitchNorm = 1;
-  let arrowLength = ringRadius * (1 - pitchNorm);
-  if (arrowLength < minLength) arrowLength = minLength;
+    // North is at angle (alpha - Math.PI/2 + Math.PI)
+    const northAngle = (alpha || 0) - Math.PI / 2 + Math.PI;
+    // Scale arrow length based on pitch (beta)
+    const { beta = 0 } = motionData.rotation;
+    // beta: 0 = flat, ±pi/2 = vertical
+    const minLength = 0; // single point
+    const maxPitch = Math.PI / 2;
+    let pitchNorm = Math.abs(beta) / maxPitch;
+    if (pitchNorm > 1) pitchNorm = 1;
+    let arrowLength = ringRadius * (1 - pitchNorm);
+    if (arrowLength < minLength) arrowLength = minLength;
     // Arrow endpoint
     const arrowX = circleCenterX + arrowLength * Math.sin(northAngle);
     const arrowY = circleCenterY - arrowLength * Math.cos(northAngle);
     northArrow = (
       <Line x1={circleCenterX} y1={circleCenterY} x2={arrowX} y2={arrowY} stroke="#f00" strokeWidth={2} />
     );
+  }
+
+  // Magnetometer direction logic
+  let magnetometerArrow = null;
+  if (magnetometerData) {
+    const { x, y, z } = magnetometerData;
+    // Normalize vector
+    const mag = Math.sqrt(x * x + y * y + z * z);
+    if (mag > 0.0001) {
+      const nx = x / mag;
+      const ny = y / mag;
+      const nz = z / mag;
+      // Project to 2D (screen: x right, y up)
+      // We'll use nx, ny for the direction in the plane
+      // Draw from center to edge of sphere
+      const arrowLength = ringRadius;
+      const arrowX = circleCenterX + arrowLength * nx;
+      const arrowY = circleCenterY - arrowLength * ny;
+      magnetometerArrow = (
+        <Line x1={circleCenterX} y1={circleCenterY} x2={arrowX} y2={arrowY} stroke="#0ff" strokeWidth={2} />
+      );
+    }
   }
 
 
@@ -89,8 +120,10 @@ export default function ThreeDScreen() {
       <Circle cx={circleCenterX} cy={circleCenterY} r={levelingRadius} stroke="#aaa" strokeWidth={1.5} fill="none" opacity={0.3} />
       {/* Level ball */}
       <Circle cx={rotX} cy={rotY} r={levelingRadius} fill={rotColor} stroke="none" />
-      {/* North arrow */}
-      {northArrow}
+  {/* North arrow */}
+  {northArrow}
+  {/* Magnetometer arrow */}
+  {magnetometerArrow}
     </Svg>
   );
 }
