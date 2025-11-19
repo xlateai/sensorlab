@@ -24,6 +24,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="creator"
+        options={{
+          title: 'Creator',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="directional"
         options={{
           title: 'Heading',
