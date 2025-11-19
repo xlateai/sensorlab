@@ -107,6 +107,9 @@ export default function MagneticScreen() {
           onPressOut={() => {
             setRecording(false);
           }}
+          onClear={() => {
+            setMagHistory([]);
+          }}
           color="#4af"
         />
       </View>

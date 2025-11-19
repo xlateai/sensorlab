@@ -211,6 +211,12 @@ export default function PositionScreen() {
           onPressOut={() => {
             setRecording(false);
           }}
+          onClear={() => {
+            setAccelHistory([]);
+            setDeltaHistory([]);
+            setPairwiseSumHistory([]);
+            setPositionEstimationHistory([]);
+          }}
           color="#fa4"
         />
       </View>
