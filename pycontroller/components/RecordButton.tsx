@@ -15,8 +15,8 @@ export default function RecordButton({ recording, onPressIn, onPressOut, onClear
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
       <TouchableOpacity
         style={{
-          width: 80,
-          height: 80,
+          width: 60,
+          height: 60,
           borderRadius: 40,
           backgroundColor: color,
           justifyContent: 'center',

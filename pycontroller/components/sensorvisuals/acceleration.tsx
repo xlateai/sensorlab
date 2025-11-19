@@ -3,7 +3,7 @@ import { TouchableOpacity, Dimensions, ScrollView, SafeAreaView } from 'react-na
 import RecordButton from '../../components/RecordButton';
 import ThreeAxisPlot from '../../components/ThreeAxisPlot';
 import SensorDots from '../../components/SensorDots';
-import { useFocusEffect } from '@react-navigation/native';
+// Removed useFocusEffect for modal compatibility
 import { View, Text } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
 
@@ -16,27 +16,25 @@ export default function AccelerationScreen() {
   const [currentAccel, setCurrentAccel] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const startTimeRef = useRef<number | null>(null);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      const sub = Accelerometer.addListener(data => {
-        const { x = 0, y = 0, z = 0 } = data;
-        setCurrentAccel({ x, y, z });
-        if (recording) {
-          const now = Date.now();
-          if (startTimeRef.current === null) startTimeRef.current = now;
-          const t = (now - startTimeRef.current) / 1000;
-          setMagHistory(prev => {
-            const updated = [...prev, { t, x, y, z }];
-            return updated.length > 128 ? updated.slice(updated.length - 128) : updated;
-          });
-        }
-      });
-      Accelerometer.setUpdateInterval(24);
-      return () => {
-        sub && sub.remove();
-      };
-    }, [recording])
-  );
+  React.useEffect(() => {
+    const sub = Accelerometer.addListener(data => {
+      const { x = 0, y = 0, z = 0 } = data;
+      setCurrentAccel({ x, y, z });
+      if (recording) {
+        const now = Date.now();
+        if (startTimeRef.current === null) startTimeRef.current = now;
+        const t = (now - startTimeRef.current) / 1000;
+        setMagHistory(prev => {
+          const updated = [...prev, { t, x, y, z }];
+          return updated.length > 128 ? updated.slice(updated.length - 128) : updated;
+        });
+      }
+    });
+    Accelerometer.setUpdateInterval(24);
+    return () => {
+      sub && sub.remove();
+    };
+  }, [recording]);
 
 
 

@@ -31,20 +31,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="acceleration"
-        options={{
-          title: 'Accel',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="speedometer" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="magnetic"
-        options={{
-          title: 'Magnetic',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="circle" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="dev"
         options={{
           title: 'Dev',
