@@ -65,8 +65,8 @@ export default function VideoScreen() {
         </TouchableOpacity>
         {/* Expanded content: 4 selectable squares for modes */}
         {menuExpanded && (
-          <View style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
+          <View style={{ flex: 1, width: '100%', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 24, marginTop: 12 }}>
               {Array.from({ length: 4 }).map((_, i) => (
                 <TouchableOpacity
                   key={i}
@@ -77,13 +77,14 @@ export default function VideoScreen() {
                     height: 48,
                     marginHorizontal: 12,
                     borderRadius: 8,
-                    backgroundColor: mode === i ? '#fff' : '#333',
-                    borderWidth: mode === i ? 3 : 1,
-                    borderColor: mode === i ? '#4f8cff' : '#555',
+                    backgroundColor: mode === i ? '#19e56a' : '#333', // green when selected, gray when not
+                    borderWidth: 2,
+                    borderColor: mode === i ? '#19e56a' : '#bbb', // green when selected, light gray when not
                   }}
                 />
               ))}
             </View>
+            {/* ...existing code... */}
           </View>
         )}
       </View>
