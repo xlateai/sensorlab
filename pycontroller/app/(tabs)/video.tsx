@@ -88,7 +88,6 @@ export default function VideoScreen() {
             elevation: 8,
           }}
         >
-          {/* Only the drag handle is clickable when expanded */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => menuExpanded ? setMenuExpanded(false) : setMenuExpanded(true)}
@@ -96,24 +95,33 @@ export default function VideoScreen() {
           >
             <View style={{ width: '18%', height: 8, backgroundColor: '#444', borderRadius: 4, opacity: 0.7 }} />
           </TouchableOpacity>
-          {/* Expanded content: 4 selectable squares for modes */}
           {menuExpanded && (
-            <View style={{ flex: 1, width: '100%', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 24, marginTop: 12 }}>
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() => setMode(i)}
-                    activeOpacity={0.8}
-                    style={{
-                      width: 48,
-                      height: 48,
-                      marginHorizontal: 12,
-                      borderRadius: 8,
-                      backgroundColor: mode === i ? '#19e56a' : '#888', // green when selected, neutral gray when not
-                      borderWidth: 0,
-                    }}
-                  />
+            <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: -24 }}>
+                {Array.from({ length: 3 }).map((_, rowIdx) => (
+                  <View
+                    key={rowIdx}
+                    style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginVertical: 4 }}
+                  >
+                    {Array.from({ length: 4 }).map((_, colIdx) => {
+                      const i = rowIdx * 4 + colIdx;
+                      return (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() => setMode(i)}
+                          activeOpacity={0.8}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            marginHorizontal: 6,
+                            borderRadius: 8,
+                            backgroundColor: mode === i ? '#19e56a' : '#888',
+                            borderWidth: 0,
+                          }}
+                        />
+                      );
+                    })}
+                  </View>
                 ))}
               </View>
               {/* ...existing code... */}
