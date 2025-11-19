@@ -17,7 +17,7 @@ export default function VideoScreen() {
   const [mode, setMode] = useState(0);
   // Fullscreen state
   const [fullscreen, setFullscreen] = useState(false);
-  const lastTapRef = useRef<number | null>(null);
+  const tapTimesRef = useRef<number[]>([]);
   const navigation = useNavigation();
 
   // Hide tab bar when fullscreen
@@ -44,14 +44,18 @@ export default function VideoScreen() {
     }
   }, [mode]);
 
-  // Double-tap handler
-  const handleDoubleTap = () => {
+  // Triple-tap handler (within 3 seconds)
+  const handleTripleTap = () => {
     const now = Date.now();
-    if (lastTapRef.current && now - lastTapRef.current < 2000) {
+    tapTimesRef.current.push(now);
+    // Keep only last 3 taps
+    if (tapTimesRef.current.length > 3) tapTimesRef.current.shift();
+    if (
+      tapTimesRef.current.length === 3 &&
+      tapTimesRef.current[2] - tapTimesRef.current[0] < 3000
+    ) {
       setFullscreen(f => !f);
-      lastTapRef.current = null;
-    } else {
-      lastTapRef.current = now;
+      tapTimesRef.current = [];
     }
   };
 
@@ -59,7 +63,7 @@ export default function VideoScreen() {
     <TouchableOpacity
       activeOpacity={1}
       style={{ flex: 1, backgroundColor: '#000' }}
-      onPress={handleDoubleTap}
+      onPress={handleTripleTap}
     >
       <StatusBar hidden={fullscreen} animated />
       {renderMode}
