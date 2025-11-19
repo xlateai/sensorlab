@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Dimensions, ScrollView, SafeAreaView } from 'react-native';
 import RecordButton from '../../components/RecordButton';
 import ThreeAxisPlot from '../../components/ThreeAxisPlot';
+import { Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { View } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
@@ -14,41 +15,91 @@ export default function AccelerationScreen() {
   const plotHeight = 120;
   const [recording, setRecording] = useState(false);
   const [accelHistory, setAccelHistory] = useState<Array<{ t: number; x: number; y: number; z: number }>>([]);
-  const [displayColor, setDisplayColor] = useState<{ r: number; g: number; b: number }>({ r: 136, g: 136, b: 136 });
-  // Color animation based on live z-axis acceleration
+  const [displayColorX, setDisplayColorX] = useState<{ r: number; g: number; b: number }>({ r: 136, g: 136, b: 136 });
+  const [displayColorY, setDisplayColorY] = useState<{ r: number; g: number; b: number }>({ r: 136, g: 136, b: 136 });
+  const [displayColorZ, setDisplayColorZ] = useState<{ r: number; g: number; b: number }>({ r: 136, g: 136, b: 136 });
+  // Color animation for each axis
   React.useEffect(() => {
-    let z = 0;
+    let x = 0, y = 0, z = 0;
     if (accelHistory.length) {
+      x = accelHistory[accelHistory.length - 1].x;
+      y = accelHistory[accelHistory.length - 1].y;
       z = accelHistory[accelHistory.length - 1].z;
     }
-    // Clamp z to [-1, 1] for color blending
     const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-    const normZ = clamp(z / 5, -1, 1);
-    const green = { r: 57, g: 255, b: 20 };
+    // X axis color
+    const normX = clamp(x / 5, -1, 1);
+    const blue = { r: 57, g: 136, b: 255 };
     const red = { r: 229, g: 57, b: 53 };
     const gray = { r: 136, g: 136, b: 136 };
-    let targetColor;
+    let targetColorX;
+    if (Math.abs(normX) < 0.05) {
+      targetColorX = gray;
+    } else if (normX > 0) {
+      targetColorX = {
+        r: Math.round(gray.r + (blue.r - gray.r) * normX),
+        g: Math.round(gray.g + (blue.g - gray.g) * normX),
+        b: Math.round(gray.b + (blue.b - gray.b) * normX),
+      };
+    } else {
+      targetColorX = {
+        r: Math.round(gray.r + (red.r - gray.r) * -normX),
+        g: Math.round(gray.g + (red.g - gray.g) * -normX),
+        b: Math.round(gray.b + (red.b - gray.b) * -normX),
+      };
+    }
+    setDisplayColorX(prev => ({
+      r: Math.round(prev.r + (targetColorX.r - prev.r) * 0.5),
+      g: Math.round(prev.g + (targetColorX.g - prev.g) * 0.5),
+      b: Math.round(prev.b + (targetColorX.b - prev.b) * 0.5),
+    }));
+    // Y axis color
+    const normY = clamp(y / 5, -1, 1);
+    const orange = { r: 255, g: 170, b: 57 };
+    let targetColorY;
+    if (Math.abs(normY) < 0.05) {
+      targetColorY = gray;
+    } else if (normY > 0) {
+      targetColorY = {
+        r: Math.round(gray.r + (orange.r - gray.r) * normY),
+        g: Math.round(gray.g + (orange.g - gray.g) * normY),
+        b: Math.round(gray.b + (orange.b - gray.b) * normY),
+      };
+    } else {
+      targetColorY = {
+        r: Math.round(gray.r + (red.r - gray.r) * -normY),
+        g: Math.round(gray.g + (red.g - gray.g) * -normY),
+        b: Math.round(gray.b + (red.b - gray.b) * -normY),
+      };
+    }
+    setDisplayColorY(prev => ({
+      r: Math.round(prev.r + (targetColorY.r - prev.r) * 0.5),
+      g: Math.round(prev.g + (targetColorY.g - prev.g) * 0.5),
+      b: Math.round(prev.b + (targetColorY.b - prev.b) * 0.5),
+    }));
+    // Z axis color
+    const normZ = clamp(z / 5, -1, 1);
+    const green = { r: 57, g: 255, b: 20 };
+    let targetColorZ;
     if (Math.abs(normZ) < 0.05) {
-      targetColor = gray;
+      targetColorZ = gray;
     } else if (normZ > 0) {
-      targetColor = {
+      targetColorZ = {
         r: Math.round(gray.r + (green.r - gray.r) * normZ),
         g: Math.round(gray.g + (green.g - gray.g) * normZ),
         b: Math.round(gray.b + (green.b - gray.b) * normZ),
       };
     } else {
-      targetColor = {
+      targetColorZ = {
         r: Math.round(gray.r + (red.r - gray.r) * -normZ),
         g: Math.round(gray.g + (red.g - gray.g) * -normZ),
         b: Math.round(gray.b + (red.b - gray.b) * -normZ),
       };
     }
-    // Animate towards targetColor
-    const step = 0.5; // smoothing factor
-    setDisplayColor(prev => ({
-      r: Math.round(prev.r + (targetColor.r - prev.r) * step),
-      g: Math.round(prev.g + (targetColor.g - prev.g) * step),
-      b: Math.round(prev.b + (targetColor.b - prev.b) * step),
+    setDisplayColorZ(prev => ({
+      r: Math.round(prev.r + (targetColorZ.r - prev.r) * 0.5),
+      g: Math.round(prev.g + (targetColorZ.g - prev.g) * 0.5),
+      b: Math.round(prev.b + (targetColorZ.b - prev.b) * 0.5),
     }));
   }, [accelHistory]);
   const startTimeRef = useRef<number | null>(null);
@@ -89,17 +140,56 @@ export default function AccelerationScreen() {
           colorX="#4af"
           colorY="#fa4"
           colorZ="#0fa"
+          min={recording ? undefined : -1}
+          max={recording ? undefined : 1}
         />
-        {/* Colored circle below plot */}
-        <View style={{ marginTop: 32, alignItems: 'center' }}>
-          <View
-            style={{
-              width: 120,
-              height: 120,
-              borderRadius: 60,
-              backgroundColor: `rgb(${displayColor.r},${displayColor.g},${displayColor.b})`,
-            }}
-          />
+        {/* Three colored circles for axes */}
+        <View style={{ marginTop: 32, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
+          {/* X axis */}
+          <View style={{ alignItems: 'center' }}>
+            <View
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: `rgb(${displayColorX.r},${displayColorX.g},${displayColorX.b})`,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, opacity: 0.7 }}>X</Text>
+            </View>
+          </View>
+          {/* Y axis */}
+          <View style={{ alignItems: 'center' }}>
+            <View
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: `rgb(${displayColorY.r},${displayColorY.g},${displayColorY.b})`,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, opacity: 0.7 }}>Y</Text>
+            </View>
+          </View>
+          {/* Z axis */}
+          <View style={{ alignItems: 'center' }}>
+            <View
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: `rgb(${displayColorZ.r},${displayColorZ.g},${displayColorZ.b})`,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, opacity: 0.7 }}>Z</Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
       {/* Record button at bottom center */}
