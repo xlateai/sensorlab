@@ -31,6 +31,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="threeD"
+        options={{
+          title: '3D',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube" color={color} />, // pick a cube icon for 3D
+        }}
+      />
+      <Tabs.Screen
         name="dev"
         options={{
           title: 'Dev',
