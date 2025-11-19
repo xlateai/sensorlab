@@ -82,9 +82,12 @@ export default function ModeOne() {
   // Update pixel cache for upward flow
   useEffect(() => {
     if (!isFocused) return;
-    pixelCacheRef.current.push(currentPixel);
-    if (pixelCacheRef.current.length > pixelHeight) pixelCacheRef.current.shift();
-    setPixelCache([...pixelCacheRef.current]);
+    // Only update cache if pixel value actually changed
+    if (pixelCacheRef.current[pixelCacheRef.current.length - 1] !== currentPixel) {
+      pixelCacheRef.current.push(currentPixel);
+      if (pixelCacheRef.current.length > pixelHeight) pixelCacheRef.current.shift();
+      setPixelCache([...pixelCacheRef.current]);
+    }
   }, [currentPixel, pixelHeight, isFocused]);
 
   if (!isFocused) {
