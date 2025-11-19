@@ -7,25 +7,25 @@ interface SensorDotsProps {
   z: number;
 }
 
-function getColor(value: number, axis: 'x' | 'y' | 'z') {
+function getColor(value: number) {
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
   const norm = clamp(value / 5, -1, 1);
-  const blue = { r: 57, g: 136, b: 255 };
   const red = { r: 229, g: 57, b: 53 };
-  const gray = { r: 136, g: 136, b: 136 };
-  const orange = { r: 255, g: 170, b: 57 };
   const green = { r: 57, g: 255, b: 20 };
+  const blue = { r: 57, g: 136, b: 255 };
+  const orange = { r: 255, g: 170, b: 57 };
+  const gray = { r: 136, g: 136, b: 136 };
+  // Use blue for X+, orange for Y+, green for Z+
+  // For this component, use green for all positive for simplicity
   let target;
   if (Math.abs(norm) < 0.05) {
     target = gray;
   } else if (norm > 0) {
-    if (axis === 'x') target = blue;
-    else if (axis === 'y') target = orange;
-    else target = green;
+    target = green;
   } else {
     target = red;
   }
-  // Linear blend between gray and target
+  // Use full blend at peaks
   const blend = Math.abs(norm);
   return {
     r: Math.round(gray.r + (target.r - gray.r) * blend),
@@ -40,56 +40,56 @@ export default function SensorDots({ x, y, z }: SensorDotsProps) {
   const [colorZ, setColorZ] = useState({ r: 136, g: 136, b: 136 });
 
   useEffect(() => {
-    setColorX(getColor(x, 'x'));
-    setColorY(getColor(y, 'y'));
-    setColorZ(getColor(z, 'z'));
+    setColorX(getColor(x));
+    setColorY(getColor(y));
+    setColorZ(getColor(z));
   }, [x, y, z]);
 
   return (
-    <View style={{ marginTop: 32, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
+    <View style={{ marginTop: 32, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 28 }}>
       {/* X axis */}
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
+            width: 72,
+            height: 72,
+            borderRadius: 36,
             backgroundColor: `rgb(${colorX.r},${colorX.g},${colorX.b})`,
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, opacity: 0.7 }}>X</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, opacity: 0.7 }}>X</Text>
         </View>
       </View>
       {/* Y axis */}
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
+            width: 72,
+            height: 72,
+            borderRadius: 36,
             backgroundColor: `rgb(${colorY.r},${colorY.g},${colorY.b})`,
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, opacity: 0.7 }}>Y</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, opacity: 0.7 }}>Y</Text>
         </View>
       </View>
       {/* Z axis */}
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
+            width: 72,
+            height: 72,
+            borderRadius: 36,
             backgroundColor: `rgb(${colorZ.r},${colorZ.g},${colorZ.b})`,
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, opacity: 0.7 }}>Z</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, opacity: 0.7 }}>Z</Text>
         </View>
       </View>
     </View>
