@@ -1,4 +1,3 @@
-
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,10 +16,6 @@ export default function ModeTwo() {
   const magnetometerRef = useRef<{x: number, y: number, z: number} | null>(null);
   const [buffer, setBuffer] = useState<{x: number, y: number, z: number}[]>([]);
   const [magnetometer, setMagnetometer] = useState<{x: number, y: number, z: number} | null>(null);
-
-  // Cache of previous pixel colors for upward flow
-  const pixelCacheRef = useRef<string[]>([]);
-  const [pixelCache, setPixelCache] = useState<string[]>([]);
 
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
@@ -66,7 +61,6 @@ export default function ModeTwo() {
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
   }, [buffer]);
 
-  // Calculate current pixel color
   let r = 0, g = 0, b = 0;
   if (magnetometer !== null) {
     const norm = (val: number, min: number, max: number) => {
@@ -77,64 +71,16 @@ export default function ModeTwo() {
     g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
     b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
   }
-  const currentPixel = `rgb(${r},${g},${b})`;
-
-  // Update pixel cache for upward flow
-  useEffect(() => {
-    if (!isFocused) return;
-    // Only update cache if pixel value actually changed
-    if (pixelCacheRef.current[pixelCacheRef.current.length - 1] !== currentPixel) {
-      pixelCacheRef.current.push(currentPixel);
-      if (pixelCacheRef.current.length > pixelHeight) pixelCacheRef.current.shift();
-      setPixelCache([...pixelCacheRef.current]);
-    }
-  }, [currentPixel, pixelHeight, isFocused]);
+  const color = `rgb(${r},${g},${b})`;
 
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Render exactly pixelHeight rows, filling from the most recent pixelCache values
-  const bandSize = 16;
-  const bands: string[] = [];
-  for (let i = 0; i < pixelHeight; i += bandSize) {
-    const cacheIdx = pixelCache.length - 1 - Math.floor(i / bandSize);
-    bands.push(pixelCache[cacheIdx] || '#000');
-  }
-
-  // Helper to parse rgb string to array
-  function parseRGB(rgb: string): [number, number, number] {
-    const m = rgb.match(/rgb\((\d+),(\d+),(\d+)\)/);
-    if (!m) return [0, 0, 0];
-    return [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];
-  }
-  // Helper to blend two rgb colors
-  function blendRGB(rgb1: string, rgb2: string, t: number): string {
-    const c1 = parseRGB(rgb1);
-    const c2 = parseRGB(rgb2);
-    const blended = c1.map((v, i) => Math.round(v * (1 - t) + c2[i] * t));
-    return `rgb(${blended[0]},${blended[1]},${blended[2]})`;
-  }
-
   return (
     <View style={{ width: screenWidth, height: canvasHeight, flexDirection: 'column' }}>
-      {Array.from({ length: pixelHeight }).map((_, y) => {
-        const bandIdx = Math.floor(y / bandSize);
-        const bandColor = bands[bandIdx];
-        const prevBandColor = bands[bandIdx - 1] || bandColor;
-  // t=0 at top of band (bandColor), t=1 at bottom (prevBandColor)
-  const t = 1 - ((y % bandSize) / (bandSize - 1));
-  const color = blendRGB(bandColor, prevBandColor, t);
-        return (
-          <View
-            key={y}
-            style={{
-              width: screenWidth,
-              height: pixelSize,
-              backgroundColor: color,
-            }}
-          />
-        );
-      })}
+      {Array.from({ length: pixelHeight }).map((_, y) => (
+        <View key={y} style={{ width: screenWidth, height: pixelSize, backgroundColor: color }} />
+      ))}
     </View>
   );
 }

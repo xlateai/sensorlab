@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,6 +17,7 @@ export default function ModeZero() {
   const magnetometerRef = useRef<{x: number, y: number, z: number} | null>(null);
   const [buffer, setBuffer] = useState<{x: number, y: number, z: number}[]>([]);
   const [magnetometer, setMagnetometer] = useState<{x: number, y: number, z: number} | null>(null);
+
 
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
@@ -61,6 +63,7 @@ export default function ModeZero() {
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
   }, [buffer]);
 
+  // Calculate current pixel color
   let r = 0, g = 0, b = 0;
   if (magnetometer !== null) {
     const norm = (val: number, min: number, max: number) => {
@@ -71,16 +74,24 @@ export default function ModeZero() {
     g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
     b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
   }
-  const color = `rgb(${r},${g},${b})`;
+  const currentPixel = `rgb(${r},${g},${b})`;
+
 
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
+  // Render a single centered circle with the latest value color
   return (
-    <View style={{ width: screenWidth, height: canvasHeight, flexDirection: 'column' }}>
-      {Array.from({ length: pixelHeight }).map((_, y) => (
-        <View key={y} style={{ width: screenWidth, height: pixelSize, backgroundColor: color }} />
-      ))}
+    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+      <View
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: currentPixel,
+          // no border
+        }}
+      />
     </View>
   );
 }
