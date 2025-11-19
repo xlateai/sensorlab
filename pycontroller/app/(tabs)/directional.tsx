@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import { Dimensions, Button, View, Pressable, Text } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
@@ -115,27 +116,75 @@ export default function DirectionalScreen() {
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
+    // Tick marks at 0°, 90°, 180°, 270°
+    const tickAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+  const tickLength = 12; // total length
+  const tickStroke = 1.2; // thinner
+  const tickColor = '#888'; // gray
+    const tickMarks = tickAngles.map((angle, idx) => {
+  // Start half inside, end half outside
+  const x1 = circleCenterX + (ringRadius - tickLength / 2) * Math.sin(angle);
+  const y1 = circleCenterY - (ringRadius - tickLength / 2) * Math.cos(angle);
+  const x2 = circleCenterX + (ringRadius + tickLength / 2) * Math.sin(angle);
+  const y2 = circleCenterY - (ringRadius + tickLength / 2) * Math.cos(angle);
+      return (
+        <Line
+          key={`tick-${idx}`}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke={tickColor}
+          strokeWidth={tickStroke}
+        />
+      );
+    });
+
+    // Haptic feedback when green dot enters tick zone
+    const DEG_TO_RAD = Math.PI / 180;
+    const TICK_ZONE = 0.5 * DEG_TO_RAD; // ±0.5° in radians
+    const [lastTickIndex, setLastTickIndex] = useState<number | null>(null);
+    useEffect(() => {
+      // Normalize dotAngle to [0, 2π)
+      let normAngle = dotAngle % (2 * Math.PI);
+      if (normAngle < 0) normAngle += 2 * Math.PI;
+      let enteredTick = null;
+      for (let i = 0; i < tickAngles.length; i++) {
+        let tick = tickAngles[i];
+        let diff = Math.abs(normAngle - tick);
+        // Handle wrap-around
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        if (diff <= TICK_ZONE) {
+          enteredTick = i;
+          break;
+        }
+      }
+      if (enteredTick !== null && enteredTick !== lastTickIndex) {
+        // Haptics.selectionAsync();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setLastTickIndex(enteredTick);
+      } else if (enteredTick === null && lastTickIndex !== null) {
+        setLastTickIndex(null);
+      }
+    }, [dotAngle]);
+
   // North and South indicator dots (true north/south using device heading)
   const indicatorRadius = 6;
   let northX = circleCenterX;
   let northY = circleCenterY;
   let southX = circleCenterX;
   let southY = circleCenterY;
-  if (motionData) {
-    // Subtract 90 degrees (Math.PI/2) so north is at top
-    const northAngle = motionData.rotation.alpha - Math.PI / 2;
-    const southAngle = motionData.rotation.alpha + Math.PI - Math.PI / 2;
-    northX = circleCenterX + ringRadius * Math.sin(northAngle);
-    northY = circleCenterY - ringRadius * Math.cos(northAngle);
-    southX = circleCenterX + ringRadius * Math.sin(southAngle);
-    southY = circleCenterY - ringRadius * Math.cos(southAngle);
-  }
-
-  // True bearing calculation (0 = North, 90 = East, etc.)
-  let trueBearingDeg = 0;
-  if (motionData) {
-    trueBearingDeg = (motionData.rotation.alpha * 180 / Math.PI) % 360;
-    if (trueBearingDeg < 0) trueBearingDeg += 360;
+  if (motionData && motionData.rotation) {
+  // Use alpha (yaw) for compass direction (true north/south)
+  const { alpha } = motionData.rotation;
+  // Subtract 90 degrees (Math.PI/2 radians) so north is at the top
+  const compassAngle = (alpha || 0) - Math.PI / 2;
+  // North indicator (white)
+  northX = circleCenterX + ringRadius * Math.sin(compassAngle);
+  northY = circleCenterY - ringRadius * Math.cos(compassAngle);
+  // South indicator (red, opposite direction, add 180°)
+  southX = circleCenterX + ringRadius * Math.sin(compassAngle + Math.PI);
+  southY = circleCenterY - ringRadius * Math.cos(compassAngle + Math.PI);
   }
 
   // Double tap to enable reorigin drag/line
@@ -227,6 +276,9 @@ export default function DirectionalScreen() {
         {/* Outer ring */}
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
 
+          {/* Tick marks at top, right, bottom, left */}
+          {tickMarks}
+
         {/* Center invisible circle with thin border */}
         <Circle
           cx={circleCenterX}
@@ -298,6 +350,34 @@ export default function DirectionalScreen() {
         <Circle cx={southX} cy={southY} r={indicatorRadius} fill="red" />
         {/* Main green dot */}
         <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
+        {/* Bearing label for green dot (static, relative to north) */}
+        {(() => {
+          // Calculate label position between dot and center
+          const labelRatio = 0.7; // 70% from center to dot (inside)
+          const labelX = circleCenterX + (dotX - circleCenterX) * labelRatio;
+          const labelY = circleCenterY + (dotY - circleCenterY) * labelRatio;
+          // Calculate static relative bearing (degrees)
+          let staticRelativeBearing = 0;
+          if (initialYawRef.current !== null) {
+            // North is 0, east is 90, south is 180, west is 270
+            staticRelativeBearing = (360-((initialYawRef.current + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360) % 360;
+            if (staticRelativeBearing >= 359.4) staticRelativeBearing = 0;
+          }
+          // Show as integer degrees
+          return (
+            <SvgText
+              x={labelX}
+              y={labelY}
+              fill="#fff"
+              fontSize={13}
+              fontWeight="bold"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              {`${staticRelativeBearing.toFixed(0)}°`}
+            </SvgText>
+          );
+        })()}
         {/* White direction line from center */}
         {showRedDot && redDotPos && fingerPos && (
           (() => {
