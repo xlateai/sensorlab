@@ -46,50 +46,50 @@ export default function SensorDots({ x, y, z }: SensorDotsProps) {
   }, [x, y, z]);
 
   return (
-    <View style={{ marginTop: 32, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 28 }}>
+    <View style={{ marginTop: 32, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 32 }}>
       {/* X axis */}
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 36,
+            width: 80,
+            height: 80,
+            borderRadius: 40,
             backgroundColor: `rgb(${colorX.r},${colorX.g},${colorX.b})`,
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, opacity: 0.7 }}>X</Text>
+          <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 18, opacity: 0.7 }}>X</Text>
         </View>
       </View>
       {/* Y axis */}
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 36,
+            width: 80,
+            height: 80,
+            borderRadius: 40,
             backgroundColor: `rgb(${colorY.r},${colorY.g},${colorY.b})`,
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, opacity: 0.7 }}>Y</Text>
+          <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 18, opacity: 0.7 }}>Y</Text>
         </View>
       </View>
       {/* Z axis */}
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 36,
+            width: 80,
+            height: 80,
+            borderRadius: 40,
             backgroundColor: `rgb(${colorZ.r},${colorZ.g},${colorZ.b})`,
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, opacity: 0.7 }}>Z</Text>
+          <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 18, opacity: 0.7 }}>Z</Text>
         </View>
       </View>
     </View>
