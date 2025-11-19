@@ -118,14 +118,15 @@ export default function DirectionalScreen() {
 
     // Tick marks at 0°, 90°, 180°, 270°
     const tickAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
-    const tickLength = 18;
-    const tickStroke = 3;
-    const tickColor = '#fff';
+  const tickLength = 24; // longer, protrudes outside
+  const tickStroke = 1.2; // thinner
+  const tickColor = '#888'; // gray
     const tickMarks = tickAngles.map((angle, idx) => {
-      const x1 = circleCenterX + (ringRadius - tickLength) * Math.sin(angle);
-      const y1 = circleCenterY - (ringRadius - tickLength) * Math.cos(angle);
-      const x2 = circleCenterX + ringRadius * Math.sin(angle);
-      const y2 = circleCenterY - ringRadius * Math.cos(angle);
+      // Start at the edge of the ring, end outside
+      const x1 = circleCenterX + ringRadius * Math.sin(angle);
+      const y1 = circleCenterY - ringRadius * Math.cos(angle);
+      const x2 = circleCenterX + (ringRadius + tickLength) * Math.sin(angle);
+      const y2 = circleCenterY - (ringRadius + tickLength) * Math.cos(angle);
       return (
         <Line
           key={`tick-${idx}`}
@@ -159,7 +160,8 @@ export default function DirectionalScreen() {
         }
       }
       if (enteredTick !== null && enteredTick !== lastTickIndex) {
-        Haptics.selectionAsync();
+        // Haptics.selectionAsync();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setLastTickIndex(enteredTick);
       } else if (enteredTick === null && lastTickIndex !== null) {
         setLastTickIndex(null);
