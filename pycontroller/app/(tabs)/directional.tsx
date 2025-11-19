@@ -361,6 +361,7 @@ export default function DirectionalScreen() {
           if (initialYawRef.current !== null) {
             // North is 0, east is 90, south is 180, west is 270
             staticRelativeBearing = (360-((initialYawRef.current + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360) % 360;
+            if (staticRelativeBearing >= 359.4) staticRelativeBearing = 0;
           }
           // Show as integer degrees
           return (
