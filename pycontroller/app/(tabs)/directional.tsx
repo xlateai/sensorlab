@@ -118,15 +118,15 @@ export default function DirectionalScreen() {
 
     // Tick marks at 0°, 90°, 180°, 270°
     const tickAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
-  const tickLength = 24; // longer, protrudes outside
+  const tickLength = 12; // total length
   const tickStroke = 1.2; // thinner
   const tickColor = '#888'; // gray
     const tickMarks = tickAngles.map((angle, idx) => {
-      // Start at the edge of the ring, end outside
-      const x1 = circleCenterX + ringRadius * Math.sin(angle);
-      const y1 = circleCenterY - ringRadius * Math.cos(angle);
-      const x2 = circleCenterX + (ringRadius + tickLength) * Math.sin(angle);
-      const y2 = circleCenterY - (ringRadius + tickLength) * Math.cos(angle);
+  // Start half inside, end half outside
+  const x1 = circleCenterX + (ringRadius - tickLength / 2) * Math.sin(angle);
+  const y1 = circleCenterY - (ringRadius - tickLength / 2) * Math.cos(angle);
+  const x2 = circleCenterX + (ringRadius + tickLength / 2) * Math.sin(angle);
+  const y2 = circleCenterY - (ringRadius + tickLength / 2) * Math.cos(angle);
       return (
         <Line
           key={`tick-${idx}`}
