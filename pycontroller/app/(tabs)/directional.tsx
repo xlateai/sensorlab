@@ -241,39 +241,34 @@ export default function DirectionalScreen() {
         {/* Gravity-based moving circle */}
         {(() => {
           // Default to center
-          let gravityX = circleCenterX;
-          let gravityY = circleCenterY;
-          let gravityColor = 'rgba(128,128,128,0.3)';
-          if (motionData && motionData.accelerationIncludingGravity) {
-            // Use pitch/roll to move the circle
-            const g = motionData.accelerationIncludingGravity;
+          let rotX = circleCenterX;
+          let rotY = circleCenterY;
+          let rotColor = 'rgba(128,128,128,0.3)';
+          // Axis mapping: try swapping axes or flipping sign if needed
+          // Try: normX = beta, normY = gamma, or flip sign
+          if (motionData && motionData.rotation) {
+            const { beta, gamma } = motionData.rotation;
             const maxOffset = ringRadius - levelingRadius;
-            const normX = Math.max(-1, Math.min(1, g.x / 9.8));
-            const normY = Math.max(-1, Math.min(1, g.y / 9.8));
-            // Calculate raw position
+            // Map ±90° to the edge of the ring
+            let normX = Math.max(-1, Math.min(1, gamma));
+            let normY = Math.max(-1, Math.min(1, beta));
+            // Option 2: X = beta, Y = gamma
+            // let normX = Math.max(-1, Math.min(1, beta / 45));
+            // let normY = Math.max(-1, Math.min(1, gamma / 45));
+            // Option 3: Flip sign if needed
+            // normX = -normX;
+            // normY = -normY;
             const rawX = circleCenterX + normX * maxOffset;
             const rawY = circleCenterY + normY * maxOffset;
-            // Interpolate toward center if within threshold
-            const levelThreshold = 0.04; // 2% of previous threshold (~0.016)
-            const distToCenter = Math.sqrt((rawX - circleCenterX) ** 2 + (rawY - circleCenterY) ** 2);
-            let t = 0;
-            if (Math.abs(normX) < levelThreshold && Math.abs(normY) < levelThreshold) {
-              gravityColor = 'rgba(57,255,20,0.7)'; // green tinge
-              // Much smoother interpolation: use a high exponent for t
-              t = 1 - (distToCenter / (maxOffset * levelThreshold * 2));
-              t = Math.max(0, Math.min(1, t));
-              t = Math.pow(t, 6); // smoother, slower approach to center
-            }
-            // Interpolate position
-            gravityX = rawX * (1 - t) + circleCenterX * t;
-            gravityY = rawY * (1 - t) + circleCenterY * t;
+            rotX = rawX;
+            rotY = rawY;
           }
           return (
             <Circle
-              cx={gravityX}
-              cy={gravityY}
+              cx={rotX}
+              cy={rotY}
               r={levelingRadius}
-              fill={gravityColor}
+              fill={rotColor}
               stroke="none"
             />
           );
@@ -314,6 +309,13 @@ export default function DirectionalScreen() {
           })()
         )}
       </Svg>
+      {/* Debug overlay for beta/gamma values */}
+      {motionData && motionData.rotation && (
+        <View style={{ position: 'absolute', left: 10, top: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 8 }}>
+          <Text style={{ color: '#fff', fontSize: 12 }}>beta: {motionData.rotation.beta?.toFixed(2)}</Text>
+          <Text style={{ color: '#fff', fontSize: 12 }}>gamma: {motionData.rotation.gamma?.toFixed(2)}</Text>
+        </View>
+      )}
       {/* Overlay SVG for red dot and line */}
       {showRedDot && redDotPos && (
         <Svg
