@@ -59,8 +59,15 @@ export default function ThreeDScreen() {
     const { alpha = 0 } = motionData.rotation;
   // North is at angle (alpha - Math.PI/2 + Math.PI)
   const northAngle = (alpha || 0) - Math.PI / 2 + Math.PI;
-    // Arrow length equal to ringRadius
-    const arrowLength = ringRadius;
+  // Scale arrow length based on pitch (beta)
+  const { beta = 0 } = motionData.rotation;
+  // beta: 0 = flat, ±pi/2 = vertical
+  const minLength = 0; // single point
+  const maxPitch = Math.PI / 2;
+  let pitchNorm = Math.abs(beta) / maxPitch;
+  if (pitchNorm > 1) pitchNorm = 1;
+  let arrowLength = ringRadius * pitchNorm;
+  if (arrowLength < minLength) arrowLength = minLength;
     // Arrow endpoint
     const arrowX = circleCenterX + arrowLength * Math.sin(northAngle);
     const arrowY = circleCenterY - arrowLength * Math.cos(northAngle);
