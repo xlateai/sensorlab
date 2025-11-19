@@ -38,6 +38,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="video"
+        options={{
+          title: 'Video',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="play.rectangle" color={color} />, // video icon
+        }}
+      />
+      <Tabs.Screen
         name="dev"
         options={{
           title: 'Dev',
