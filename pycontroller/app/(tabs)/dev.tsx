@@ -185,11 +185,11 @@ export default function DevScreen() {
           {/* Motion Data Table */}
           <View style={[styles.tableContainer, styles.motionTable]}>
             <View style={styles.tableRow}>
-              <Text style={styles.tableHeader}>Measurement</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}>X</Text>
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
-              <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
@@ -203,7 +203,7 @@ export default function DevScreen() {
               </Pressable>
             </View>
             <View style={styles.tableRow}>
-              <Text style={styles.tableMeasurementCell}>acc+grav</Text>
+              <Text style={styles.tableMeasurementCell}>acc+g</Text>
               <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.x?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.y?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.z?.toFixed(3) ?? '-'}</Text>
@@ -237,15 +237,15 @@ export default function DevScreen() {
           <Text style={styles.header}>Magnetometer</Text>
           <View style={[styles.tableContainer, styles.magnetometerTable]}>
             <View style={styles.tableRow}>
-              <Text style={styles.tableHeader}>Measurement</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}>X</Text>
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
-              <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
-              <Text style={styles.tableMeasurementCell}>magnetometer</Text>
+              <Text style={styles.tableMeasurementCell}>mag</Text>
               <Text style={styles.tableCell}>{magnetometerData?.x?.toFixed(2) ?? '-'}</Text>
               <Text style={styles.tableCell}>{magnetometerData?.y?.toFixed(2) ?? '-'}</Text>
               <Text style={styles.tableCell}>{magnetometerData?.z?.toFixed(2) ?? '-'}</Text>
@@ -259,15 +259,15 @@ export default function DevScreen() {
           <Text style={styles.header}>Gyroscope</Text>
           <View style={[styles.tableContainer, styles.gyroscopeTable]}>
             <View style={styles.tableRow}>
-              <Text style={styles.tableHeader}>Measurement</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}>X</Text>
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
-              <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
-              <Text style={styles.tableMeasurementCell}>gyroscope</Text>
+              <Text style={styles.tableMeasurementCell}>gryo</Text>
               <Text style={styles.tableCell}>{gyroscopeData?.x?.toFixed(2) ?? '-'}</Text>
               <Text style={styles.tableCell}>{gyroscopeData?.y?.toFixed(2) ?? '-'}</Text>
               <Text style={styles.tableCell}>{gyroscopeData?.z?.toFixed(2) ?? '-'}</Text>
@@ -281,15 +281,15 @@ export default function DevScreen() {
           <Text style={styles.header}>Barometer</Text>
           <View style={[styles.tableContainer, styles.barometerTable]}>
             <View style={styles.tableRow}>
-              <Text style={styles.tableHeader}>Measurement</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}>X</Text>
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
-              <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
               <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
-              <Text style={styles.tableMeasurementCell}>barometer</Text>
+              <Text style={styles.tableMeasurementCell}>barom</Text>
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>-</Text>
