@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import { Dimensions, Button, View, Pressable, Text } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
@@ -115,6 +116,56 @@ export default function DirectionalScreen() {
   const dotX = circleCenterX + ringRadius * Math.sin(dotAngle);
   const dotY = circleCenterY - ringRadius * Math.cos(dotAngle);
 
+    // Tick marks at 0°, 90°, 180°, 270°
+    const tickAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+    const tickLength = 18;
+    const tickStroke = 3;
+    const tickColor = '#fff';
+    const tickMarks = tickAngles.map((angle, idx) => {
+      const x1 = circleCenterX + (ringRadius - tickLength) * Math.sin(angle);
+      const y1 = circleCenterY - (ringRadius - tickLength) * Math.cos(angle);
+      const x2 = circleCenterX + ringRadius * Math.sin(angle);
+      const y2 = circleCenterY - ringRadius * Math.cos(angle);
+      return (
+        <Line
+          key={`tick-${idx}`}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke={tickColor}
+          strokeWidth={tickStroke}
+        />
+      );
+    });
+
+    // Haptic feedback when green dot enters tick zone
+    const DEG_TO_RAD = Math.PI / 180;
+    const TICK_ZONE = 0.5 * DEG_TO_RAD; // ±0.5° in radians
+    const [lastTickIndex, setLastTickIndex] = useState<number | null>(null);
+    useEffect(() => {
+      // Normalize dotAngle to [0, 2π)
+      let normAngle = dotAngle % (2 * Math.PI);
+      if (normAngle < 0) normAngle += 2 * Math.PI;
+      let enteredTick = null;
+      for (let i = 0; i < tickAngles.length; i++) {
+        let tick = tickAngles[i];
+        let diff = Math.abs(normAngle - tick);
+        // Handle wrap-around
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        if (diff <= TICK_ZONE) {
+          enteredTick = i;
+          break;
+        }
+      }
+      if (enteredTick !== null && enteredTick !== lastTickIndex) {
+        Haptics.selectionAsync();
+        setLastTickIndex(enteredTick);
+      } else if (enteredTick === null && lastTickIndex !== null) {
+        setLastTickIndex(null);
+      }
+    }, [dotAngle]);
+
   // North and South indicator dots (true north/south using device heading)
   const indicatorRadius = 6;
   let northX = circleCenterX;
@@ -229,6 +280,9 @@ export default function DirectionalScreen() {
       >
         {/* Outer ring */}
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+
+          {/* Tick marks at top, right, bottom, left */}
+          {tickMarks}
 
         {/* Center invisible circle with thin border */}
         <Circle
