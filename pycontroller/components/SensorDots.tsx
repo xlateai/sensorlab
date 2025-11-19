@@ -72,7 +72,7 @@ function getColor(value: number, axis: 'x' | 'y' | 'z', low: number, high: numbe
   return COLORS.red;
 }
 
-export default function SensorDots({ x, y, z, xLow = -1, xHigh = 1, yLow = -1, yHigh = 1, zLow = -2, zHigh = 0 }: SensorDotsProps) {
+export default function SensorDots({ x, y, z, xLow = -1, xHigh = 1, yLow = -1, yHigh = 1, zLow = -1, zHigh = 1 }: SensorDotsProps) {
   const [colorX, setColorX] = useState({ r: 136, g: 136, b: 136 });
   const [colorY, setColorY] = useState({ r: 136, g: 136, b: 136 });
   const [colorZ, setColorZ] = useState({ r: 136, g: 136, b: 136 });

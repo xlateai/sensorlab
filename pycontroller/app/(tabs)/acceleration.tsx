@@ -54,6 +54,12 @@ export default function AccelerationScreen() {
           x={currentAccel.x}
           y={currentAccel.y}
           z={currentAccel.z}
+          xLow={-1.25}
+          xHigh={1.25}
+          yLow={-1.25}
+          yHigh={1.25}
+          zLow={-1.25}
+          zHigh={1.25}
         />
       </ScrollView>
       {/* Record button at bottom center */}
