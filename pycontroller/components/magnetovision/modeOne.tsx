@@ -93,24 +93,26 @@ export default function ModeOne() {
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Render rows from oldest (top) to newest (bottom), but with 16 rows per pixel color
+  // Render exactly pixelHeight rows, filling from the most recent pixelCache values
   const bandSize = 16;
-  const bandCount = Math.floor(pixelHeight / bandSize);
-  const bands = Array.from({ length: bandCount }).map((_, i) => pixelCache[pixelCache.length - 1 - i] || '#000');
+  const bands: string[] = [];
+  for (let i = 0; i < pixelHeight; i += bandSize) {
+    // Get the color for this band, most recent first
+    const cacheIdx = pixelCache.length - 1 - Math.floor(i / bandSize);
+    bands.push(pixelCache[cacheIdx] || '#000');
+  }
 
   return (
     <View style={{ width: screenWidth, height: canvasHeight, flexDirection: 'column' }}>
-      {bands.map((color, i) => (
-        Array.from({ length: bandSize }).map((_, j) => (
-          <View
-            key={i * bandSize + j}
-            style={{
-              width: screenWidth,
-              height: pixelSize,
-              backgroundColor: color,
-            }}
-          />
-        ))
+      {Array.from({ length: pixelHeight }).map((_, y) => (
+        <View
+          key={y}
+          style={{
+            width: screenWidth,
+            height: pixelSize,
+            backgroundColor: bands[Math.floor(y / bandSize)],
+          }}
+        />
       ))}
     </View>
   );
