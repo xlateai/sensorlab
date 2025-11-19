@@ -56,16 +56,31 @@ export default function MagneticScreen() {
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Magnetometer</Text>
           </View>
           <View>
-            <Svg width={plotWidth} height={plotHeight} style={{ backgroundColor: '#222', borderRadius: 8 }}>
-              <Polyline points={xPoints} fill="none" stroke="#4af" strokeWidth="2" />
-              <Polyline points={yPoints} fill="none" stroke="#fa4" strokeWidth="2" />
-              <Polyline points={zPoints} fill="none" stroke="#0fa" strokeWidth="2" />
-              {/* Zero line */}
-              <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
-              {/* Axes */}
-              <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
-              <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
-            </Svg>
+            <View style={{ position: 'relative' }}>
+              <Svg width={plotWidth} height={plotHeight} style={{ backgroundColor: '#222', borderRadius: 8 }}>
+                <Polyline points={xPoints} fill="none" stroke="#4af" strokeWidth="2" />
+                <Polyline points={yPoints} fill="none" stroke="#fa4" strokeWidth="2" />
+                <Polyline points={zPoints} fill="none" stroke="#0fa" strokeWidth="2" />
+                {/* Zero line */}
+                <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
+                {/* Axes */}
+                <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
+                <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
+              </Svg>
+              {/* Y-axis labels on the far right */}
+              {(() => {
+                const allVals = magHistory.flatMap(d => [d.x, d.y, d.z]);
+                const vMin = allVals.length ? Math.min(...allVals) : -1;
+                const vMax = allVals.length ? Math.max(...allVals) : 1;
+                return (
+                  <>
+                    <Text style={{ position: 'absolute', right: 0, top: 0, color: '#fff', fontSize: 12 }}>{vMax.toFixed(2)}</Text>
+                    <Text style={{ position: 'absolute', right: 0, top: plotHeight/2 - 8, color: '#fff', fontSize: 12 }}>{'0'}</Text>
+                    <Text style={{ position: 'absolute', right: 0, bottom: 0, color: '#fff', fontSize: 12 }}>{vMin.toFixed(2)}</Text>
+                  </>
+                );
+              })()}
+            </View>
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
               <Text style={{ color: '#4af', fontWeight: 'bold', marginHorizontal: 8 }}>x</Text>
               <Text style={{ color: '#fa4', fontWeight: 'bold', marginHorizontal: 8 }}>y</Text>
