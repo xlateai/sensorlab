@@ -1,6 +1,46 @@
 // ...existing code...
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
+import { Modal, Pressable } from 'react-native';
+// Blank popup component
+function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => void; measurement: string }) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+        <View
+          style={{
+            width: '85%',
+            height: '60%',
+            backgroundColor: '#000',
+            borderRadius: 24,
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 32,
+          }}
+        >
+          {/* Intentionally left blank */}
+          <Pressable
+            onPress={onClose}
+            style={{
+              backgroundColor: '#222',
+              paddingHorizontal: 32,
+              paddingVertical: 14,
+              borderRadius: 10,
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 import type { Subscription } from 'expo-sensors';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView } from 'react-native';
 import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
@@ -12,6 +52,14 @@ type OriginType = {
 };
 
 export default function DevScreen() {
+  // Popup state
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupMeasurement, setPopupMeasurement] = useState('');
+  const openPopup = (measurement: string) => {
+    setPopupMeasurement(measurement);
+    setPopupVisible(true);
+  };
+  const closePopup = () => setPopupVisible(false);
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
   const [magnetometerData, setMagnetometerData] = useState<{x: number, y: number, z: number} | null>(null);
   const [gyroscopeData, setGyroscopeData] = useState<{x: number, y: number, z: number} | null>(null);
@@ -113,6 +161,7 @@ export default function DevScreen() {
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
               <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>acc</Text>
@@ -120,6 +169,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.acceleration?.y?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{motionData?.acceleration?.z?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>m/s²</Text>
+              <Pressable onPress={() => openPopup('acc')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>acc+grav</Text>
@@ -127,6 +179,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.y?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.z?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>m/s²</Text>
+              <Pressable onPress={() => openPopup('acc+grav')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>rot</Text>
@@ -134,6 +189,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.rotation?.beta?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{motionData?.rotation?.gamma?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>deg</Text>
+              <Pressable onPress={() => openPopup('rot')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>rotΔ</Text>
@@ -141,6 +199,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.rotationRate?.beta?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{motionData?.rotationRate?.gamma?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>deg/s</Text>
+              <Pressable onPress={() => openPopup('rotΔ')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>Interval</Text>
@@ -148,6 +209,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>ms</Text>
+              <Pressable onPress={() => openPopup('Interval')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
           </View>
           {/* Magnetometer Table */}
@@ -159,6 +223,7 @@ export default function DevScreen() {
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
               <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>magnetometer</Text>
@@ -166,6 +231,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{magnetometerData?.y?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{magnetometerData?.z?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>μT</Text>
+              <Pressable onPress={() => openPopup('magnetometer')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
           </View>
           {/* Gyroscope Table */}
@@ -177,6 +245,7 @@ export default function DevScreen() {
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
               <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>gyroscope</Text>
@@ -184,6 +253,9 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{gyroscopeData?.y?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>{gyroscopeData?.z?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>rad/s</Text>
+              <Pressable onPress={() => openPopup('gyroscope')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
           </View>
           {/* Barometer Table */}
@@ -195,6 +267,7 @@ export default function DevScreen() {
               <Text style={styles.tableHeader}>Y</Text>
               <Text style={styles.tableHeader}>Z</Text>
               <Text style={styles.tableHeader}>Other</Text>
+              <Text style={styles.tableHeader}></Text>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>barometer</Text>
@@ -202,9 +275,14 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>{barometerData?.pressure?.toFixed(2) ?? '-'} hPa</Text>
+              <Pressable onPress={() => openPopup('barometer')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+              </Pressable>
             </View>
           </View>
           <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
+          {/* Blank popup modal */}
+          <BlankPopup visible={popupVisible} onClose={closePopup} measurement={popupMeasurement} />
         </View>
       </ScrollView>
     </SafeAreaView>
