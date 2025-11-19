@@ -121,14 +121,17 @@ export default function DirectionalScreen() {
   let northY = circleCenterY;
   let southX = circleCenterX;
   let southY = circleCenterY;
-  if (motionData) {
-    // Subtract 90 degrees (Math.PI/2) so north is at top
-    const northAngle = motionData.rotation.alpha - Math.PI / 2;
-    const southAngle = motionData.rotation.alpha + Math.PI - Math.PI / 2;
-    northX = circleCenterX + ringRadius * Math.sin(northAngle);
-    northY = circleCenterY - ringRadius * Math.cos(northAngle);
-    southX = circleCenterX + ringRadius * Math.sin(southAngle);
-    southY = circleCenterY - ringRadius * Math.cos(southAngle);
+  if (motionData && motionData.rotation) {
+  // Use alpha (yaw) for compass direction (true north/south)
+  const { alpha } = motionData.rotation;
+  // Subtract 90 degrees (Math.PI/2 radians) so north is at the top
+  const compassAngle = (alpha || 0) - Math.PI / 2;
+  // North indicator (white)
+  northX = circleCenterX + ringRadius * Math.sin(compassAngle);
+  northY = circleCenterY - ringRadius * Math.cos(compassAngle);
+  // South indicator (red, opposite direction)
+  southX = circleCenterX - ringRadius * Math.sin(compassAngle);
+  southY = circleCenterY + ringRadius * Math.cos(compassAngle);
   }
 
   // True bearing calculation (0 = North, 90 = East, etc.)
