@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Dimensions, View, Animated, PanResponder } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
 const PIXEL_WIDTH = 256;
@@ -21,15 +22,17 @@ export default function VideoScreen() {
   const [buffer, setBuffer] = useState<{x: number, y: number, z: number}[]>([]);
   const [magnetometer, setMagnetometer] = useState<{x: number, y: number, z: number} | null>(null);
 
-  useEffect(() => {
-    const sub = Magnetometer.addListener(data => {
-      bufferRef.current.push(data);
-      if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
-      magnetometerRef.current = data;
-    });
-    Magnetometer.setUpdateInterval(24);
-    return () => { sub && sub.remove(); };
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const sub = Magnetometer.addListener(data => {
+        bufferRef.current.push(data);
+        if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
+        magnetometerRef.current = data;
+      });
+      Magnetometer.setUpdateInterval(24);
+      return () => { sub && sub.remove(); };
+    }, [])
+  );
 
   // Update buffer and magnetometer state at a regular interval (not every sensor event)
   useEffect(() => {
