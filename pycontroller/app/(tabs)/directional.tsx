@@ -187,13 +187,6 @@ export default function DirectionalScreen() {
   southY = circleCenterY - ringRadius * Math.cos(compassAngle + Math.PI);
   }
 
-  // True bearing calculation (0 = North, 90 = East, etc.)
-  let trueBearingDeg = 0;
-  if (motionData) {
-  trueBearingDeg = ((motionData.rotation.alpha + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360;
-  if (trueBearingDeg < 0) trueBearingDeg += 360;
-  }
-
   // Double tap to enable reorigin drag/line
   const DOUBLE_TAP_DELAY = 300; // ms
   const [readyForDrag, setReadyForDrag] = useState(false);
@@ -367,8 +360,7 @@ export default function DirectionalScreen() {
           let staticRelativeBearing = 0;
           if (initialYawRef.current !== null) {
             // North is 0, east is 90, south is 180, west is 270
-            staticRelativeBearing = ((initialYawRef.current + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360;
-            if (staticRelativeBearing < 0) staticRelativeBearing += 360;
+            staticRelativeBearing = (360-((initialYawRef.current + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360) % 360;
           }
           // Show as integer degrees
           return (
