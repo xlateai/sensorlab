@@ -2,8 +2,13 @@
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable } from 'react-native';
+
 // Blank popup component
-function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => void; measurement: string }) {
+function BlankPopup({ visible, onClose, children }: {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <Modal
       visible={visible}
@@ -21,9 +26,12 @@ function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => voi
             alignItems: 'center',
             justifyContent: 'flex-end',
             paddingBottom: 10,
+            overflow: 'hidden',
           }}
         >
-          {/* Intentionally left blank */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 60, alignItems: 'center', justifyContent: 'center' }}>
+            {children}
+          </View>
           <Pressable
             onPress={onClose}
             style={{
@@ -33,6 +41,10 @@ function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => voi
               borderRadius: 10,
               marginBottom: 0,
               alignSelf: 'center',
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
             }}
           >
             <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
@@ -42,22 +54,31 @@ function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => voi
     </Modal>
   );
 }
-import type { Subscription } from 'expo-sensors';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView } from 'react-native';
 import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
 import type { DeviceMotionMeasurement } from 'expo-sensors';
+import AccelerationScreen from '@/components/sensorvisuals/acceleration';
 
-type OriginType = {
-  position: DeviceMotionMeasurement['accelerationIncludingGravity'];
-  orientation: DeviceMotionMeasurement['rotation'];
+// Map measurement to component
+const measurementComponentMap: Record<string, React.ComponentType | null> = {
+  'acc': AccelerationScreen,
+  'acc+grav': null,
+  'rot': null,
+  'rotΔ': null,
+  'Interval': null,
+  'magnetometer': null,
+  'gyroscope': null,
+  'barometer': null,
 };
 
 export default function DevScreen() {
   // Popup state
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupMeasurement, setPopupMeasurement] = useState('');
+  const [popupComponent, setPopupComponent] = useState<string>('');
   const openPopup = (measurement: string) => {
     setPopupMeasurement(measurement);
+    setPopupComponent(measurement);
     setPopupVisible(true);
   };
   const closePopup = () => setPopupVisible(false);
@@ -283,7 +304,14 @@ export default function DevScreen() {
           </View>
           <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
           {/* Blank popup modal */}
-          <BlankPopup visible={popupVisible} onClose={closePopup} measurement={popupMeasurement} />
+          <BlankPopup visible={popupVisible} onClose={closePopup}>
+            {popupComponent === 'acc' ? <AccelerationScreen /> : (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 32 }}>{popupMeasurement}</Text>
+                <Text style={{ color: '#fff', fontSize: 18, marginTop: 16 }}>TODO</Text>
+              </View>
+            )}
+          </BlankPopup>
         </View>
       </ScrollView>
     </SafeAreaView>
