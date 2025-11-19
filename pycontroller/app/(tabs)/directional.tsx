@@ -161,7 +161,7 @@ export default function DirectionalScreen() {
       }
       if (enteredTick !== null && enteredTick !== lastTickIndex) {
         // Haptics.selectionAsync();
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setLastTickIndex(enteredTick);
       } else if (enteredTick === null && lastTickIndex !== null) {
         setLastTickIndex(null);
@@ -182,16 +182,16 @@ export default function DirectionalScreen() {
   // North indicator (white)
   northX = circleCenterX + ringRadius * Math.sin(compassAngle);
   northY = circleCenterY - ringRadius * Math.cos(compassAngle);
-  // South indicator (red, opposite direction)
-  southX = circleCenterX - ringRadius * Math.sin(compassAngle);
-  southY = circleCenterY + ringRadius * Math.cos(compassAngle);
+  // South indicator (red, opposite direction, add 180°)
+  southX = circleCenterX + ringRadius * Math.sin(compassAngle + Math.PI);
+  southY = circleCenterY - ringRadius * Math.cos(compassAngle + Math.PI);
   }
 
   // True bearing calculation (0 = North, 90 = East, etc.)
   let trueBearingDeg = 0;
   if (motionData) {
-    trueBearingDeg = (motionData.rotation.alpha * 180 / Math.PI) % 360;
-    if (trueBearingDeg < 0) trueBearingDeg += 360;
+  trueBearingDeg = ((motionData.rotation.alpha + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360;
+  if (trueBearingDeg < 0) trueBearingDeg += 360;
   }
 
   // Double tap to enable reorigin drag/line
@@ -357,6 +357,34 @@ export default function DirectionalScreen() {
         <Circle cx={southX} cy={southY} r={indicatorRadius} fill="red" />
         {/* Main green dot */}
         <Circle cx={dotX} cy={dotY} r={dotRadius} fill="#39ff14" />
+        {/* Bearing label for green dot (static, relative to north) */}
+        {(() => {
+          // Calculate label position between dot and center
+          const labelRatio = 0.7; // 70% from center to dot (inside)
+          const labelX = circleCenterX + (dotX - circleCenterX) * labelRatio;
+          const labelY = circleCenterY + (dotY - circleCenterY) * labelRatio;
+          // Calculate static relative bearing (degrees)
+          let staticRelativeBearing = 0;
+          if (initialYawRef.current !== null) {
+            // North is 0, east is 90, south is 180, west is 270
+            staticRelativeBearing = ((initialYawRef.current + Math.PI - Math.PI / 2) * 180 / Math.PI) % 360;
+            if (staticRelativeBearing < 0) staticRelativeBearing += 360;
+          }
+          // Show as integer degrees
+          return (
+            <SvgText
+              x={labelX}
+              y={labelY}
+              fill="#fff"
+              fontSize={13}
+              fontWeight="bold"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              {`${staticRelativeBearing.toFixed(0)}°`}
+            </SvgText>
+          );
+        })()}
         {/* White direction line from center */}
         {showRedDot && redDotPos && fingerPos && (
           (() => {
