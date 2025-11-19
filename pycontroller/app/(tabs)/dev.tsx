@@ -58,6 +58,7 @@ import { StyleSheet, View, Text, SafeAreaView, ScrollView } from 'react-native';
 import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
 import type { DeviceMotionMeasurement } from 'expo-sensors';
 import AccelerationScreen from '@/components/sensorvisuals/acceleration';
+import MagneticScreen from '@/components/sensorvisuals/magnetic';
 
 // Map measurement to component
 const measurementComponentMap: Record<string, React.ComponentType | null> = {
@@ -305,7 +306,8 @@ export default function DevScreen() {
           <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
           {/* Blank popup modal */}
           <BlankPopup visible={popupVisible} onClose={closePopup}>
-            {popupComponent === 'acc' ? <AccelerationScreen /> : (
+            {popupComponent === 'acc' ? <AccelerationScreen /> :
+             popupComponent === 'magnetometer' ? <MagneticScreen /> : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 32 }}>{popupMeasurement}</Text>
                 <Text style={{ color: '#fff', fontSize: 18, marginTop: 16 }}>TODO</Text>
