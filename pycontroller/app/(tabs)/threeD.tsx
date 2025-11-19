@@ -66,7 +66,7 @@ export default function ThreeDScreen() {
   const maxPitch = Math.PI / 2;
   let pitchNorm = Math.abs(beta) / maxPitch;
   if (pitchNorm > 1) pitchNorm = 1;
-  let arrowLength = ringRadius * pitchNorm;
+  let arrowLength = ringRadius * (1 - pitchNorm);
   if (arrowLength < minLength) arrowLength = minLength;
     // Arrow endpoint
     const arrowX = circleCenterX + arrowLength * Math.sin(northAngle);
