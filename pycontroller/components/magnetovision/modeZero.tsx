@@ -63,7 +63,8 @@ export default function ModeZero() {
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
   }, [buffer]);
 
-  // Calculate current pixel color
+  // Interpolate between colors for smooth transitions
+  const prevRGBRef = useRef<[number, number, number]>([0, 0, 0]);
   let r = 0, g = 0, b = 0;
   if (magnetometer !== null) {
     const norm = (val: number, min: number, max: number) => {
@@ -74,7 +75,14 @@ export default function ModeZero() {
     g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
     b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
   }
-  const currentPixel = `rgb(${r},${g},${b})`;
+  // Blend previous and current RGB
+  const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
+  const prev = prevRGBRef.current;
+  const smoothR = Math.round(prev[0] * (1 - blend) + r * blend);
+  const smoothG = Math.round(prev[1] * (1 - blend) + g * blend);
+  const smoothB = Math.round(prev[2] * (1 - blend) + b * blend);
+  prevRGBRef.current = [smoothR, smoothG, smoothB];
+  const currentPixel = `rgb(${smoothR},${smoothG},${smoothB})`;
 
 
   if (!isFocused) {
