@@ -21,14 +21,12 @@ interface ThreeAxisPlotProps {
   max?: number;
 }
 
-function getPolylinePoints(data: Array<{ t: number; v: number }>, width: number, height: number) {
+function getPolylinePoints(data: Array<{ v: number }>, width: number, height: number) {
   if (data.length === 0) return '';
-  const tMin = data[0].t;
-  const tMax = data[data.length - 1].t;
   const vMin = Math.min(...data.map(d => d.v));
   const vMax = Math.max(...data.map(d => d.v));
-  return data.map(d => {
-    const x = ((d.t - tMin) / Math.max(0.001, tMax - tMin)) * width;
+  return data.map((d, i) => {
+    const x = (i / Math.max(1, data.length - 1)) * width;
     const y = height - ((d.v - vMin) / Math.max(0.001, vMax - vMin)) * height;
     return `${x},${y}`;
   }).join(' ');
@@ -45,10 +43,10 @@ export default function ThreeAxisPlot({
   min,
   max,
 }: ThreeAxisPlotProps) {
-  const tMax = data.length > 0 ? data[data.length - 1].t : 0.0;
-  const xPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.x })), width, height);
-  const yPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.y })), width, height);
-  const zPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.z })), width, height);
+  const tMax = data.length > 0 ? data.length - 1 : 0;
+  const xPoints = getPolylinePoints(data.map(d => ({ v: d.x })), width, height);
+  const yPoints = getPolylinePoints(data.map(d => ({ v: d.y })), width, height);
+  const zPoints = getPolylinePoints(data.map(d => ({ v: d.z })), width, height);
   // For axis labels, use min/max across all axes
   const allVals = data.flatMap(d => [d.x, d.y, d.z]);
   const vMin = typeof min === 'number' ? min : (allVals.length ? Math.min(...allVals) : -1);
@@ -81,7 +79,7 @@ export default function ThreeAxisPlot({
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8 }}>
         <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>0</Text>
         <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>time</Text>
-        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>{tMax.toFixed(1)}</Text>
+  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>{tMax}</Text>
       </View>
     </View>
   );

@@ -25,7 +25,10 @@ export default function AccelerationScreen() {
           const now = Date.now();
           if (startTimeRef.current === null) startTimeRef.current = now;
           const t = (now - startTimeRef.current) / 1000;
-          setMagHistory(prev => [...prev, { t, x, y, z }]);
+          setMagHistory(prev => {
+            const updated = [...prev, { t, x, y, z }];
+            return updated.length > 128 ? updated.slice(updated.length - 128) : updated;
+          });
         }
       });
       Accelerometer.setUpdateInterval(24);
@@ -68,14 +71,18 @@ export default function AccelerationScreen() {
           recording={recording}
           onPressIn={() => {
             setRecording(true);
-            setMagHistory([]);
-            startTimeRef.current = null;
+            if (startTimeRef.current === null && magHistory.length > 0) {
+              startTimeRef.current = Date.now() - magHistory[magHistory.length - 1].t * 1000;
+            } else {
+              startTimeRef.current = null;
+            }
           }}
           onPressOut={() => {
             setRecording(false);
           }}
           onClear={() => {
             setMagHistory([]);
+            startTimeRef.current = null;
           }}
           color="#4af"
         />
