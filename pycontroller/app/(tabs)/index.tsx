@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const screenWidth = Dimensions.get('window').width;
   const toggledRef = useRef(false);
   const gestureReadyRef = useRef(false); // Swipe completed, ready for tap sequence
+  const swipeCompleteTimeRef = useRef<number | null>(null); // Timestamp when swipe completed
   const swipeActiveRef = useRef(false); // Is swipe finger still down
   // No need for tapTimesRef, just track if tap happened
   const tapDetectedRef = useRef(false);
@@ -42,8 +43,8 @@ export default function HomeScreen() {
           gestureState.moveX - gestureState.x0 > screenWidth * 0.85 &&
           gestureState.x0 < screenWidth * 0.1
         ) {
-          // Don't toggle yet, require tap sequence
           gestureReadyRef.current = true;
+          swipeCompleteTimeRef.current = Date.now();
         }
       },
       onPanResponderTerminationRequest: () => false,
@@ -52,14 +53,16 @@ export default function HomeScreen() {
         swipeActiveRef.current = false;
         toggledRef.current = false;
         gestureReadyRef.current = false;
-  // ...existing code...
+        swipeCompleteTimeRef.current = null;
       },
       onPanResponderStart: (evt, gestureState) => {
         // Multi-touch: check for additional finger taps
         if (
           gestureReadyRef.current &&
           swipeActiveRef.current &&
-          evt.nativeEvent.touches.length > 1
+          evt.nativeEvent.touches.length > 1 &&
+          swipeCompleteTimeRef.current !== null &&
+          Date.now() - swipeCompleteTimeRef.current < 250 // within 250ms gotta tap quickly interval wait
         ) {
           // Detect a tap anywhere else on the screen (not the swipe finger)
           if (!tapDetectedRef.current) {
@@ -68,6 +71,7 @@ export default function HomeScreen() {
             toggledRef.current = false;
             gestureReadyRef.current = false;
             swipeActiveRef.current = false;
+            swipeCompleteTimeRef.current = null;
             setTimeout(() => { tapDetectedRef.current = false; }, 500); // reset for next gesture
           }
         }
