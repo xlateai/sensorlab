@@ -245,25 +245,31 @@ export default function DirectionalScreen() {
           let rotY = circleCenterY;
           let rotColor = 'rgba(128,128,128,0.3)';
           if (motionData && motionData.rotation) {
-            const { alpha, beta } = motionData.rotation;
-            let gamma = motionData.rotation.gamma;
+            // Convert alpha, beta, gamma (in radians) to 3D orientation vector
+            // See: https://w3c.github.io/deviceorientation/#deviceorientation
+            const { alpha, beta, gamma } = motionData.rotation;
+            // Rotation matrix from Euler angles
+            // Z (alpha), X' (beta), Y'' (gamma)
+            // We'll use the orientation of the device's z-axis in world coordinates
+            // Calculate the direction vector (x, y, z)
+            // Reference: https://stackoverflow.com/a/57851999
+            const _alpha = alpha || 0;
+            const _beta = beta || 0;
+            const _gamma = gamma || 0;
+            // Calculate vector
+            const x = Math.cos(_beta) * Math.sin(_gamma);
+            const y = Math.sin(_beta);
+            const z = Math.cos(_beta) * Math.cos(_gamma);
+            // Project to 2D (x, y)
             const maxOffset = ringRadius - levelingRadius;
-            // Unwrap gamma to [-π, π] for smooth transition
-            if (gamma > Math.PI) gamma -= 2 * Math.PI;
-            if (gamma < -Math.PI) gamma += 2 * Math.PI;
-            let normX = Math.max(-1, Math.min(1, gamma / Math.PI));
-            let normY = Math.max(-1, Math.min(1, beta / Math.PI));
-            // Rotate the vector by alpha (in radians)
-            const angle = alpha || 0;
-            const cosA = Math.cos(angle);
-            const sinA = Math.sin(angle);
-            // Apply rotation
-            const rotatedX = normX * cosA - normY * sinA;
-            const rotatedY = normX * sinA + normY * cosA;
-            // Calculate unconstrained position from center
-            let dx = rotatedX * maxOffset;
-            let dy = rotatedY * maxOffset;
-            // Clamp to circle boundary: if sqrt(dx^2 + dy^2) > maxOffset, scale vector down
+            // Normalize to unit vector
+            const mag = Math.sqrt(x * x + y * y + z * z);
+            const px = x / mag;
+            const py = y / mag;
+            // Use px, py for dot position
+            let dx = px * maxOffset;
+            let dy = py * maxOffset;
+            // Clamp to circle boundary
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist > maxOffset) {
               dx = dx * maxOffset / dist;
@@ -271,8 +277,8 @@ export default function DirectionalScreen() {
             }
             rotX = circleCenterX + dx;
             rotY = circleCenterY + dy;
-            // If both beta and gamma are within 0.01, color green
-            if (Math.abs(beta) < 0.01 && Math.abs(gamma) < 0.01) {
+            // If device is level (y near 0, x near 0), color green
+            if (Math.abs(px) < 0.01 && Math.abs(py) < 0.01) {
               rotColor = 'rgba(57,255,20,0.7)'; // bright green
             }
           }
