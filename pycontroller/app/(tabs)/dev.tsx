@@ -2,6 +2,7 @@
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 // Blank popup component
 function BlankPopup({ visible, onClose, children }: {
@@ -16,16 +17,17 @@ function BlankPopup({ visible, onClose, children }: {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <BlurView intensity={40} tint="dark" style={{ ...StyleSheet.absoluteFillObject, zIndex: 0 }} />
         <View
           style={{
-            width: '85%',
+            width: '100%',
             height: '60%',
             backgroundColor: '#000',
-            borderRadius: 24,
+            borderRadius: 0,
             alignItems: 'center',
             justifyContent: 'flex-end',
-            paddingBottom: 10,
+            paddingBottom: 0,
             overflow: 'hidden',
           }}
         >
@@ -37,17 +39,18 @@ function BlankPopup({ visible, onClose, children }: {
             style={{
               backgroundColor: '#222',
               paddingHorizontal: 32,
-              paddingVertical: 14,
+              paddingVertical: 12,
               borderRadius: 10,
-              marginBottom: 0,
+              marginBottom: 16,
               alignSelf: 'center',
               position: 'absolute',
               bottom: 0,
-              left: 0,
-              right: 0,
+              left: '50%',
+              transform: [{ translateX: -64 }],
+              width: 128,
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16, textAlign: 'center' }}>Dismiss</Text>
           </Pressable>
         </View>
       </View>
