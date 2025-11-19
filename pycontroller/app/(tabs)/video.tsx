@@ -77,9 +77,8 @@ export default function VideoScreen() {
                     height: 48,
                     marginHorizontal: 12,
                     borderRadius: 8,
-                    backgroundColor: mode === i ? '#19e56a' : '#333', // green when selected, gray when not
-                    borderWidth: 2,
-                    borderColor: mode === i ? '#19e56a' : '#bbb', // green when selected, light gray when not
+                    backgroundColor: mode === i ? '#19e56a' : '#888', // green when selected, neutral gray when not
+                    borderWidth: 0,
                   }}
                 />
               ))}
