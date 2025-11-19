@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { Dimensions } from 'react-native';
-import { View } from 'react-native';
+import { Dimensions, View, Animated, PanResponder } from 'react-native';
 import { Magnetometer } from 'expo-sensors';
 
 const PIXEL_WIDTH = 256;
@@ -16,17 +15,29 @@ export default function VideoScreen() {
   const BUFFER_SIZE = 256;
   // ...existing code...
   // Magnetometer buffer
+
   const bufferRef = useRef<{x: number, y: number, z: number}[]>([]);
+  const magnetometerRef = useRef<{x: number, y: number, z: number} | null>(null);
+  const [buffer, setBuffer] = useState<{x: number, y: number, z: number}[]>([]);
   const [magnetometer, setMagnetometer] = useState<{x: number, y: number, z: number} | null>(null);
 
   useEffect(() => {
     const sub = Magnetometer.addListener(data => {
       bufferRef.current.push(data);
       if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
-      setMagnetometer(data);
+      magnetometerRef.current = data;
     });
     Magnetometer.setUpdateInterval(24);
     return () => { sub && sub.remove(); };
+  }, []);
+
+  // Update buffer and magnetometer state at a regular interval (not every sensor event)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBuffer([...bufferRef.current]);
+      setMagnetometer(magnetometerRef.current);
+    }, 100);
+    return () => clearInterval(interval);
   }, []);
 
   // Compute min/max for normalization
@@ -37,12 +48,11 @@ export default function VideoScreen() {
   });
 
   useEffect(() => {
-    const buf = bufferRef.current;
-    if (buf.length === 0) return;
-    let minX = buf[0].x, maxX = buf[0].x;
-    let minY = buf[0].y, maxY = buf[0].y;
-    let minZ = buf[0].z, maxZ = buf[0].z;
-    for (const v of buf) {
+    if (buffer.length === 0) return;
+    let minX = buffer[0].x, maxX = buffer[0].x;
+    let minY = buffer[0].y, maxY = buffer[0].y;
+    let minZ = buffer[0].z, maxZ = buffer[0].z;
+    for (const v of buffer) {
       if (v.x < minX) minX = v.x;
       if (v.x > maxX) maxX = v.x;
       if (v.y < minY) minY = v.y;
@@ -51,7 +61,7 @@ export default function VideoScreen() {
       if (v.z > maxZ) maxZ = v.z;
     }
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
-  }, [magnetometer]);
+  }, [buffer]);
 
   // Get normalized RGB from latest sample
   let r = 0, g = 0, b = 0;
@@ -66,7 +76,41 @@ export default function VideoScreen() {
   }
   const color = `rgb(${r},${g},${b})`;
 
-  // Fill every pixel with the same color
+  // Draggable control bar logic
+  const MENU_MIN_HEIGHT = 32;
+  const MENU_MAX_HEIGHT = 220;
+  const menuHeight = useRef(new Animated.Value(MENU_MIN_HEIGHT)).current;
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      return Math.abs(gestureState.dy) > 4;
+    },
+    onPanResponderMove: (_, gestureState) => {
+      let newHeight = MENU_MIN_HEIGHT - gestureState.dy;
+      if (newHeight < MENU_MIN_HEIGHT) newHeight = MENU_MIN_HEIGHT;
+      if (newHeight > MENU_MAX_HEIGHT) newHeight = MENU_MAX_HEIGHT;
+      menuHeight.setValue(newHeight);
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (MENU_MIN_HEIGHT - gestureState.dy > MENU_MIN_HEIGHT + (MENU_MAX_HEIGHT - MENU_MIN_HEIGHT) / 2) {
+        // Open menu
+        Animated.spring(menuHeight, {
+          toValue: MENU_MAX_HEIGHT,
+          useNativeDriver: false,
+        }).start();
+        setMenuOpen(true);
+      } else {
+        // Close menu
+        Animated.spring(menuHeight, {
+          toValue: MENU_MIN_HEIGHT,
+          useNativeDriver: false,
+        }).start();
+        setMenuOpen(false);
+      }
+    },
+  }), [menuHeight]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <View style={{ width: screenWidth, height: canvasHeight, flexDirection: 'column' }}>
@@ -74,6 +118,39 @@ export default function VideoScreen() {
           <View key={y} style={{ width: screenWidth, height: pixelSize, backgroundColor: color }} />
         ))}
       </View>
+      {/* Draggable control bar and menu */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: menuHeight,
+          backgroundColor: '#222',
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          zIndex: 10,
+          overflow: 'hidden',
+        }}
+        {...panResponder.panHandlers}
+      >
+        <View style={{ width: '60%', height: 4, backgroundColor: '#444', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
+        {menuOpen && (
+          <View style={{ width: '90%', height: MENU_MAX_HEIGHT - MENU_MIN_HEIGHT - 16, backgroundColor: '#333', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: 8 }}>
+            <View>
+              <View style={{ marginBottom: 8 }}>
+                <View style={{ width: 32, height: 32, backgroundColor: '#555', borderRadius: 16 }} />
+              </View>
+              <View style={{ marginBottom: 8 }}>
+                <View style={{ width: 64, height: 8, backgroundColor: '#666', borderRadius: 4 }} />
+              </View>
+              <View style={{ width: 96, height: 8, backgroundColor: '#666', borderRadius: 4 }} />
+            </View>
+          </View>
+        )}
+      </Animated.View>
     </View>
   );
 }
