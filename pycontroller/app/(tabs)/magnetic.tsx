@@ -54,6 +54,9 @@ export default function MagneticScreen() {
         <View style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Magnetometer</Text>
+            <Text style={{ color: '#4af', fontWeight: 'bold', marginLeft: 12, marginRight: 4 }}>x</Text>
+            <Text style={{ color: '#fa4', fontWeight: 'bold', marginHorizontal: 4 }}>y</Text>
+            <Text style={{ color: '#0fa', fontWeight: 'bold', marginHorizontal: 4 }}>z</Text>
           </View>
           <View>
             <View style={{ position: 'relative' }}>
@@ -81,10 +84,12 @@ export default function MagneticScreen() {
                 );
               })()}
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
-              <Text style={{ color: '#4af', fontWeight: 'bold', marginHorizontal: 8 }}>x</Text>
-              <Text style={{ color: '#fa4', fontWeight: 'bold', marginHorizontal: 8 }}>y</Text>
-              <Text style={{ color: '#0fa', fontWeight: 'bold', marginHorizontal: 8 }}>z</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>0</Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>time</Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>
+                {magHistory.length > 0 ? magHistory[magHistory.length - 1].t.toFixed(1) : '0.0'}
+              </Text>
             </View>
           </View>
         </View>
