@@ -5,9 +5,15 @@ interface SensorDotsProps {
   x: number;
   y: number;
   z: number;
+  xLow?: number;
+  xHigh?: number;
+  yLow?: number;
+  yHigh?: number;
+  zLow?: number;
+  zHigh?: number;
 }
 
-function getColor(value: number, axis: 'x' | 'y' | 'z') {
+function getColor(value: number, axis: 'x' | 'y' | 'z', low: number, high: number) {
   // Helper to interpolate between two colors
   function lerp(a: number, b: number, t: number) {
     return Math.round(a + (b - a) * t);
@@ -22,56 +28,60 @@ function getColor(value: number, axis: 'x' | 'y' | 'z') {
     gray: { r: 136, g: 136, b: 136 },
   };
 
-  // >1: axis color
-  if (value > 1) {
+  // Above high: axis color
+  if (value > high) {
     if (axis === 'x') return COLORS.blue;
     if (axis === 'y') return COLORS.yellow;
     if (axis === 'z') return COLORS.green;
   }
-  // < -1: red
-  if (value < -1) {
+  // Below low: red
+  if (value < low) {
     return COLORS.red;
   }
-  // Between -1 and 1 (exclusive): fade between red and gray
-  if (value > -1 && value < 1) {
-    // t = 0 at value = -1 (red), t = 1 at value = 0 (gray), t = 0 at value = 1 (red)
-    let t;
-    if (value < 0) {
-      t = (value + 1) / 1; // -1 to 0
+  // Between low and high: fade between red and gray
+  if (value > low && value < high) {
+    // t = 0 at low (red), t = 1 at high (axis color)
+    let t = (value - low) / (high - low);
+    // Fade from red to gray in the middle
+    if (t < 0.5) {
+      // red to gray
+      let t2 = t / 0.5;
       return {
-        r: lerp(COLORS.red.r, COLORS.gray.r, t),
-        g: lerp(COLORS.red.g, COLORS.gray.g, t),
-        b: lerp(COLORS.red.b, COLORS.gray.b, t),
+        r: lerp(COLORS.red.r, COLORS.gray.r, t2),
+        g: lerp(COLORS.red.g, COLORS.gray.g, t2),
+        b: lerp(COLORS.red.b, COLORS.gray.b, t2),
       };
     } else {
-      t = 1 - value / 1; // 0 to 1
+      // gray to axis color
+      let t2 = (t - 0.5) / 0.5;
+      let axisColor = axis === 'x' ? COLORS.blue : axis === 'y' ? COLORS.yellow : COLORS.green;
       return {
-        r: lerp(COLORS.gray.r, COLORS.red.r, 1 - t),
-        g: lerp(COLORS.gray.g, COLORS.red.g, 1 - t),
-        b: lerp(COLORS.gray.b, COLORS.red.b, 1 - t),
+        r: lerp(COLORS.gray.r, axisColor.r, t2),
+        g: lerp(COLORS.gray.g, axisColor.g, t2),
+        b: lerp(COLORS.gray.b, axisColor.b, t2),
       };
     }
   }
-  // >=1: axis color
-  if (value >= 1) {
+  // At high: axis color
+  if (value === high) {
     if (axis === 'x') return COLORS.blue;
     if (axis === 'y') return COLORS.yellow;
     if (axis === 'z') return COLORS.green;
   }
-  // <=-1: red
+  // At low: red
   return COLORS.red;
 }
 
-export default function SensorDots({ x, y, z }: SensorDotsProps) {
+export default function SensorDots({ x, y, z, xLow = -1, xHigh = 1, yLow = -1, yHigh = 1, zLow = -2, zHigh = 0 }: SensorDotsProps) {
   const [colorX, setColorX] = useState({ r: 136, g: 136, b: 136 });
   const [colorY, setColorY] = useState({ r: 136, g: 136, b: 136 });
   const [colorZ, setColorZ] = useState({ r: 136, g: 136, b: 136 });
 
   useEffect(() => {
-    setColorX(getColor(x, 'x'));
-    setColorY(getColor(y, 'y'));
-    setColorZ(getColor(z, 'z'));
-  }, [x, y, z]);
+    setColorX(getColor(x, 'x', xLow, xHigh));
+    setColorY(getColor(y, 'y', yLow, yHigh));
+    setColorZ(getColor(z, 'z', zLow, zHigh));
+  }, [x, y, z, xLow, xHigh, yLow, yHigh, zLow, zHigh]);
 
   return (
     <View style={{ marginTop: 32, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 32 }}>
