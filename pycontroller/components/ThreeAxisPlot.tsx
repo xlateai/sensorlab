@@ -21,10 +21,12 @@ interface ThreeAxisPlotProps {
   max?: number;
 }
 
-function getPolylinePoints(data: Array<{ t: number; v: number }>, width: number, height: number, vMin: number, vMax: number) {
+function getPolylinePoints(data: Array<{ t: number; v: number }>, width: number, height: number) {
   if (data.length === 0) return '';
   const tMin = data[0].t;
   const tMax = data[data.length - 1].t;
+  const vMin = Math.min(...data.map(d => d.v));
+  const vMax = Math.max(...data.map(d => d.v));
   return data.map(d => {
     const x = ((d.t - tMin) / Math.max(0.001, tMax - tMin)) * width;
     const y = height - ((d.v - vMin) / Math.max(0.001, vMax - vMin)) * height;
@@ -43,13 +45,14 @@ export default function ThreeAxisPlot({
   min,
   max,
 }: ThreeAxisPlotProps) {
+  const tMax = data.length > 0 ? data[data.length - 1].t : 0.0;
+  const xPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.x })), width, height);
+  const yPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.y })), width, height);
+  const zPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.z })), width, height);
+  // For axis labels, use min/max across all axes
   const allVals = data.flatMap(d => [d.x, d.y, d.z]);
   const vMin = typeof min === 'number' ? min : (allVals.length ? Math.min(...allVals) : -1);
   const vMax = typeof max === 'number' ? max : (allVals.length ? Math.max(...allVals) : 1);
-  const tMax = data.length > 0 ? data[data.length - 1].t : 0.0;
-  const xPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.x })), width, height, vMin, vMax);
-  const yPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.y })), width, height, vMin, vMax);
-  const zPoints = getPolylinePoints(data.map(d => ({ t: d.t, v: d.z })), width, height, vMin, vMax);
 
   return (
     <View style={{ marginBottom: 12 }}>
