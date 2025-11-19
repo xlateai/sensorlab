@@ -13,7 +13,7 @@ export default function VideoScreen() {
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
 
-  const BUFFER_SIZE = 256;
+  const BUFFER_SIZE = 64;
   // ...existing code...
   // Magnetometer buffer
 
@@ -35,7 +35,7 @@ export default function VideoScreen() {
       const interval = setInterval(() => {
         setBuffer([...bufferRef.current]);
         setMagnetometer(magnetometerRef.current);
-      }, 16); // 16ms = ~60fps
+  }, 33); // 33ms = ~30fps
       return () => {
         setIsFocused(false);
         sub && sub.remove();
