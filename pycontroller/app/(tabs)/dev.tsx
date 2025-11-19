@@ -31,7 +31,7 @@ function BlankPopup({ visible, onClose, children }: {
             overflow: 'hidden',
           }}
         >
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 60, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 60, alignItems: 'center', justifyContent: 'center', paddingTop: 20 }}>
             {children}
           </View>
           <Pressable
