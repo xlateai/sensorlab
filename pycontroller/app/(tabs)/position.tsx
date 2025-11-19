@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import RecordButton from '../../components/RecordButton';
 import Svg, { Polyline, Line, Text as SvgText } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from 'react-native';
@@ -197,33 +198,21 @@ export default function PositionScreen() {
       </ScrollView>
       {/* Record button at bottom center */}
       <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
-        <TouchableOpacity
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: 40,
-            backgroundColor: recording ? '#fa4' : '#444',
-            justifyContent: 'center',
-            alignItems: 'center',
-            shadowColor: '#fa4',
-            shadowOpacity: recording ? 0.5 : 0.2,
-            shadowRadius: 8,
-          }}
-          activeOpacity={0.7}
+        <RecordButton
+          recording={recording}
           onPressIn={() => {
             setRecording(true);
             setAccelHistory([]);
             setDeltaHistory([]);
             setPairwiseSumHistory([]);
-              setPositionEstimationHistory([]);
+            setPositionEstimationHistory([]);
             startTimeRef.current = null;
           }}
           onPressOut={() => {
             setRecording(false);
           }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{recording ? 'Recording...' : 'Hold to Record'}</Text>
-        </TouchableOpacity>
+          color="#fa4"
+        />
       </View>
     </View>
   );
