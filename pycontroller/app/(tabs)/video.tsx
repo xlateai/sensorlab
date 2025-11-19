@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { Dimensions, View, Animated, PanResponder } from 'react-native';
+import { Dimensions, View, Animated, PanResponder, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
@@ -16,6 +16,9 @@ export default function VideoScreen() {
   const BUFFER_SIZE = 64;
   // ...existing code...
   // Magnetometer buffer
+
+    // State for menu expansion
+    const [menuExpanded, setMenuExpanded] = useState(false);
 
   const bufferRef = useRef<{x: number, y: number, z: number}[]>([]);
   const magnetometerRef = useRef<{x: number, y: number, z: number} | null>(null);
@@ -90,14 +93,16 @@ export default function VideoScreen() {
           <View key={y} style={{ width: screenWidth, height: pixelSize, backgroundColor: color }} />
         ))}
       </View>
-      {/* Fixed modern menu bar at the bottom */}
-      <View
+      {/* Expandable menu bar at the bottom */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setMenuExpanded((prev) => !prev)}
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          height: 40,
+          height: menuExpanded ? Math.round(screenHeight * 0.4) : 40,
           backgroundColor: '#18181c',
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
@@ -112,7 +117,13 @@ export default function VideoScreen() {
         }}
       >
         <View style={{ width: '18%', height: 4, backgroundColor: '#444', borderRadius: 2, marginTop: 8, marginBottom: 8, opacity: 0.7 }} />
-      </View>
+        {/* Expanded content placeholder */}
+        {menuExpanded && (
+          <View style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}>
+            {/* Add menu content here */}
+          </View>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
