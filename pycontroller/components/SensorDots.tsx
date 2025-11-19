@@ -9,7 +9,7 @@ interface SensorDotsProps {
 
 function getColor(value: number) {
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-  const norm = clamp(value / 5, -1, 1);
+  const norm = clamp(value / (5 * 0.7), -1, 1);
   const red = { r: 229, g: 57, b: 53 };
   const green = { r: 57, g: 255, b: 20 };
   const blue = { r: 57, g: 136, b: 255 };
