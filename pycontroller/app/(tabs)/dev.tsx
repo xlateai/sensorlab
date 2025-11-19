@@ -20,7 +20,7 @@ function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => voi
             borderRadius: 24,
             alignItems: 'center',
             justifyContent: 'flex-end',
-            paddingBottom: 32,
+            paddingBottom: 10,
           }}
         >
           {/* Intentionally left blank */}
@@ -31,7 +31,8 @@ function BlankPopup({ visible, onClose }: { visible: boolean; onClose: () => voi
               paddingHorizontal: 32,
               paddingVertical: 14,
               borderRadius: 10,
-              marginBottom: 8,
+              marginBottom: 0,
+              alignSelf: 'center',
             }}
           >
             <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
