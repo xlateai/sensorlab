@@ -245,15 +245,33 @@ export default function DirectionalScreen() {
           let rotY = circleCenterY;
           let rotColor = 'rgba(128,128,128,0.3)';
           if (motionData && motionData.rotation) {
-            const { beta, gamma } = motionData.rotation;
+            const { alpha, beta } = motionData.rotation;
+            let gamma = motionData.rotation.gamma;
             const maxOffset = ringRadius - levelingRadius;
-            let normX = Math.max(-1, Math.min(1, gamma));
-            let normY = Math.max(-1, Math.min(1, beta));
-            const rawX = circleCenterX + normX * maxOffset;
-            const rawY = circleCenterY + normY * maxOffset;
-            rotX = rawX;
-            rotY = rawY;
-            // If both beta and gamma are within 0.1 degrees, color green
+            // Unwrap gamma to [-π, π] for smooth transition
+            if (gamma > Math.PI) gamma -= 2 * Math.PI;
+            if (gamma < -Math.PI) gamma += 2 * Math.PI;
+            let normX = Math.max(-1, Math.min(1, gamma / Math.PI));
+            let normY = Math.max(-1, Math.min(1, beta / Math.PI));
+            // Rotate the vector by alpha (in radians)
+            const angle = alpha || 0;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            // Apply rotation
+            const rotatedX = normX * cosA - normY * sinA;
+            const rotatedY = normX * sinA + normY * cosA;
+            // Calculate unconstrained position from center
+            let dx = rotatedX * maxOffset;
+            let dy = rotatedY * maxOffset;
+            // Clamp to circle boundary: if sqrt(dx^2 + dy^2) > maxOffset, scale vector down
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > maxOffset) {
+              dx = dx * maxOffset / dist;
+              dy = dy * maxOffset / dist;
+            }
+            rotX = circleCenterX + dx;
+            rotY = circleCenterY + dy;
+            // If both beta and gamma are within 0.01, color green
             if (Math.abs(beta) < 0.01 && Math.abs(gamma) < 0.01) {
               rotColor = 'rgba(57,255,20,0.7)'; // bright green
             }
