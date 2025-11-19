@@ -57,7 +57,7 @@ export default function ThreeAxisPlot({
   return (
     <View style={{ marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{title}</Text>
+        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 24 }}>{title}</Text>
         <Text style={{ color: colorX, fontWeight: 'bold', marginLeft: 12, marginRight: 4 }}>x</Text>
         <Text style={{ color: colorY, fontWeight: 'bold', marginHorizontal: 4 }}>y</Text>
         <Text style={{ color: colorZ, fontWeight: 'bold', marginHorizontal: 4 }}>z</Text>
