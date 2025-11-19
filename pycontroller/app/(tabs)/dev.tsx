@@ -73,7 +73,6 @@ const measurementComponentMap: Record<string, React.ComponentType | null> = {
   'acc+grav': AccelerationWithGravityScreen,
   'rot': RotationScreen,
   'rotΔ': RotationDeltaScreen,
-  'Interval': null,
   'magnetometer': MagneticScreen,
   'gyroscope': GyroscopeScreen,
   'barometer': null,
@@ -200,7 +199,7 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.acceleration?.z?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>m/s²</Text>
               <Pressable onPress={() => openPopup('acc')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
               </Pressable>
             </View>
             <View style={styles.tableRow}>
@@ -210,7 +209,7 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.accelerationIncludingGravity?.z?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>m/s²</Text>
               <Pressable onPress={() => openPopup('acc+grav')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
               </Pressable>
             </View>
             <View style={styles.tableRow}>
@@ -220,7 +219,7 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.rotation?.gamma?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>deg</Text>
               <Pressable onPress={() => openPopup('rot')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
               </Pressable>
             </View>
             <View style={styles.tableRow}>
@@ -230,17 +229,7 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>{motionData?.rotationRate?.gamma?.toFixed(3) ?? '-'}</Text>
               <Text style={styles.tableCell}>deg/s</Text>
               <Pressable onPress={() => openPopup('rotΔ')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
-              </Pressable>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.tableMeasurementCell}>Interval</Text>
-              <Text style={styles.tableCell}>{motionData?.interval ?? '-'}</Text>
-              <Text style={styles.tableCell}>-</Text>
-              <Text style={styles.tableCell}>-</Text>
-              <Text style={styles.tableCell}>ms</Text>
-              <Pressable onPress={() => openPopup('Interval')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
               </Pressable>
             </View>
           </View>
@@ -257,12 +246,12 @@ export default function DevScreen() {
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>magnetometer</Text>
-              <Text style={styles.tableCell}>{magnetometerData?.x?.toFixed(3) ?? '-'}</Text>
-              <Text style={styles.tableCell}>{magnetometerData?.y?.toFixed(3) ?? '-'}</Text>
-              <Text style={styles.tableCell}>{magnetometerData?.z?.toFixed(3) ?? '-'}</Text>
+              <Text style={styles.tableCell}>{magnetometerData?.x?.toFixed(2) ?? '-'}</Text>
+              <Text style={styles.tableCell}>{magnetometerData?.y?.toFixed(2) ?? '-'}</Text>
+              <Text style={styles.tableCell}>{magnetometerData?.z?.toFixed(2) ?? '-'}</Text>
               <Text style={styles.tableCell}>μT</Text>
               <Pressable onPress={() => openPopup('magnetometer')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
               </Pressable>
             </View>
           </View>
@@ -279,12 +268,12 @@ export default function DevScreen() {
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableMeasurementCell}>gyroscope</Text>
-              <Text style={styles.tableCell}>{gyroscopeData?.x?.toFixed(3) ?? '-'}</Text>
-              <Text style={styles.tableCell}>{gyroscopeData?.y?.toFixed(3) ?? '-'}</Text>
-              <Text style={styles.tableCell}>{gyroscopeData?.z?.toFixed(3) ?? '-'}</Text>
+              <Text style={styles.tableCell}>{gyroscopeData?.x?.toFixed(2) ?? '-'}</Text>
+              <Text style={styles.tableCell}>{gyroscopeData?.y?.toFixed(2) ?? '-'}</Text>
+              <Text style={styles.tableCell}>{gyroscopeData?.z?.toFixed(2) ?? '-'}</Text>
               <Text style={styles.tableCell}>rad/s</Text>
               <Pressable onPress={() => openPopup('gyroscope')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
               </Pressable>
             </View>
           </View>
@@ -305,9 +294,7 @@ export default function DevScreen() {
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>-</Text>
               <Text style={styles.tableCell}>{barometerData?.pressure?.toFixed(2) ?? '-'} hPa</Text>
-              <Pressable onPress={() => openPopup('barometer')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Show</Text>
-              </Pressable>
+              {/* No Plot button for barometer */}
             </View>
           </View>
           <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
