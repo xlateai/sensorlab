@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { TouchableOpacity, Dimensions, ScrollView, SafeAreaView } from 'react-native';
 import RecordButton from '../../components/RecordButton';
 import ThreeAxisPlot from '../../components/ThreeAxisPlot';
+import SensorDots from '../../components/SensorDots';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
@@ -12,12 +13,14 @@ export default function AccelerationScreen() {
   const plotHeight = 120;
   const [recording, setRecording] = useState(false);
   const [magHistory, setMagHistory] = useState<Array<{ t: number; x: number; y: number; z: number }>>([]);
+  const [currentAccel, setCurrentAccel] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const startTimeRef = useRef<number | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
       const sub = Accelerometer.addListener(data => {
         const { x = 0, y = 0, z = 0 } = data;
+        setCurrentAccel({ x, y, z });
         if (recording) {
           const now = Date.now();
           if (startTimeRef.current === null) startTimeRef.current = now;
@@ -45,6 +48,12 @@ export default function AccelerationScreen() {
           colorX="#4af"
           colorY="#fa4"
           colorZ="#0fa"
+        />
+        {/* SensorDots below the plot */}
+        <SensorDots
+          x={currentAccel.x}
+          y={currentAccel.y}
+          z={currentAccel.z}
         />
       </ScrollView>
       {/* Record button at bottom center */}
