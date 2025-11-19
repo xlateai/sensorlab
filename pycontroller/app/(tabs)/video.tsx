@@ -36,7 +36,7 @@ export default function VideoScreen() {
     const interval = setInterval(() => {
       setBuffer([...bufferRef.current]);
       setMagnetometer(magnetometerRef.current);
-    }, 100);
+    }, 16); // 16ms = ~60fps
     return () => clearInterval(interval);
   }, []);
 
