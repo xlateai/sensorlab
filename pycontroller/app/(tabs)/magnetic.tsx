@@ -52,17 +52,26 @@ export default function MagneticScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ alignItems: 'center' }}>
         <View style={{ marginBottom: 12 }}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 4 }}>Magnetometer (x, y, z)</Text>
-          <Svg width={plotWidth} height={plotHeight} style={{ backgroundColor: '#222', borderRadius: 8 }}>
-            <Polyline points={xPoints} fill="none" stroke="#4af" strokeWidth="2" />
-            <Polyline points={yPoints} fill="none" stroke="#fa4" strokeWidth="2" />
-            <Polyline points={zPoints} fill="none" stroke="#0fa" strokeWidth="2" />
-            {/* Zero line */}
-            <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
-            {/* Axes */}
-            <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
-            <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
-          </Svg>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Magnetometer</Text>
+          </View>
+          <View>
+            <Svg width={plotWidth} height={plotHeight} style={{ backgroundColor: '#222', borderRadius: 8 }}>
+              <Polyline points={xPoints} fill="none" stroke="#4af" strokeWidth="2" />
+              <Polyline points={yPoints} fill="none" stroke="#fa4" strokeWidth="2" />
+              <Polyline points={zPoints} fill="none" stroke="#0fa" strokeWidth="2" />
+              {/* Zero line */}
+              <Line x1={0} y1={plotHeight/2} x2={plotWidth} y2={plotHeight/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
+              {/* Axes */}
+              <Line x1={0} y1={plotHeight} x2={plotWidth} y2={plotHeight} stroke="#888" strokeWidth="1" />
+              <Line x1={0} y1={0} x2={0} y2={plotHeight} stroke="#888" strokeWidth="1" />
+            </Svg>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
+              <Text style={{ color: '#4af', fontWeight: 'bold', marginHorizontal: 8 }}>x</Text>
+              <Text style={{ color: '#fa4', fontWeight: 'bold', marginHorizontal: 8 }}>y</Text>
+              <Text style={{ color: '#0fa', fontWeight: 'bold', marginHorizontal: 8 }}>z</Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
       {/* Record button at bottom center */}
