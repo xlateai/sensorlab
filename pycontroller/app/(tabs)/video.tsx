@@ -94,9 +94,7 @@ export default function VideoScreen() {
         ))}
       </View>
       {/* Expandable menu bar at the bottom */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => setMenuExpanded((prev) => !prev)}
+      <View
         style={{
           position: 'absolute',
           left: 0,
@@ -106,7 +104,7 @@ export default function VideoScreen() {
           backgroundColor: '#18181c',
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
-          justifyContent: 'center',
+          justifyContent: 'flex-start',
           alignItems: 'center',
           zIndex: 10,
           shadowColor: '#000',
@@ -116,14 +114,21 @@ export default function VideoScreen() {
           elevation: 8,
         }}
       >
-        <View style={{ width: '18%', height: 4, backgroundColor: '#444', borderRadius: 2, marginTop: 8, marginBottom: 8, opacity: 0.7 }} />
+        {/* Only the drag handle is clickable when expanded */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => menuExpanded ? setMenuExpanded(false) : setMenuExpanded(true)}
+          style={{ width: '100%', alignItems: 'center', height: 40, justifyContent: 'center' }}
+        >
+          <View style={{ width: '18%', height: 8, backgroundColor: '#444', borderRadius: 4, opacity: 0.7 }} />
+        </TouchableOpacity>
         {/* Expanded content placeholder */}
         {menuExpanded && (
           <View style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}>
             {/* Add menu content here */}
           </View>
         )}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }
