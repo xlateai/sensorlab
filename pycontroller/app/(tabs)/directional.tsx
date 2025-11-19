@@ -244,24 +244,19 @@ export default function DirectionalScreen() {
           let rotX = circleCenterX;
           let rotY = circleCenterY;
           let rotColor = 'rgba(128,128,128,0.3)';
-          // Axis mapping: try swapping axes or flipping sign if needed
-          // Try: normX = beta, normY = gamma, or flip sign
           if (motionData && motionData.rotation) {
             const { beta, gamma } = motionData.rotation;
             const maxOffset = ringRadius - levelingRadius;
-            // Map ±90° to the edge of the ring
             let normX = Math.max(-1, Math.min(1, gamma));
             let normY = Math.max(-1, Math.min(1, beta));
-            // Option 2: X = beta, Y = gamma
-            // let normX = Math.max(-1, Math.min(1, beta / 45));
-            // let normY = Math.max(-1, Math.min(1, gamma / 45));
-            // Option 3: Flip sign if needed
-            // normX = -normX;
-            // normY = -normY;
             const rawX = circleCenterX + normX * maxOffset;
             const rawY = circleCenterY + normY * maxOffset;
             rotX = rawX;
             rotY = rawY;
+            // If both beta and gamma are within 0.1 degrees, color green
+            if (Math.abs(beta) < 0.01 && Math.abs(gamma) < 0.01) {
+              rotColor = 'rgba(57,255,20,0.7)'; // bright green
+            }
           }
           return (
             <Circle
