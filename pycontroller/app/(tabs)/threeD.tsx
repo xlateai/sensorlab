@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dimensions } from 'react-native';
 import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Line, Polygon } from 'react-native-svg';
 
 export default function ThreeDScreen() {
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
@@ -53,6 +53,40 @@ export default function ThreeDScreen() {
     }
   }
 
+  // Arrow to north logic
+  let northArrow = null;
+  if (motionData && motionData.rotation) {
+    const { alpha = 0 } = motionData.rotation;
+  // North is at angle (alpha - Math.PI/2 + Math.PI)
+  const northAngle = (alpha || 0) - Math.PI / 2 + Math.PI;
+    // Arrow length
+    const arrowLength = ringRadius * 0.8;
+    // Arrow endpoint
+    const arrowX = circleCenterX + arrowLength * Math.sin(northAngle);
+    const arrowY = circleCenterY - arrowLength * Math.cos(northAngle);
+    // Arrowhead size
+    const headLength = 18;
+    const headAngle = Math.PI / 7;
+    // Arrowhead points
+    const tipX = arrowX;
+    const tipY = arrowY;
+    const leftX = tipX - headLength * Math.sin(northAngle - headAngle);
+    const leftY = tipY + headLength * Math.cos(northAngle - headAngle);
+    const rightX = tipX - headLength * Math.sin(northAngle + headAngle);
+    const rightY = tipY + headLength * Math.cos(northAngle + headAngle);
+    northArrow = (
+      <>
+        {/* Arrow shaft */}
+        <Line x1={circleCenterX} y1={circleCenterY} x2={arrowX} y2={arrowY} stroke="#00f" strokeWidth={4} />
+        {/* Arrowhead */}
+        <Polygon
+          points={`${tipX},${tipY} ${leftX},${leftY} ${rightX},${rightY}`}
+          fill="#00f"
+        />
+      </>
+    );
+  }
+
 
   return (
     <Svg
@@ -66,6 +100,8 @@ export default function ThreeDScreen() {
       <Circle cx={circleCenterX} cy={circleCenterY} r={levelingRadius} stroke="#aaa" strokeWidth={1.5} fill="none" opacity={0.3} />
       {/* Level ball */}
       <Circle cx={rotX} cy={rotY} r={levelingRadius} fill={rotColor} stroke="none" />
+      {/* North arrow */}
+      {northArrow}
     </Svg>
   );
 }
