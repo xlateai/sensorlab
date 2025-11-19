@@ -5,7 +5,7 @@ import ModeOne from '../../components/magnetovision/modeOne';
 import ModeTwo from '../../components/magnetovision/modeTwo';
 import ModeThree from '../../components/magnetovision/modeThree';
 import { Dimensions, View, Animated, PanResponder, TouchableOpacity } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
 const PIXEL_WIDTH = 256;
@@ -18,6 +18,14 @@ export default function VideoScreen() {
   // Fullscreen state
   const [fullscreen, setFullscreen] = useState(false);
   const lastTapRef = useRef<number | null>(null);
+  const navigation = useNavigation();
+
+  // Hide tab bar when fullscreen
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: fullscreen ? { display: 'none' } : undefined,
+    });
+  }, [fullscreen, navigation]);
 
   // Alternate between ModeZero and ModeOne based on mode index
   // Render the correct mode component based on mode index
