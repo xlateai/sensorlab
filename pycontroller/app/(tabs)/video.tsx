@@ -1,5 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import ModeZero from '../../components/magnetovision/modeZero';
+import ModeOne from '../../components/magnetovision/modeOne';
+import ModeTwo from '../../components/magnetovision/modeTwo';
+import ModeThree from '../../components/magnetovision/modeThree';
 import { Dimensions, View, Animated, PanResponder, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
@@ -11,10 +14,26 @@ export default function VideoScreen() {
   const [menuExpanded, setMenuExpanded] = useState(false);
   // Mode state (0-3)
   const [mode, setMode] = useState(0);
+  // Alternate between ModeZero and ModeOne based on mode index
+  // Render the correct mode component based on mode index
+  const renderMode = useMemo(() => {
+    switch (mode) {
+      case 0:
+        return <ModeZero key="mode-zero" />;
+      case 1:
+        return <ModeOne key="mode-one" />;
+      case 2:
+        return <ModeTwo key="mode-two" />;
+      case 3:
+        return <ModeThree key="mode-three" />;
+      default:
+        return null;
+    }
+  }, [mode]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      {/* Render ModeZero for all modes for now */}
-      <ModeZero />
+      {renderMode}
       {/* Expandable menu bar at the bottom */}
       <View
         style={{
