@@ -4,7 +4,7 @@ import RecordButton from '../../components/RecordButton';
 import ThreeAxisPlot from '../../components/ThreeAxisPlot';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from 'react-native';
-import { Magnetometer } from 'expo-sensors';
+import { Accelerometer } from 'expo-sensors';
 
 export default function AccelerationScreen() {
   const { width } = Dimensions.get('window');
@@ -16,7 +16,7 @@ export default function AccelerationScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      const sub = Magnetometer.addListener(data => {
+      const sub = Accelerometer.addListener(data => {
         const { x = 0, y = 0, z = 0 } = data;
         if (recording) {
           const now = Date.now();
@@ -25,7 +25,7 @@ export default function AccelerationScreen() {
           setMagHistory(prev => [...prev, { t, x, y, z }]);
         }
       });
-      Magnetometer.setUpdateInterval(24);
+      Accelerometer.setUpdateInterval(24);
       return () => {
         sub && sub.remove();
       };
@@ -41,7 +41,7 @@ export default function AccelerationScreen() {
           data={magHistory}
           width={plotWidth}
           height={plotHeight}
-          title="Magnetometer"
+          title="Accelerometer"
           colorX="#4af"
           colorY="#fa4"
           colorZ="#0fa"
