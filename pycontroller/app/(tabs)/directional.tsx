@@ -104,6 +104,7 @@ export default function DirectionalScreen() {
   const compassSize = Math.min(screenWidth, screenHeight) * 0.8;
   const center = compassSize / 2;
   const dotRadius = 12;
+  const levelingRadius = dotRadius * 1.5; // 20% bigger for leveling slot
   const ringStroke = 2; // thinner ring
   const ringRadius = center - ringStroke / 2 - dotRadius;
   const circleCenterX = center;
@@ -223,7 +224,61 @@ export default function DirectionalScreen() {
         height={compassSize}
         style={{ position: 'absolute', left: (screenWidth - compassSize) / 2, top: (screenHeight - compassSize) / 2, backgroundColor: 'transparent' }}
       >
+        {/* Outer ring */}
         <Circle cx={circleCenterX} cy={circleCenterY} r={ringRadius} stroke="#fff" strokeWidth={ringStroke} fill="none" />
+
+        {/* Center invisible circle with thin border */}
+        <Circle
+          cx={circleCenterX}
+          cy={circleCenterY}
+          r={levelingRadius}
+          stroke="#aaa"
+          strokeWidth={1.5}
+          fill="none"
+          opacity={0.3}
+        />
+
+        {/* Gravity-based moving circle */}
+        {(() => {
+          // Default to center
+          let gravityX = circleCenterX;
+          let gravityY = circleCenterY;
+          let gravityColor = 'rgba(128,128,128,0.3)';
+          if (motionData && motionData.accelerationIncludingGravity) {
+            // Use pitch/roll to move the circle
+            const g = motionData.accelerationIncludingGravity;
+            const maxOffset = ringRadius - levelingRadius;
+            const normX = Math.max(-1, Math.min(1, g.x / 9.8));
+            const normY = Math.max(-1, Math.min(1, g.y / 9.8));
+            // Calculate raw position
+            const rawX = circleCenterX + normX * maxOffset;
+            const rawY = circleCenterY + normY * maxOffset;
+            // Interpolate toward center if within threshold
+            const levelThreshold = 0.04; // 2% of previous threshold (~0.016)
+            const distToCenter = Math.sqrt((rawX - circleCenterX) ** 2 + (rawY - circleCenterY) ** 2);
+            let t = 0;
+            if (Math.abs(normX) < levelThreshold && Math.abs(normY) < levelThreshold) {
+              gravityColor = 'rgba(57,255,20,0.7)'; // green tinge
+              // Much smoother interpolation: use a high exponent for t
+              t = 1 - (distToCenter / (maxOffset * levelThreshold * 2));
+              t = Math.max(0, Math.min(1, t));
+              t = Math.pow(t, 6); // smoother, slower approach to center
+            }
+            // Interpolate position
+            gravityX = rawX * (1 - t) + circleCenterX * t;
+            gravityY = rawY * (1 - t) + circleCenterY * t;
+          }
+          return (
+            <Circle
+              cx={gravityX}
+              cy={gravityY}
+              r={levelingRadius}
+              fill={gravityColor}
+              stroke="none"
+            />
+          );
+        })()}
+
         {/* North and South indicator dots */}
         <Circle cx={northX} cy={northY} r={indicatorRadius} fill="#fff" />
         <Circle cx={southX} cy={southY} r={indicatorRadius} fill="red" />
