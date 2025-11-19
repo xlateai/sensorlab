@@ -22,26 +22,27 @@ export default function VideoScreen() {
   const [buffer, setBuffer] = useState<{x: number, y: number, z: number}[]>([]);
   const [magnetometer, setMagnetometer] = useState<{x: number, y: number, z: number} | null>(null);
 
+  const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
     React.useCallback(() => {
+      setIsFocused(true);
       const sub = Magnetometer.addListener(data => {
         bufferRef.current.push(data);
         if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
         magnetometerRef.current = data;
       });
       Magnetometer.setUpdateInterval(24);
-      return () => { sub && sub.remove(); };
+      const interval = setInterval(() => {
+        setBuffer([...bufferRef.current]);
+        setMagnetometer(magnetometerRef.current);
+      }, 16); // 16ms = ~60fps
+      return () => {
+        setIsFocused(false);
+        sub && sub.remove();
+        clearInterval(interval);
+      };
     }, [])
   );
-
-  // Update buffer and magnetometer state at a regular interval (not every sensor event)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBuffer([...bufferRef.current]);
-      setMagnetometer(magnetometerRef.current);
-    }, 16); // 16ms = ~60fps
-    return () => clearInterval(interval);
-  }, []);
 
   // Compute min/max for normalization
   const [minMax, setMinMax] = useState({
@@ -114,6 +115,9 @@ export default function VideoScreen() {
     },
   }), [menuHeight]);
 
+  if (!isFocused) {
+    return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+  }
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <View style={{ width: screenWidth, height: canvasHeight, flexDirection: 'column' }}>
