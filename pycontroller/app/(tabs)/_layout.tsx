@@ -24,10 +24,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="compass"
+        name="directional"
         options={{
-          title: 'Locational',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="dot.scope.laptopcomputer" color={color} />,
+          title: 'Heading',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass.circle" color={color} />,
         }}
       />
       <Tabs.Screen

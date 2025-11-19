@@ -10,7 +10,7 @@ type Origin = {
   orientation: DeviceMotionMeasurement['rotation'];
 };
 
-export default function HomeScreen() {
+export default function DirectionalScreen() {
   // Device motion state
   const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
   const originRef = useRef<{ position: DeviceMotionMeasurement['accelerationIncludingGravity']; orientation: DeviceMotionMeasurement['rotation']; } | null>(null);
