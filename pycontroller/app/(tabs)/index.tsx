@@ -1,15 +1,22 @@
 
 
-
-
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { StatusBar, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import ModeZero from '../../components/magnetovision/modeZero';
 
 export default function HomeScreen() {
   // Fullscreen state, default enabled
   const [fullscreen, setFullscreen] = useState(true);
   const tapTimesRef = useRef<number[]>([]);
+  const navigation = useNavigation();
+
+  // Hide tab bar when fullscreen
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: fullscreen ? { display: 'none' } : undefined,
+    });
+  }, [fullscreen, navigation]);
 
   // Triple-tap handler (within 3 seconds)
   const handleTripleTap = () => {
