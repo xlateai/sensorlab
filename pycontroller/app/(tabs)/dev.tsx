@@ -62,16 +62,20 @@ import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
 import type { DeviceMotionMeasurement } from 'expo-sensors';
 import AccelerationScreen from '@/components/sensorvisuals/acceleration';
 import MagneticScreen from '@/components/sensorvisuals/magnetic';
+import AccelerationWithGravityScreen from '@/components/sensorvisuals/accelerationWithGravity';
+import RotationScreen from '@/components/sensorvisuals/rotation';
+import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
+import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 
 // Map measurement to component
 const measurementComponentMap: Record<string, React.ComponentType | null> = {
   'acc': AccelerationScreen,
-  'acc+grav': null,
-  'rot': null,
-  'rotΔ': null,
+  'acc+grav': AccelerationWithGravityScreen,
+  'rot': RotationScreen,
+  'rotΔ': RotationDeltaScreen,
   'Interval': null,
-  'magnetometer': null,
-  'gyroscope': null,
+  'magnetometer': MagneticScreen,
+  'gyroscope': GyroscopeScreen,
   'barometer': null,
 };
 
@@ -309,13 +313,14 @@ export default function DevScreen() {
           <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
           {/* Blank popup modal */}
           <BlankPopup visible={popupVisible} onClose={closePopup}>
-            {popupComponent === 'acc' ? <AccelerationScreen /> :
-             popupComponent === 'magnetometer' ? <MagneticScreen /> : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 32 }}>{popupMeasurement}</Text>
-                <Text style={{ color: '#fff', fontSize: 18, marginTop: 16 }}>TODO</Text>
-              </View>
-            )}
+            {measurementComponentMap[popupComponent]
+              ? React.createElement(measurementComponentMap[popupComponent])
+              : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 32 }}>{popupMeasurement}</Text>
+                  <Text style={{ color: '#fff', fontSize: 18, marginTop: 16 }}>TODO</Text>
+                </View>
+              )}
           </BlankPopup>
         </View>
       </ScrollView>
