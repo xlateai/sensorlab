@@ -2,6 +2,7 @@
 import CoreHaptics
 import CoreHaptics
 import ExpoModulesCore
+import ConvolutionView
 // Error type for haptics
 enum HapticError: Error {
   case missingDuration
