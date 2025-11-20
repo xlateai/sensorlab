@@ -1,53 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, Button, PanResponder } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Button } from 'react-native';
 import { playContinuousHaptic } from '../haptics';
-
-// CustomSlider: a simple horizontal slider using PanResponder
-function CustomSlider({ value, onValueChange, trackColor }: { value: number; onValueChange: (v: number) => void; trackColor: string }) {
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderGrant: (evt) => {
-      if (containerWidth === 0) return;
-      const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
-      onValueChange(Number(percent.toFixed(2)));
-    },
-    onPanResponderMove: (evt) => {
-      if (containerWidth === 0) return;
-      const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
-      onValueChange(Number(percent.toFixed(2)));
-    },
-  });
-
-  return (
-    <View
-      onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
-      {...panResponder.panHandlers}
-      style={{
-        width: '100%',
-        height: 32,
-        backgroundColor: '#222',
-        borderRadius: 16,
-        marginVertical: 8,
-        justifyContent: 'center',
-        position: 'relative',
-      }}
-    >
-      <View
-        style={{
-          position: 'absolute',
-          left: Math.max(0, Math.min(value * (containerWidth - 24), containerWidth - 24)),
-          top: 0,
-          width: 24,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: trackColor,
-        }}
-      />
-    </View>
-  );
-}
+import Slider from '../../components/ui/slider';
 
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
@@ -62,13 +16,13 @@ export default function AudioTab() {
       <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
       <View style={{ marginBottom: 32 }}>
         <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
-        <CustomSlider
+        <Slider
           value={intensity}
           onValueChange={setIntensity}
           trackColor="#39ff14"
         />
         <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
-        <CustomSlider
+        <Slider
           value={sharpness}
           onValueChange={setSharpness}
           trackColor="#39ff14"
