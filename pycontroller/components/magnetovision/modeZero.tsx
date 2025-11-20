@@ -91,7 +91,8 @@ export default function ModeZero() {
 
 
   // 16x16 grid setup
-  const GRID_SIZE = 16;
+  // 24x24 grid setup
+  const GRID_SIZE = 24;
   const squareSize = screenWidth / GRID_SIZE;
 
   // Helper to create a new random grid
