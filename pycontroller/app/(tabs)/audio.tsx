@@ -31,8 +31,6 @@ export default function AudioTab() {
           <Button title="Play Haptic" color="#39ff14" onPress={handlePlay} />
         </View>
       </View>
-      {/* Leave room for future audio features below */}
-      <Text style={{ fontSize: 18, color: '#39ff14' }}>More audio features coming soon...</Text>
     </View>
   );
 }
