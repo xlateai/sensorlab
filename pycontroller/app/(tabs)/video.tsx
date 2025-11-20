@@ -18,11 +18,10 @@ export default function VideoScreen() {
 
   // Sync mode from context when it changes in storage
   useEffect(() => {
-    const stored = get('selectedMode');
-    if (stored !== undefined && Number(stored) !== mode) {
-      setMode(Number(stored));
+    if (get('selectedMode') !== undefined && Number(get('selectedMode')) !== mode) {
+      setMode(Number(get('selectedMode')));
     }
-  }, [get, mode]);
+  }, [get('selectedMode')]);
 
   // Persist mode changes to context/storage
   useEffect(() => {
