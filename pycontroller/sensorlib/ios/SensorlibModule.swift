@@ -111,8 +111,8 @@ public class SensorlibModule: Module {
       Events("onLoad")
     }
 
-    // Register ConvolutionView as a native view with explicit name
-    View(ConvolutionView.self, "ConvolutionView") {
+    // Register ConvolutionView as a native view
+    View(ConvolutionView.self) {
       // Example: add props/events as needed later
     }
   }
