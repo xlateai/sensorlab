@@ -67,7 +67,7 @@ export async function playSimpleHaptic(intensity: number, sharpness: number, dur
   await Sensorlib.playHaptic(pattern);
 }
 
-export async function playLongHaptic() {
+export async function playChimeHaptic() {
   if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
     // ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
     return;
@@ -75,14 +75,13 @@ export async function playLongHaptic() {
   // Example: fade in, pulse, fade out
   const pattern: HapticPatternRequest = {
     type: 'continuous',
-    intensity: 1.0,
-    sharpness: 0.5,
-    duration: 0.7,
+    // intensity: 1.0,
+    // sharpness: 1.0,
+    duration: 0.5,
     curve: [
-      { time: 0, intensity: 0.0 },
-      { time: 0.1, intensity: 1.0 },
-      { time: 0.5, intensity: 0.7 },
-      { time: 0.7, intensity: 0.0 }
+      { time: 0, intensity: 0.0, sharpness: 0.0 },
+      { time: 0.25, intensity: 0.25, sharpness: 0.25 },
+      // { time: 0.5, intensity: 0.0, sharpness: 0.0 }
     ]
   };
   await Sensorlib.playHaptic(pattern);

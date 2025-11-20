@@ -76,12 +76,18 @@ export default function AudioTab() {
           value={intensity}
           onValueChange={handleIntensityChange}
           trackColor="#39ff14"
+          minimumValue={0}
+          maximumValue={1}
+          defaultValue={1.0}
         />
         <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
         <Slider
           value={sharpness}
           onValueChange={handleSharpnessChange}
           trackColor="#39ff14"
+          minimumValue={0}
+          maximumValue={1}
+          defaultValue={0.5}
         />
         <View style={{ marginTop: 24 }}>
           <Button
