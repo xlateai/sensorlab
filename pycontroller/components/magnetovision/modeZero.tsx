@@ -147,7 +147,13 @@ export default function ModeZero() {
               return (
                 <View
                   key={col}
-                  style={{ width: squareSize, height: squareSize, backgroundColor: color }}
+                  style={{
+                    width: squareSize,
+                    height: squareSize,
+                    backgroundColor: color,
+                    borderWidth: 1,
+                    borderColor: 'rgba(0,0,0,1.0)', // faint black grid line
+                  }}
                 />
               );
             })}
