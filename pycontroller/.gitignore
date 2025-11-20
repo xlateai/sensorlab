@@ -32,5 +32,6 @@ yarn-error.*
 app-example
 
 
-*/ios/
-*/android/
+# ignore generated ios and android folders
+ios/
+android/
