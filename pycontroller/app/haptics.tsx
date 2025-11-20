@@ -23,7 +23,22 @@ try {
   Sensorlib = null;
 }
 
-export async function playContinuousHaptic() {
+
+export async function playContinuousHaptic(intensity: number, sharpness: number, duration: number) {
+  if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
+    await ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
+    return;
+  }
+
+  const pattern: HapticPatternRequest = {
+    type: 'continuous',
+    intensity,
+    sharpness,
+    duration
+  };
+}
+
+export async function playLongHaptic() {
   if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
     // ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
     return;
