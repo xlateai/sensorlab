@@ -25,12 +25,8 @@ class HapticsEngineManager {
 
     func getEngine() throws -> CHHapticEngine {
         if let engine = engine {
-            if engine.isRunning {
-                return engine
-            } else {
-                try engine.start()
-                return engine
-            }
+            try? engine.start() // Always try to start, safe and idempotent
+            return engine
         }
         let newEngine = try CHHapticEngine()
         try newEngine.start()

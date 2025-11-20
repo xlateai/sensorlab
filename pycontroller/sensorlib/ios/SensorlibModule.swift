@@ -1,4 +1,11 @@
+
+import CoreHaptics
+import CoreHaptics
 import ExpoModulesCore
+// Error type for haptics
+enum HapticError: Error {
+  case missingDuration
+}
 
 public class SensorlibModule: Module {
   // Each module class must implement the definition function. The definition consists of components
@@ -45,7 +52,7 @@ public class SensorlibModule: Module {
         events.append(event)
       case "continuous":
         guard let duration = input.duration else {
-          throw Exception("Missing duration for continuous haptic")
+          throw HapticError.missingDuration
         }
         let event = CHHapticEvent(eventType: .hapticContinuous,
                                  parameters: [
