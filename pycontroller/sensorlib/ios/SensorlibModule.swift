@@ -5,6 +5,7 @@ import ExpoModulesCore
 // Error type for haptics
 enum HapticError: Error {
   case missingDuration
+  case unknownType(String)
 }
 
 public class SensorlibModule: Module {
@@ -75,14 +76,14 @@ public class SensorlibModule: Module {
             }
           }
           if !intensityCurvePoints.isEmpty {
-            curves.append(CHHapticParameterCurve(parameterID: .hapticIntensity, controlPoints: intensityCurvePoints, relativeTime: 0))
+            curves.append(CHHapticParameterCurve(parameterID: .hapticIntensityControl, controlPoints: intensityCurvePoints, relativeTime: 0))
           }
           if !sharpnessCurvePoints.isEmpty {
-            curves.append(CHHapticParameterCurve(parameterID: .hapticSharpness, controlPoints: sharpnessCurvePoints, relativeTime: 0))
+            curves.append(CHHapticParameterCurve(parameterID: .hapticSharpnessControl, controlPoints: sharpnessCurvePoints, relativeTime: 0))
           }
         }
       default:
-        throw Exception("Unknown haptic type: \(input.type)")
+  throw HapticError.unknownType(input.type)
       }
 
       let pattern = try CHHapticPattern(events: events, parameterCurves: curves)
