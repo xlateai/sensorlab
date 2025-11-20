@@ -125,7 +125,6 @@ export default function ModeZero() {
       if (maxK === minK) return 0;
       return ((x - minK) / (maxK - minK)) * 2 - 1;
     });
-    // Slide over imageGrid and apply convolution
     setImageGrid(prevGrid => {
       // For each cell, apply 3x3 conv with kernel
       const newGrid = prevGrid.map((row, r) =>
@@ -146,6 +145,11 @@ export default function ModeZero() {
           return Math.max(0, Math.min(1, acc));
         })
       );
+      // If all values are zero, reinitialize
+      const allZero = newGrid.every(row => row.every(v => v === 0));
+      if (allZero) {
+        return createRandomGrid();
+      }
       return newGrid;
     });
   }, [convBuffer, minMax]);
