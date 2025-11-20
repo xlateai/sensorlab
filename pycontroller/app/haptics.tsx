@@ -77,10 +77,10 @@ export async function playChimeHaptic() {
     type: 'continuous',
     // intensity: 1.0,
     // sharpness: 1.0,
-    duration: 0.33,
+    duration: 0.7,
     curve: [
-      { time: 0.0, intensity: 0.3, sharpness: 0.3 },
-      { time: 0.33, intensity: 0.0, sharpness: 0.0 },
+      { time: 0.0, intensity: 1.0, sharpness: 0.3 },
+      { time: 0.7, intensity: 0.0, sharpness: 0.0 },
       // { time: 0.5, intensity: 0.0, sharpness: 0.0 }
     ]
   };
