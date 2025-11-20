@@ -3,30 +3,27 @@ import { View, Text, Button, PanResponder } from 'react-native';
 import { playContinuousHaptic } from '../haptics';
 
 // CustomSlider: a simple horizontal slider using PanResponder
-function CustomSlider({ value, onValueChange, trackColor }) {
-  const panResponder = useRef();
+function CustomSlider({ value, onValueChange, trackColor }: { value: number; onValueChange: (v: number) => void; trackColor: string }) {
   const [containerWidth, setContainerWidth] = useState(0);
 
-  if (!panResponder.current) {
-    panResponder.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        if (containerWidth === 0) return;
-        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
-        onValueChange(Number(percent.toFixed(2)));
-      },
-      onPanResponderMove: (evt) => {
-        if (containerWidth === 0) return;
-        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
-        onValueChange(Number(percent.toFixed(2)));
-      },
-    });
-  }
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderGrant: (evt) => {
+      if (containerWidth === 0) return;
+      const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
+      onValueChange(Number(percent.toFixed(2)));
+    },
+    onPanResponderMove: (evt) => {
+      if (containerWidth === 0) return;
+      const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
+      onValueChange(Number(percent.toFixed(2)));
+    },
+  });
 
   return (
     <View
       onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
-      {...panResponder.current.panHandlers}
+      {...panResponder.panHandlers}
       style={{
         width: '100%',
         height: 32,
@@ -40,7 +37,7 @@ function CustomSlider({ value, onValueChange, trackColor }) {
       <View
         style={{
           position: 'absolute',
-          left: value * (containerWidth - 24),
+          left: Math.max(0, Math.min(value * (containerWidth - 24), containerWidth - 24)),
           top: 0,
           width: 24,
           height: 32,
