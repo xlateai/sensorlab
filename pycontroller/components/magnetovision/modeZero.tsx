@@ -6,7 +6,7 @@ import { Magnetometer } from 'expo-sensors';
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
-export default function ModeOne() {
+export default function ModeZero() {
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
