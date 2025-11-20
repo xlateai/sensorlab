@@ -7,27 +7,25 @@ import Slider from '../../components/ui/slider';
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
   const [sharpness, setSharpness] = useState(0.5);
-  const duration = 1.0;
+  // Use refs to hold live values for haptic stream
+  const valuesRef = React.useRef({ intensity: 1.0, sharpness: 0.5 });
+  const duration = 0.5;
   const [isPlaying, setIsPlaying] = useState(false);
   const controllerRef = React.useRef<{ cancel: () => void } | null>(null);
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
     while (true) {
-      // Wait for a short interval between pulses
-      yield { intensity, sharpness, duration };
+      // Always yield the latest values from ref
+      yield { intensity: valuesRef.current.intensity, sharpness: valuesRef.current.sharpness, duration };
       await new Promise(resolve => setTimeout(resolve, duration * 1000));
     }
   }
 
-  const handlePlayPause = async () => {
-    if (isPlaying) {
-      // Stop the stream
-      setIsPlaying(false);
-      controllerRef.current?.cancel();
-      return;
-    }
-    setIsPlaying(true);
+  // Store the current haptic runner
+  const hapticRunnerRef = React.useRef<Promise<void> | null>(null);
+
+  const startHaptic = () => {
     let cancelled = false;
     controllerRef.current = {
       cancel: () => { cancelled = true; }
@@ -39,8 +37,34 @@ export default function AudioTab() {
         yield value;
       }
     }
-    await playContinuousHaptic(cancellableStream());
+    hapticRunnerRef.current = playContinuousHaptic(cancellableStream()).then(() => {
+      setIsPlaying(false);
+    });
+  };
+
+  const stopHaptic = () => {
+    controllerRef.current?.cancel();
+    hapticRunnerRef.current = null;
     setIsPlaying(false);
+  };
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      stopHaptic();
+      return;
+    }
+    setIsPlaying(true);
+    startHaptic();
+  };
+
+  // Update ref and state on slider change
+  const handleIntensityChange = (val: number) => {
+    setIntensity(val);
+    valuesRef.current.intensity = val;
+  };
+  const handleSharpnessChange = (val: number) => {
+    setSharpness(val);
+    valuesRef.current.sharpness = val;
   };
 
   return (
@@ -50,13 +74,13 @@ export default function AudioTab() {
         <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
         <Slider
           value={intensity}
-          onValueChange={setIntensity}
+          onValueChange={handleIntensityChange}
           trackColor="#39ff14"
         />
         <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
         <Slider
           value={sharpness}
-          onValueChange={setSharpness}
+          onValueChange={handleSharpnessChange}
           trackColor="#39ff14"
         />
         <View style={{ marginTop: 24 }}>
