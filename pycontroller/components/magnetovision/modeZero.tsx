@@ -1,6 +1,7 @@
 
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
+import Svg, { Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
@@ -100,7 +101,7 @@ export default function ModeZero() {
 
   // Compute RGB for each permutation
   const getRGB = (order: [string, string, string]) => {
-    if (!magnetometer) return "rgb(128,128,128)";
+    if (!magnetometer) return [128,128,128];
     const norm = (val: number, min: number, max: number) => {
       if (max === min) return 0.5;
       return Math.max(0, Math.min(1, (val - min) / (max - min)));
@@ -110,15 +111,15 @@ export default function ModeZero() {
       y: norm(magnetometer.y, minMax.minY, minMax.maxY),
       z: norm(magnetometer.z, minMax.minZ, minMax.maxZ),
     };
-    const rgb = order.map(axis => Math.round(values[axis] * 255));
-    return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    return order.map(axis => Math.round(values[axis] * 255));
   };
 
   // Hexagon layout
   const radius = 40;
   const circleSize = 28;
-  const centerX = 0;
-  const centerY = 0;
+  const svgSize = radius * 2 + circleSize;
+  const centerX = svgSize / 2;
+  const centerY = svgSize / 2;
   const hexPoints = Array.from({ length: 6 }, (_, i) => {
     const angle = (Math.PI / 3) * i - Math.PI / 2;
     return {
@@ -127,24 +128,58 @@ export default function ModeZero() {
     };
   });
 
+  // Prepare colors for each vertex
+  const colors = permutations.map(getRGB);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <View style={{ width: radius * 2 + circleSize, height: radius * 2 + circleSize, position: "relative" }}>
+      <Svg width={svgSize} height={svgSize}>
+        <Defs>
+          {hexPoints.map((pt, i) => {
+            const nextIdx = (i + 1) % 6;
+            const colorA = colors[i];
+            const colorB = colors[nextIdx];
+            return (
+              <LinearGradient
+                key={`grad${i}`}
+                id={`grad${i}`}
+                x1={pt.x}
+                y1={pt.y}
+                x2={hexPoints[nextIdx].x}
+                y2={hexPoints[nextIdx].y}
+              >
+                <Stop offset="0%" stopColor={`rgb(${colorA[0]},${colorA[1]},${colorA[2]})`} />
+                <Stop offset="100%" stopColor={`rgb(${colorB[0]},${colorB[1]},${colorB[2]})`} />
+              </LinearGradient>
+            );
+          })}
+        </Defs>
+        {/* Draw hexagon links with blended gradients */}
+        {hexPoints.map((pt, i) => {
+          const nextIdx = (i + 1) % 6;
+          return (
+            <Line
+              key={`line${i}`}
+              x1={pt.x}
+              y1={pt.y}
+              x2={hexPoints[nextIdx].x}
+              y2={hexPoints[nextIdx].y}
+              stroke={`url(#grad${i})`}
+              strokeWidth={6}
+            />
+          );
+        })}
+        {/* Draw circles at vertices */}
         {hexPoints.map((pt, i) => (
-          <View
-            key={i}
-            style={{
-              position: "absolute",
-              left: pt.x + radius,
-              top: pt.y + radius,
-              width: circleSize,
-              height: circleSize,
-              borderRadius: circleSize / 2,
-              backgroundColor: getRGB(permutations[i]),
-            }}
+          <Circle
+            key={`circle${i}`}
+            cx={pt.x}
+            cy={pt.y}
+            r={circleSize / 2}
+            fill={`rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`}
           />
         ))}
-      </View>
+      </Svg>
     </View>
   );
 }
