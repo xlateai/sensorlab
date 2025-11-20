@@ -1,15 +1,46 @@
 import React, { useState } from 'react';
 import { View, Text, Button } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { playSimpleHaptic } from '../haptics';
+import { playContinuousHaptic } from '../haptics';
 import Slider from '../../components/ui/slider';
 
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
   const [sharpness, setSharpness] = useState(0.5);
   const duration = 1.0;
-  const handlePlay = async () => {
-    await playSimpleHaptic(intensity, sharpness, duration);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const controllerRef = React.useRef<{ cancel: () => void } | null>(null);
+
+  // Stream generator for continuous haptic
+  async function* hapticStream() {
+    while (true) {
+      // Wait for a short interval between pulses
+      yield { intensity, sharpness, duration };
+      await new Promise(resolve => setTimeout(resolve, duration * 1000));
+    }
+  }
+
+  const handlePlayPause = async () => {
+    if (isPlaying) {
+      // Stop the stream
+      setIsPlaying(false);
+      controllerRef.current?.cancel();
+      return;
+    }
+    setIsPlaying(true);
+    let cancelled = false;
+    controllerRef.current = {
+      cancel: () => { cancelled = true; }
+    };
+    // Wrap the stream to allow cancellation
+    async function* cancellableStream() {
+      for await (const value of hapticStream()) {
+        if (cancelled) break;
+        yield value;
+      }
+    }
+    await playContinuousHaptic(cancellableStream());
+    setIsPlaying(false);
   };
 
   return (
@@ -29,7 +60,11 @@ export default function AudioTab() {
           trackColor="#39ff14"
         />
         <View style={{ marginTop: 24 }}>
-          <Button title="Play Haptic" color="#39ff14" onPress={handlePlay} />
+          <Button
+            title={isPlaying ? 'Pause' : 'Play Haptic'}
+            color="#39ff14"
+            onPress={handlePlayPause}
+          />
         </View>
       </View>
     </SafeAreaView>

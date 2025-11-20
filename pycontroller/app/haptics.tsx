@@ -1,3 +1,28 @@
+/**
+ * Play a continuous haptic pattern from a stream of values.
+ * @param stream An async iterable yielding { intensity, sharpness, duration } objects.
+ */
+export async function playContinuousHaptic(
+  stream: AsyncIterable<{ intensity: number; sharpness: number; duration: number }>
+) {
+  if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
+    return;
+  }
+  // Native: play each value as a short continuous haptic
+  for await (const { intensity, sharpness, duration } of stream) {
+    const pattern: HapticPatternRequest = {
+      type: 'continuous',
+      intensity,
+      sharpness,
+      duration,
+      curve: [
+        { time: 0, intensity, sharpness },
+        { time: duration, intensity, sharpness }
+      ]
+    };
+    await Sensorlib.playHaptic(pattern);
+  }
+}
 import { requireNativeModule } from 'expo-modules-core';
 
 export type HapticCurvePoint = {
