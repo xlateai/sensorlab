@@ -1,5 +1,12 @@
 import { NativeModules } from 'react-native';
-const { AudioBridge } = NativeModules;
+
+let AudioBridge = null;
+try {
+  AudioBridge = requireNativeModule('AudioBridge');
+} catch {
+  AudioBridge = null;
+}
+
 
 const SAMPLE_RATE = 48000;
 const CHUNK_SIZE = 2048;
@@ -24,6 +31,7 @@ let running = false;
 
 async function loop() {
   if (!running) return;
+  
   const buffered = await AudioBridge.getBufferedSamples();
   const seconds = buffered / SAMPLE_RATE;
   let timeout = 2;
