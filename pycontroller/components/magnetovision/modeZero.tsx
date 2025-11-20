@@ -176,11 +176,11 @@ export default function ModeZero() {
           strokeWidth={2}
           opacity={1}
         />
-        {/* Add a center dot with the same thickness as endpoint circles */}
+        {/* Add a smaller center dot */}
         <Circle
           cx={centerX}
           cy={centerY}
-          r={5}
+          r={1}
           fill={segmentColor}
         />
       </Svg>
