@@ -6,7 +6,7 @@ import { Magnetometer } from 'expo-sensors';
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
-export default function ModeOne() {
+export default function ModeFour() {
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
@@ -95,7 +95,7 @@ export default function ModeOne() {
   const maxRadius = innerRadius * 1.333;
   const avgRGB = (smoothR + smoothG + smoothB) / 3;
   const ringRadius = minRadius + ((maxRadius - minRadius) * (avgRGB / 255));
-  const ringThickness = 3;
+  const ringThickness = 1.5;
 
   // Use react-native-svg for rendering
   const Svg = require('react-native-svg').Svg;
