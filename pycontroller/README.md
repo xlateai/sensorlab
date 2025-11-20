@@ -6,6 +6,7 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 - Easy way: `npx expo start`.
 - With custom native modules: `npx expo run:ios --device` (requires extra setup and phone to be plugged into your pc)
+- Persistent version on your phone (locally plugged in only) `npx expo run:ios --configuration Release`
 
 ## Get started
 
