@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 let memoryStore: Record<string, string> = {};
-let AsyncStorage: any = null;
-try {
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
-} catch (e) {
-  AsyncStorage = null;
-}
 
 interface StorageContextType {
   get: (key: string) => string | undefined;
