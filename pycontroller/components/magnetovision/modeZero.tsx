@@ -62,9 +62,8 @@ export default function ModeZero() {
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
   }, [buffer]);
 
-  // Interpolate between colors for smooth transitions
-  const prevRGBRef = useRef<[number, number, number]>([0, 0, 0]);
-  let r = 0, g = 0, b = 0;
+  // Prepare normalized RGB from magnetometer
+  let r = 128, g = 128, b = 128;
   if (magnetometer !== null) {
     const norm = (val: number, min: number, max: number) => {
       if (max === min) return 0.5;
@@ -74,51 +73,47 @@ export default function ModeZero() {
     g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
     b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
   }
-  // Blend previous and current RGB
-  const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
-  const prev = prevRGBRef.current;
-  const smoothR = Math.round(prev[0] * (1 - blend) + r * blend);
-  const smoothG = Math.round(prev[1] * (1 - blend) + g * blend);
-  const smoothB = Math.round(prev[2] * (1 - blend) + b * blend);
-  prevRGBRef.current = [smoothR, smoothG, smoothB];
-  const currentPixel = `rgb(${smoothR},${smoothG},${smoothB})`;
 
+
+  // 8x8 grid setup
+  const GRID_SIZE = 8;
+  const squareSize = screenWidth / GRID_SIZE;
+
+  // Generate static random multipliers for each square (once per mount)
+  const randomMultipliers = useMemo(() => {
+    const arr: number[][] = [];
+    for (let i = 0; i < GRID_SIZE; i++) {
+      arr[i] = [];
+      for (let j = 0; j < GRID_SIZE; j++) {
+        arr[i][j] = 0.5 + Math.random() * 0.5; // range [0.5, 1.0]
+      }
+    }
+    return arr;
+  }, []);
 
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Render a single centered circle with the latest value color
-  // Outer ring logic
-  const baseRadius = Math.min(screenWidth, canvasHeight) / 6;
-  const innerRadius = baseRadius * 0.5; // 50% smaller
-  const minRadius = innerRadius;
-  const maxRadius = innerRadius * 1.333;
-  const avgRGB = (smoothR + smoothG + smoothB) / 3;
-  const ringRadius = minRadius + ((maxRadius - minRadius) * (avgRGB / 255));
-  const ringThickness = 1.5;
 
-  // Use react-native-svg for rendering
-  const Svg = require('react-native-svg').Svg;
-  const Circle = require('react-native-svg').Circle;
-
-  const centerX = screenWidth / 2;
-  const centerY = canvasHeight / 2;
-
+  // Render grid
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {/* Outer ring */}
-        <Circle
-          cx={centerX}
-          cy={centerY}
-          r={ringRadius}
-          fill="none"
-          stroke={`rgba(${smoothR},${smoothG},${smoothB},0.25)`}
-          strokeWidth={ringThickness}
-        />
-        {/* Inner circle */}
-        <Circle cx={centerX} cy={centerY} r={innerRadius} fill={currentPixel} />
-      </Svg>
+    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ width: screenWidth, height: squareSize * GRID_SIZE, flexDirection: 'column' }}>
+        {Array.from({ length: GRID_SIZE }).map((_, row) => (
+          <View key={row} style={{ flexDirection: 'row' }}>
+            {Array.from({ length: GRID_SIZE }).map((_, col) => {
+              const mult = randomMultipliers[row][col];
+              const color = `rgb(${Math.round(r * mult)},${Math.round(g * mult)},${Math.round(b * mult)})`;
+              return (
+                <View
+                  key={col}
+                  style={{ width: squareSize, height: squareSize, backgroundColor: color }}
+                />
+              );
+            })}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
