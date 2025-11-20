@@ -138,6 +138,16 @@ export default function ModeZero() {
             />
           );
         })}
+        {/* Add circles at each hexagon vertex to fill gaps */}
+        {hexPoints.map((pt, i) => (
+          <Circle
+            key={`circle${i}`}
+            cx={pt.x}
+            cy={pt.y}
+            r={5}
+            fill={segmentColor}
+          />
+        ))}
       </Svg>
     </View>
   );
