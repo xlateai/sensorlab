@@ -148,6 +148,34 @@ export default function ModeZero() {
             fill={segmentColor}
           />
         ))}
+        {/* Draw faint thin lines from top left, top right, and bottom to center using segmentColor */}
+        <Line
+          x1={hexPoints[5].x}
+          y1={hexPoints[5].y}
+          x2={centerX}
+          y2={centerY}
+          stroke={segmentColor}
+          strokeWidth={2}
+          opacity={0.25}
+        />
+        <Line
+          x1={hexPoints[1].x}
+          y1={hexPoints[1].y}
+          x2={centerX}
+          y2={centerY}
+          stroke={segmentColor}
+          strokeWidth={2}
+          opacity={0.25}
+        />
+        <Line
+          x1={hexPoints[3].x}
+          y1={hexPoints[3].y}
+          x2={centerX}
+          y2={centerY}
+          stroke={segmentColor}
+          strokeWidth={2}
+          opacity={0.25}
+        />
       </Svg>
     </View>
   );
