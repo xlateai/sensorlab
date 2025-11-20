@@ -1,7 +1,8 @@
 
 
 import React, { useRef, useState, useEffect } from 'react';
-import { StatusBar, View, PanResponder, Dimensions } from 'react-native';
+import { StatusBar, View, PanResponder, Dimensions, Platform } from 'react-native';
+import * as ExpoStatusBar from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
 import ModeZero from '../../components/magnetovision/modeZero';
 
@@ -79,11 +80,26 @@ export default function HomeScreen() {
     })
   ).current;
 
+
   // Hide tab bar when fullscreen
   useEffect(() => {
     navigation.setOptions({
       tabBarStyle: fullscreen ? { display: 'none' } : undefined,
     });
+    if (fullscreen) {
+      // Hide status bar and notch/time bar
+      ExpoStatusBar.setStatusBarHidden(true, 'fade');
+      if (Platform.OS === 'android') {
+        ExpoStatusBar.setStatusBarTranslucent(true);
+        ExpoStatusBar.setStatusBarStyle('light');
+      }
+    } else {
+      ExpoStatusBar.setStatusBarHidden(false, 'fade');
+      if (Platform.OS === 'android') {
+        ExpoStatusBar.setStatusBarTranslucent(false);
+        ExpoStatusBar.setStatusBarStyle('dark');
+      }
+    }
   }, [fullscreen, navigation]);
 
 
@@ -92,7 +108,7 @@ export default function HomeScreen() {
       style={{ flex: 1, backgroundColor: '#000' }}
       {...panResponder.panHandlers}
     >
-      <StatusBar hidden={fullscreen} animated />
+  <StatusBar hidden={fullscreen} animated />
       <View style={{ flex: 1 }}>
         <ModeZero />
       </View>
