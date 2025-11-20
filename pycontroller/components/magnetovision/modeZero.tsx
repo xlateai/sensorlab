@@ -151,7 +151,7 @@ export default function ModeZero() {
                     width: squareSize,
                     height: squareSize,
                     backgroundColor: color,
-                    borderWidth: 1,
+                    borderWidth: 0.25,
                     borderColor: 'rgba(0,0,0,1.0)', // faint black grid line
                   }}
                 />
