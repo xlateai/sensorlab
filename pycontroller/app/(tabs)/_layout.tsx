@@ -38,6 +38,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="audio"
+        options={{
+          title: 'Audio',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="waveform" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="threeD"
         options={{
           title: '3D',
