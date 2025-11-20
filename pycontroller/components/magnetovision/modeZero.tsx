@@ -88,17 +88,37 @@ export default function ModeOne() {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
   // Render a single centered circle with the latest value color
+  // Outer ring logic
+  const baseRadius = Math.min(screenWidth, canvasHeight) / 6;
+  const innerRadius = baseRadius * 0.7; // 30% smaller
+  const minRadius = innerRadius;
+  const maxRadius = innerRadius * 1.333;
+  const avgRGB = (smoothR + smoothG + smoothB) / 3;
+  const ringRadius = minRadius + ((maxRadius - minRadius) * (avgRGB / 255));
+  const ringThickness = 3;
+
+  // Use react-native-svg for rendering
+  const Svg = require('react-native-svg').Svg;
+  const Circle = require('react-native-svg').Circle;
+
+  const centerX = screenWidth / 2;
+  const centerY = canvasHeight / 2;
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: currentPixel,
-          // no border
-        }}
-      />
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
+        {/* Outer ring */}
+        <Circle
+          cx={centerX}
+          cy={centerY}
+          r={ringRadius}
+          fill="none"
+          stroke={currentPixel}
+          strokeWidth={ringThickness}
+        />
+        {/* Inner circle */}
+        <Circle cx={centerX} cy={centerY} r={innerRadius} fill={currentPixel} />
+      </Svg>
     </View>
   );
 }
