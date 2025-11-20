@@ -2,9 +2,21 @@
 
 import QRCode from 'react-native-qrcode-svg';
 import { Dimensions, View, Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import { NativeModules } from 'react-native';
 
 export default function CreatorScreen() {
   const { width } = Dimensions.get('window');
+  const [helloMsg, setHelloMsg] = useState('');
+
+  useEffect(() => {
+    if (NativeModules.HelloModule && NativeModules.HelloModule.getHelloWorld) {
+      NativeModules.HelloModule.getHelloWorld((msg: string[]) => {
+        setHelloMsg(msg[0]);
+      });
+    }
+  }, []);
+
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
       <Text
@@ -25,6 +37,9 @@ export default function CreatorScreen() {
         size={width * 0.5}
         backgroundColor="#fff"
       />
+      {helloMsg ? (
+        <Text style={{ color: '#39ff14', fontSize: 12, marginTop: 24 }}>{helloMsg}</Text>
+      ) : null}
     </View>
   );
 }
