@@ -1,5 +1,5 @@
 import { requireNativeModule } from 'expo-modules-core';
-const AudioEngine = requireNativeModule('AudioEngine');
+const Sensorlib = requireNativeModule('Sensorlib');
 
 
 const SAMPLE_RATE = 48000;
@@ -25,13 +25,13 @@ let running = false;
 
 async function loop() {
   if (!running) return;
-  const buffered = await AudioEngine.getBufferedSamples();
+  const buffered = await Sensorlib.getAudioBufferedSamples();
   const seconds = buffered / SAMPLE_RATE;
   let timeout = 2;
   if (seconds < 0.3) timeout = 0;
   else if (seconds > 0.8) timeout = 10;
   const chunk = generateSineChunk();
-  AudioEngine.pushSamples(Array.from(chunk));
+  Sensorlib.pushAudioSamples(Array.from(chunk));
   setTimeout(loop, timeout);
 }
 

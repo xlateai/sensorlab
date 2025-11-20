@@ -35,13 +35,10 @@ public class SensorlibModule: Module {
     // Unified haptics play function
     AsyncFunction("playHaptic") { (input: HapticPatternInput) in
       let engine = try HapticsEngineManager.shared.getEngine()
-
       var events: [CHHapticEvent] = []
       var curves: [CHHapticParameterCurve] = []
-
       let intensity = input.intensity ?? 1.0
       let sharpness = input.sharpness ?? 0.5
-
       switch input.type {
       case "transient":
         let event = CHHapticEvent(eventType: .hapticTransient,
@@ -63,7 +60,6 @@ public class SensorlibModule: Module {
                                  relativeTime: 0,
                                  duration: duration)
         events.append(event)
-
         if let curvePoints = input.curve {
           var intensityCurvePoints: [CHHapticParameterCurve.ControlPoint] = []
           var sharpnessCurvePoints: [CHHapticParameterCurve.ControlPoint] = []
@@ -83,12 +79,21 @@ public class SensorlibModule: Module {
           }
         }
       default:
-  throw HapticError.unknownType(input.type)
+        throw HapticError.unknownType(input.type)
       }
-
       let pattern = try CHHapticPattern(events: events, parameterCurves: curves)
       let player = try engine.makePlayer(with: pattern)
       try player.start(atTime: 0)
+    }
+
+    // Expose audio engine methods
+    AsyncFunction("pushAudioSamples") { (samples: [Double]) in
+      let floatSamples = samples.map { Float($0) }
+      AudioEngine.shared.pushSamples(floatSamples)
+    }
+
+    AsyncFunction("getAudioBufferedSamples") { () -> Int in
+      return AudioEngine.shared.getBufferedSamples()
     }
 
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
