@@ -115,8 +115,8 @@ export default function ModeZero() {
   };
 
   // Hexagon layout
-  const radius = 40;
-  const circleSize = 28;
+  const radius = 60;
+  const circleSize = 10;
   const svgSize = radius * 2 + circleSize;
   const centerX = svgSize / 2;
   const centerY = svgSize / 2;
@@ -130,6 +130,13 @@ export default function ModeZero() {
 
   // Prepare colors for each vertex
   const colors = permutations.map(getRGB);
+
+  // Helper to blend two colors
+  const blendColors = (a: number[], b: number[], t: number) => [
+    Math.round(a[0] * (1 - t) + b[0] * t),
+    Math.round(a[1] * (1 - t) + b[1] * t),
+    Math.round(a[2] * (1 - t) + b[2] * t),
+  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
@@ -154,7 +161,7 @@ export default function ModeZero() {
             );
           })}
         </Defs>
-        {/* Draw hexagon links with blended gradients */}
+        {/* Draw hexagon links with blended gradients, no extension, for a seamless hexagon */}
         {hexPoints.map((pt, i) => {
           const nextIdx = (i + 1) % 6;
           return (
@@ -165,20 +172,11 @@ export default function ModeZero() {
               x2={hexPoints[nextIdx].x}
               y2={hexPoints[nextIdx].y}
               stroke={`url(#grad${i})`}
-              strokeWidth={6}
+              strokeWidth={10}
+              strokeLinecap="round"
             />
           );
         })}
-        {/* Draw circles at vertices */}
-        {hexPoints.map((pt, i) => (
-          <Circle
-            key={`circle${i}`}
-            cx={pt.x}
-            cy={pt.y}
-            r={circleSize / 2}
-            fill={`rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`}
-          />
-        ))}
       </Svg>
     </View>
   );
