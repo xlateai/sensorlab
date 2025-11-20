@@ -89,8 +89,8 @@ export default function ModeZero() {
   }, [magnetometer]);
 
 
-  // 8x8 grid setup
-  const GRID_SIZE = 8;
+  // 16x16 grid setup
+  const GRID_SIZE = 16;
   const squareSize = screenWidth / GRID_SIZE;
 
   // Initial randomized grid
