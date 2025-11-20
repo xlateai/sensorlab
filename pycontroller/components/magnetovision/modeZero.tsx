@@ -174,6 +174,7 @@ export default function ModeZero() {
               stroke={`url(#grad${i})`}
               strokeWidth={10}
               strokeLinecap="round"
+              strokeLinejoin="round"
             />
           );
         })}
