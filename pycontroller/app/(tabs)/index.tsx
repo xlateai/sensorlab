@@ -1,6 +1,7 @@
 
 
 import React, { useRef, useState, useEffect } from 'react';
+import { playContinuousHaptic } from '../haptics';
 import { StatusBar, View, PanResponder, Dimensions, Platform } from 'react-native';
 import * as ExpoStatusBar from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
@@ -86,6 +87,7 @@ export default function HomeScreen() {
     navigation.setOptions({
       tabBarStyle: fullscreen ? { display: 'none' } : undefined,
     });
+    playContinuousHaptic();
     if (fullscreen) {
       // Hide status bar and notch/time bar
       ExpoStatusBar.setStatusBarHidden(true, 'fade');
