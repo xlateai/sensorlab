@@ -15,3 +15,26 @@ struct HapticPatternInput: Record {
     @Field var duration: Double?
     @Field var curve: [HapticCurvePoint]?
 }
+
+
+class HapticsEngineManager {
+    static let shared = HapticsEngineManager()
+    private var engine: CHHapticEngine?
+
+    private init() {}
+
+    func getEngine() throws -> CHHapticEngine {
+        if let engine = engine {
+            if engine.isRunning {
+                return engine
+            } else {
+                try engine.start()
+                return engine
+            }
+        }
+        let newEngine = try CHHapticEngine()
+        try newEngine.start()
+        engine = newEngine
+        return newEngine
+    }
+}

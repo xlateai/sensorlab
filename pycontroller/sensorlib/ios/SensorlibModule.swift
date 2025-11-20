@@ -23,13 +23,64 @@ public class SensorlibModule: Module {
       return "Hello world! 👋"
     }
 
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { (value: String) in
-      // Send an event to JavaScript.
-      self.sendEvent("onChange", [
-        "value": value
-      ])
+
+    // Unified haptics play function
+    AsyncFunction("playHaptic") { (input: HapticPatternInput) in
+      let engine = try HapticsEngineManager.shared.getEngine()
+
+      var events: [CHHapticEvent] = []
+      var curves: [CHHapticParameterCurve] = []
+
+      let intensity = input.intensity ?? 1.0
+      let sharpness = input.sharpness ?? 0.5
+
+      switch input.type {
+      case "transient":
+        let event = CHHapticEvent(eventType: .hapticTransient,
+                                 parameters: [
+                                    CHHapticEventParameter(parameterID: .hapticIntensity, value: Float(intensity)),
+                                    CHHapticEventParameter(parameterID: .hapticSharpness, value: Float(sharpness))
+                                 ],
+                                 relativeTime: 0)
+        events.append(event)
+      case "continuous":
+        guard let duration = input.duration else {
+          throw Exception("Missing duration for continuous haptic")
+        }
+        let event = CHHapticEvent(eventType: .hapticContinuous,
+                                 parameters: [
+                                    CHHapticEventParameter(parameterID: .hapticIntensity, value: Float(intensity)),
+                                    CHHapticEventParameter(parameterID: .hapticSharpness, value: Float(sharpness))
+                                 ],
+                                 relativeTime: 0,
+                                 duration: duration)
+        events.append(event)
+
+        if let curvePoints = input.curve {
+          var intensityCurvePoints: [CHHapticParameterCurve.ControlPoint] = []
+          var sharpnessCurvePoints: [CHHapticParameterCurve.ControlPoint] = []
+          for point in curvePoints {
+            if let i = point.intensity {
+              intensityCurvePoints.append(.init(relativeTime: point.time, value: Float(i)))
+            }
+            if let s = point.sharpness {
+              sharpnessCurvePoints.append(.init(relativeTime: point.time, value: Float(s)))
+            }
+          }
+          if !intensityCurvePoints.isEmpty {
+            curves.append(CHHapticParameterCurve(parameterID: .hapticIntensity, controlPoints: intensityCurvePoints, relativeTime: 0))
+          }
+          if !sharpnessCurvePoints.isEmpty {
+            curves.append(CHHapticParameterCurve(parameterID: .hapticSharpness, controlPoints: sharpnessCurvePoints, relativeTime: 0))
+          }
+        }
+      default:
+        throw Exception("Unknown haptic type: \(input.type)")
+      }
+
+      let pattern = try CHHapticPattern(events: events, parameterCurves: curves)
+      let player = try engine.makePlayer(with: pattern)
+      try player.start(atTime: 0)
     }
 
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
