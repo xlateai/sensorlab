@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
+import { Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
@@ -138,6 +139,7 @@ export default function ModeZero() {
   // Render grid
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+      {/* Main grid */}
       <View style={{ width: screenWidth, height: squareSize * GRID_SIZE, flexDirection: 'column' }}>
         {Array.from({ length: GRID_SIZE }).map((_, row) => (
           <View key={row} style={{ flexDirection: 'row' }}>
@@ -159,6 +161,32 @@ export default function ModeZero() {
             })}
           </View>
         ))}
+      </View>
+      {/* Kernel grid below main grid */}
+      <View style={{ marginTop: 16 }}>
+        <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+          {kernel.map((row, i) => (
+            <View key={i} style={{ flexDirection: 'row' }}>
+              {row.map((val, j) => (
+                <View
+                  key={j}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    backgroundColor: '#222',
+                    borderWidth: 1,
+                    borderColor: 'rgba(0,0,0,0.3)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    margin: 1,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 14 }}>{val.toFixed(2)}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
