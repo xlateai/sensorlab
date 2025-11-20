@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["SensorlibModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.sensorlib.SensorlibModule"]
+  }
+}
