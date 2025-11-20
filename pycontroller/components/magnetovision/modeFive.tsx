@@ -7,7 +7,7 @@ const ConvolutionView = requireNativeViewManager('ConvolutionView');
 export default function ModeFive() {
   return (
     <View style={styles.container}>
-      <ConvolutionView />
+      <ConvolutionView style={{ flex: 1 }} />
     </View>
   );
 }
