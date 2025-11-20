@@ -1,13 +1,12 @@
-
-import { requireNativeComponent } from 'react-native';
+import { requireNativeModule } from 'expo-modules-core';
 import { View, StyleSheet } from 'react-native';
 
-const NativeConvolutionView = requireNativeComponent('ConvolutionView');
+const sensorLib = requireNativeModule('Sensorlib');
 
 export default function ModeFour() {
   return (
     <View style={styles.container}>
-      <NativeConvolutionView style={StyleSheet.absoluteFill} />
+      <sensorLib.ConvolutionView />
     </View>
   );
 }
