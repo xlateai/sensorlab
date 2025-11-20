@@ -1,14 +1,12 @@
-
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
-import Svg, { Circle, Line, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
 const PIXEL_WIDTH = 256;
-const BUFFER_SIZE = 16;
+const BUFFER_SIZE = 64;
 
-export default function ModeZero() {
+export default function ModeOne() {
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
@@ -89,101 +87,18 @@ export default function ModeZero() {
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Hexagon layout
-  const radius = 60;
-  const circleSize = 10;
-  const svgSize = radius * 2 + circleSize;
-  const centerX = svgSize / 2;
-  const centerY = svgSize / 2;
-  const hexPoints = Array.from({ length: 6 }, (_, i) => {
-    const angle = (Math.PI / 3) * i - Math.PI / 2;
-    return {
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle),
-    };
-  });
-
-  // All segments use the same color, RGB = normalized XYZ
-  const segmentColor = `rgb(${smoothR},${smoothG},${smoothB})`;
-
+  // Render a single centered circle with the latest value color
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <Svg width={svgSize} height={svgSize}>
-        {/* Draw hexagon links as thick rectangles, all the same color */}
-        {hexPoints.map((pt, i) => {
-          const nextIdx = (i + 1) % 6;
-          const x1 = pt.x;
-          const y1 = pt.y;
-          const x2 = hexPoints[nextIdx].x;
-          const y2 = hexPoints[nextIdx].y;
-          const dx = x2 - x1;
-          const dy = y2 - y1;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-          // Overlap a bit at the ends for seamless connection
-          const overlap = 8;
-          const extendedLength = length + overlap;
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          return (
-            <Rect
-              key={`rect${i}`}
-              x={midX - extendedLength / 2}
-              y={midY - 5}
-              width={extendedLength}
-              height={10}
-              fill={segmentColor}
-              rx={5}
-              transform={`rotate(${angle},${midX},${midY})`}
-            />
-          );
-        })}
-        {/* Add circles at each hexagon vertex to fill gaps */}
-        {hexPoints.map((pt, i) => (
-          <Circle
-            key={`circle${i}`}
-            cx={pt.x}
-            cy={pt.y}
-            r={5}
-            fill={segmentColor}
-          />
-        ))}
-        {/* Draw thin lines from top left, top right, and bottom to center using segmentColor, fully opaque */}
-        <Line
-          x1={hexPoints[5].x}
-          y1={hexPoints[5].y}
-          x2={centerX}
-          y2={centerY}
-          stroke={segmentColor}
-          strokeWidth={2}
-          opacity={1}
-        />
-        <Line
-          x1={hexPoints[1].x}
-          y1={hexPoints[1].y}
-          x2={centerX}
-          y2={centerY}
-          stroke={segmentColor}
-          strokeWidth={2}
-          opacity={1}
-        />
-        <Line
-          x1={hexPoints[3].x}
-          y1={hexPoints[3].y}
-          x2={centerX}
-          y2={centerY}
-          stroke={segmentColor}
-          strokeWidth={2}
-          opacity={1}
-        />
-        {/* Add a smaller center dot */}
-        <Circle
-          cx={centerX}
-          cy={centerY}
-          r={1}
-          fill={segmentColor}
-        />
-      </Svg>
+      <View
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: currentPixel,
+          // no border
+        }}
+      />
     </View>
   );
 }
