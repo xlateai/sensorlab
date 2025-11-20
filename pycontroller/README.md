@@ -2,6 +2,11 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Development
+
+- Easy way: `npx expo start`.
+- With custom native modules: `npx expo run:ios --device` (requires extra setup and phone to be plugged into your pc)
+
 ## Get started
 
 1. Install dependencies
