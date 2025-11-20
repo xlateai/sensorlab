@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { TouchableWithoutFeedback } from 'react-native';
 import { Dimensions, View } from 'react-native';
 import { Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -93,12 +94,25 @@ export default function ModeZero() {
   const GRID_SIZE = 16;
   const squareSize = screenWidth / GRID_SIZE;
 
-  // Initial randomized grid
-  const [imageGrid, setImageGrid] = useState<number[][]>(() => {
-    return Array.from({ length: GRID_SIZE }, () =>
+  // Helper to create a new random grid
+  const createRandomGrid = () =>
+    Array.from({ length: GRID_SIZE }, () =>
       Array.from({ length: GRID_SIZE }, () => Math.random())
     );
-  });
+
+  // Initial randomized grid
+  const [imageGrid, setImageGrid] = useState<number[][]>(createRandomGrid);
+
+  // Double-tap handler to reset grid
+  const lastTapRef = useRef<number>(0);
+  const handleGridTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap detected
+      setImageGrid(createRandomGrid());
+    }
+    lastTapRef.current = now;
+  };
 
   // On each update, apply convolution using convBuffer as kernel
   useEffect(() => {
@@ -146,29 +160,31 @@ export default function ModeZero() {
   // Render grid
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      {/* Main grid */}
-      <View style={{ width: screenWidth, height: squareSize * GRID_SIZE, flexDirection: 'column' }}>
-        {imageGrid.map((row, r) => (
-          <View key={r} style={{ flexDirection: 'row' }}>
-            {row.map((val, c) => {
-              // Use grayscale for now, could extend to RGB
-              const color = `rgb(${mapColor(val)},${mapColor(val)},${mapColor(val)})`;
-              return (
-                <View
-                  key={c}
-                  style={{
-                    width: squareSize,
-                    height: squareSize,
-                    backgroundColor: color,
-                    borderWidth: 0.25,
-                    borderColor: 'rgba(0,0,0,1.0)',
-                  }}
-                />
-              );
-            })}
-          </View>
-        ))}
-      </View>
+      {/* Main grid with double-tap gesture */}
+      <TouchableWithoutFeedback onPress={handleGridTap}>
+        <View style={{ width: screenWidth, height: squareSize * GRID_SIZE, flexDirection: 'column' }}>
+          {imageGrid.map((row, r) => (
+            <View key={r} style={{ flexDirection: 'row' }}>
+              {row.map((val, c) => {
+                // Use grayscale for now, could extend to RGB
+                const color = `rgb(${mapColor(val)},${mapColor(val)},${mapColor(val)})`;
+                return (
+                  <View
+                    key={c}
+                    style={{
+                      width: squareSize,
+                      height: squareSize,
+                      backgroundColor: color,
+                      borderWidth: 0.25,
+                      borderColor: 'rgba(0,0,0,1.0)',
+                    }}
+                  />
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </TouchableWithoutFeedback>
       {/* Kernel grid below main grid */}
       <View style={{ marginTop: 16 }}>
         <View style={{ flexDirection: 'column', alignItems: 'center' }}>
