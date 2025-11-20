@@ -103,10 +103,13 @@ export default function ModeZero() {
   // On each update, apply convolution using convBuffer as kernel
   useEffect(() => {
     if (convBuffer.length < 9) return;
-    // Flatten kernel: use normalized magnetometer samples
-    const flatKernel = convBuffer.map((sample, i) => {
-      // Use x channel for kernel value, normalized
-      return norm(sample.x, minMax.minX, minMax.maxX);
+    // Normalize kernel values to [-1, 1] using instantaneous group of 9
+    const xs = convBuffer.map(sample => sample.x);
+    const minK = Math.min(...xs);
+    const maxK = Math.max(...xs);
+    const flatKernel = xs.map(x => {
+      if (maxK === minK) return 0;
+      return ((x - minK) / (maxK - minK)) * 2 - 1;
     });
     // Slide over imageGrid and apply convolution
     setImageGrid(prevGrid => {
@@ -191,7 +194,19 @@ export default function ModeZero() {
                           margin: 1,
                         }}
                       >
-                        <Text style={{ color: '#fff', fontSize: 10, textAlign: 'center' }}>{sample.x.toFixed(2)}</Text>
+                        {/* Show normalized value between -1 and 1 */}
+                        {convBuffer.length === 9 && (
+                          <Text style={{ color: '#fff', fontSize: 10, textAlign: 'center' }}>
+                            {(() => {
+                              const xs = convBuffer.map(s => s.x);
+                              const minK = Math.min(...xs);
+                              const maxK = Math.max(...xs);
+                              if (maxK === minK) return '0.00';
+                              const normVal = ((sample.x - minK) / (maxK - minK)) * 2 - 1;
+                              return normVal.toFixed(2);
+                            })()}
+                          </Text>
+                        )}
                       </View>
                     );
                   })}
