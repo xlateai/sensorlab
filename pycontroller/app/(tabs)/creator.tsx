@@ -2,20 +2,9 @@
 
 import QRCode from 'react-native-qrcode-svg';
 import { Dimensions, View, Text } from 'react-native';
-import { useEffect, useState } from 'react';
-import { requireNativeModule } from 'expo-modules-core';
 
 export default function CreatorScreen() {
   const { width } = Dimensions.get('window');
-  const [helloMsg, setHelloMsg] = useState('');
-
-  useEffect(() => {
-    const Sensorlib = requireNativeModule('Sensorlib');
-    if (Sensorlib && typeof Sensorlib.hello === 'function') {
-      const result = Sensorlib.hello();
-      setHelloMsg(result);
-    }
-  }, []);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
@@ -37,9 +26,6 @@ export default function CreatorScreen() {
         size={width * 0.5}
         backgroundColor="#fff"
       />
-      {helloMsg ? (
-        <Text style={{ color: '#39ff14', fontSize: 12, marginTop: 24 }}>{helloMsg}</Text>
-      ) : null}
     </View>
   );
 }
