@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Button } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../haptics';
 import Slider from '../../components/ui/slider';
 
@@ -12,7 +13,7 @@ export default function AudioTab() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000', padding: 24 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#000', padding: 24 }}>
       <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
       <View style={{ marginBottom: 32 }}>
         <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
@@ -31,6 +32,6 @@ export default function AudioTab() {
           <Button title="Play Haptic" color="#39ff14" onPress={handlePlay} />
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
