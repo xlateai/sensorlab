@@ -29,13 +29,17 @@ export async function playContinuousHaptic(intensity: number, sharpness: number,
     await ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
     return;
   }
-
   const pattern: HapticPatternRequest = {
     type: 'continuous',
     intensity,
     sharpness,
-    duration
+    duration,
+    curve: [
+      { time: 0, intensity },
+      { time: duration, intensity }
+    ]
   };
+  await Sensorlib.playHaptic(pattern);
 }
 
 export async function playLongHaptic() {

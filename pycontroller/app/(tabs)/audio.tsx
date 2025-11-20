@@ -4,36 +4,43 @@ import { playContinuousHaptic } from '../haptics';
 
 // CustomSlider: a simple horizontal slider using PanResponder
 function CustomSlider({ value, onValueChange, trackColor }) {
-  const sliderWidth = 240;
-  const panResponder = useRef(
-    PanResponder.create({
+  const panResponder = useRef();
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  if (!panResponder.current) {
+    panResponder.current = PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / sliderWidth));
+        if (containerWidth === 0) return;
+        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
         onValueChange(Number(percent.toFixed(2)));
       },
       onPanResponderMove: (evt) => {
-        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / sliderWidth));
+        if (containerWidth === 0) return;
+        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
         onValueChange(Number(percent.toFixed(2)));
       },
-    })
-  ).current;
+    });
+  }
+
   return (
     <View
-      {...panResponder.panHandlers}
+      onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
+      {...panResponder.current.panHandlers}
       style={{
-        width: sliderWidth,
+        width: '100%',
         height: 32,
         backgroundColor: '#222',
         borderRadius: 16,
         marginVertical: 8,
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       <View
         style={{
           position: 'absolute',
-          left: value * (sliderWidth - 24),
+          left: value * (containerWidth - 24),
           top: 0,
           width: 24,
           height: 32,
