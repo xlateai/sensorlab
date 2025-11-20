@@ -1,0 +1,36 @@
+name: iOS TestFlight
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        working-directory: ./pycontroller
+        run: npm ci
+        shell: bash
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          expo-cache: true
+          working-directory: ./pycontroller
+          # Create personal access token https://expo.dev/settings/access-tokens
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Build iOS app
+        working-directory: ./pycontroller
+        run: eas build --local -p ios --profile production --non-interactive --output app.ipa
+      - name: 'Upload app to TestFlight'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: './pycontroller/app.ipa'
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
