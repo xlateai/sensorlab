@@ -1,7 +1,8 @@
 
-import { View, StyleSheet, requireNativeComponent } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { requireNativeViewManager } from "expo-modules-core";
 
-const ConvolutionView = requireNativeComponent('ConvolutionView');
+const ConvolutionView = requireNativeViewManager('ConvolutionView');
 
 export default function ModeFive() {
   return (
