@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 let memoryStore: Record<string, string> = {};
+let AsyncStorage: any = null;
+try {
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+} catch (e) {
+  AsyncStorage = null;
+}
 
 interface StorageContextType {
   get: (key: string) => string | undefined;
@@ -21,20 +26,25 @@ export function useStorage() {
 export function StorageProvider({ children }: { children: React.ReactNode }) {
   const [store, setStore] = useState<Record<string, string>>({});
 
-  // Load all keys you care about on mount
+  // Load all keys from AsyncStorage on mount
   useEffect(() => {
     (async () => {
-      let selectedMode: string | null = null;
       if (AsyncStorage) {
         try {
-          selectedMode = await AsyncStorage.getItem('selectedMode');
+          const keys = await AsyncStorage.getAllKeys();
+          const entries = keys.length > 0 ? await AsyncStorage.multiGet(keys) : [];
+          const loaded: Record<string, string> = {};
+          for (const [key, value] of entries) {
+            if (key) loaded[key] = value ?? '';
+          }
+          // Also merge in-memory store in case there are unsaved keys
+          setStore(s => ({ ...loaded, ...memoryStore }));
         } catch {
-          selectedMode = memoryStore['selectedMode'] ?? null;
+          setStore(s => ({ ...memoryStore }));
         }
       } else {
-        selectedMode = memoryStore['selectedMode'] ?? null;
+        setStore(s => ({ ...memoryStore }));
       }
-      setStore(s => ({ ...s, selectedMode: selectedMode ?? '0' }));
     })();
   }, []);
 
