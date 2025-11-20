@@ -32,6 +32,8 @@ yarn-error.*
 app-example
 
 
-# ignore generated ios and android folders
-ios/
-android/
+# only ignore this folder's relative ios and android folders but not the one inside of sensorlib
+**/ios/
+**/android/
+!sensorlib/ios/
+!sensorlib/android/
