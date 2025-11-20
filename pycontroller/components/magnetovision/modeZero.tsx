@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
-import Svg, { Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Line, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
@@ -89,31 +89,6 @@ export default function ModeZero() {
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Generate 6 permutations of [X, Y, Z] mapped to [R, G, B]
-  const permutations: [string, string, string][] = [
-    ["x", "y", "z"],
-    ["x", "z", "y"],
-    ["y", "x", "z"],
-    ["y", "z", "x"],
-    ["z", "x", "y"],
-    ["z", "y", "x"],
-  ];
-
-  // Compute RGB for each permutation
-  const getRGB = (order: [string, string, string]) => {
-    if (!magnetometer) return [128,128,128];
-    const norm = (val: number, min: number, max: number) => {
-      if (max === min) return 0.5;
-      return Math.max(0, Math.min(1, (val - min) / (max - min)));
-    };
-    const values: Record<string, number> = {
-      x: norm(magnetometer.x, minMax.minX, minMax.maxX),
-      y: norm(magnetometer.y, minMax.minY, minMax.maxY),
-      z: norm(magnetometer.z, minMax.minZ, minMax.maxZ),
-    };
-    return order.map(axis => Math.round(values[axis] * 255));
-  };
-
   // Hexagon layout
   const radius = 60;
   const circleSize = 10;
@@ -128,53 +103,38 @@ export default function ModeZero() {
     };
   });
 
-  // Prepare colors for each vertex
-  const colors = permutations.map(getRGB);
-
-  // Helper to blend two colors
-  const blendColors = (a: number[], b: number[], t: number) => [
-    Math.round(a[0] * (1 - t) + b[0] * t),
-    Math.round(a[1] * (1 - t) + b[1] * t),
-    Math.round(a[2] * (1 - t) + b[2] * t),
-  ];
+  // All segments use the same color, RGB = normalized XYZ
+  const segmentColor = `rgb(${smoothR},${smoothG},${smoothB})`;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
       <Svg width={svgSize} height={svgSize}>
-        <Defs>
-          {hexPoints.map((pt, i) => {
-            const nextIdx = (i + 1) % 6;
-            const colorA = colors[i];
-            const colorB = colors[nextIdx];
-            return (
-              <LinearGradient
-                key={`grad${i}`}
-                id={`grad${i}`}
-                x1={pt.x}
-                y1={pt.y}
-                x2={hexPoints[nextIdx].x}
-                y2={hexPoints[nextIdx].y}
-              >
-                <Stop offset="0%" stopColor={`rgb(${colorA[0]},${colorA[1]},${colorA[2]})`} />
-                <Stop offset="100%" stopColor={`rgb(${colorB[0]},${colorB[1]},${colorB[2]})`} />
-              </LinearGradient>
-            );
-          })}
-        </Defs>
-        {/* Draw hexagon links with blended gradients, no extension, for a seamless hexagon */}
+        {/* Draw hexagon links as thick rectangles, all the same color */}
         {hexPoints.map((pt, i) => {
           const nextIdx = (i + 1) % 6;
+          const x1 = pt.x;
+          const y1 = pt.y;
+          const x2 = hexPoints[nextIdx].x;
+          const y2 = hexPoints[nextIdx].y;
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          // Overlap a bit at the ends for seamless connection
+          const overlap = 8;
+          const extendedLength = length + overlap;
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
           return (
-            <Line
-              key={`line${i}`}
-              x1={pt.x}
-              y1={pt.y}
-              x2={hexPoints[nextIdx].x}
-              y2={hexPoints[nextIdx].y}
-              stroke={`url(#grad${i})`}
-              strokeWidth={10}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Rect
+              key={`rect${i}`}
+              x={midX - extendedLength / 2}
+              y={midY - 5}
+              width={extendedLength}
+              height={10}
+              fill={segmentColor}
+              rx={5}
+              transform={`rotate(${angle},${midX},${midY})`}
             />
           );
         })}
