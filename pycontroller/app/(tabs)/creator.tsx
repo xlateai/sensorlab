@@ -3,17 +3,17 @@
 import QRCode from 'react-native-qrcode-svg';
 import { Dimensions, View, Text } from 'react-native';
 import { useEffect, useState } from 'react';
-import { NativeModules } from 'react-native';
+import { requireNativeModule } from 'expo-modules-core';
 
 export default function CreatorScreen() {
   const { width } = Dimensions.get('window');
   const [helloMsg, setHelloMsg] = useState('');
 
   useEffect(() => {
-    if (NativeModules.HelloModule && NativeModules.HelloModule.getHelloWorld) {
-      NativeModules.HelloModule.getHelloWorld((msg: string[]) => {
-        setHelloMsg(msg[0]);
-      });
+    const Sensorlib = requireNativeModule('Sensorlib');
+    if (Sensorlib && typeof Sensorlib.hello === 'function') {
+      const result = Sensorlib.hello();
+      setHelloMsg(result);
     }
   }, []);
 

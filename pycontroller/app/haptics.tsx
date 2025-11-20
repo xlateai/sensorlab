@@ -24,8 +24,8 @@ try {
 }
 
 export async function playContinuousHaptic() {
-  if (!Sensorlib || typeof Sensorlib.play !== 'function') {
-    ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
+  if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
+    // ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
     return;
   }
   // Example: fade in, pulse, fade out
@@ -41,5 +41,5 @@ export async function playContinuousHaptic() {
       { time: 0.7, intensity: 0.0 }
     ]
   };
-  await Sensorlib.play(pattern);
+  await Sensorlib.playHaptic(pattern);
 }
