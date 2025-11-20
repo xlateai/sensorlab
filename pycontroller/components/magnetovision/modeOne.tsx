@@ -18,9 +18,6 @@ export default function ModeOne() {
   const [buffer, setBuffer] = useState<{x: number, y: number, z: number}[]>([]);
   const [magnetometer, setMagnetometer] = useState<{x: number, y: number, z: number} | null>(null);
 
-  // Cache of previous pixel colors for upward flow
-  const pixelCacheRef = useRef<string[]>([]);
-  const [pixelCache, setPixelCache] = useState<string[]>([]);
 
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
@@ -66,7 +63,8 @@ export default function ModeOne() {
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
   }, [buffer]);
 
-  // Calculate current pixel color
+  // Interpolate between colors for smooth transitions
+  const prevRGBRef = useRef<[number, number, number]>([0, 0, 0]);
   let r = 0, g = 0, b = 0;
   if (magnetometer !== null) {
     const norm = (val: number, min: number, max: number) => {
@@ -77,43 +75,31 @@ export default function ModeOne() {
     g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
     b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
   }
-  const currentPixel = `rgb(${r},${g},${b})`;
+  // Blend previous and current RGB
+  const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
+  const prev = prevRGBRef.current;
+  const smoothR = Math.round(prev[0] * (1 - blend) + r * blend);
+  const smoothG = Math.round(prev[1] * (1 - blend) + g * blend);
+  const smoothB = Math.round(prev[2] * (1 - blend) + b * blend);
+  prevRGBRef.current = [smoothR, smoothG, smoothB];
+  const currentPixel = `rgb(${smoothR},${smoothG},${smoothB})`;
 
-  // Update pixel cache for upward flow
-  useEffect(() => {
-    if (!isFocused) return;
-    // Only update cache if pixel value actually changed
-    if (pixelCacheRef.current[pixelCacheRef.current.length - 1] !== currentPixel) {
-      pixelCacheRef.current.push(currentPixel);
-      if (pixelCacheRef.current.length > pixelHeight) pixelCacheRef.current.shift();
-      setPixelCache([...pixelCacheRef.current]);
-    }
-  }, [currentPixel, pixelHeight, isFocused]);
 
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Render exactly pixelHeight rows, filling from the most recent pixelCache values
-  const bandSize = 16;
-  const bands: string[] = [];
-  for (let i = 0; i < pixelHeight; i += bandSize) {
-    // Get the color for this band, most recent first
-    const cacheIdx = pixelCache.length - 1 - Math.floor(i / bandSize);
-    bands.push(pixelCache[cacheIdx] || '#000');
-  }
-
+  // Render a single centered circle with the latest value color
   return (
-    <View style={{ width: screenWidth, height: canvasHeight, flexDirection: 'column' }}>
-      {Array.from({ length: pixelHeight }).map((_, y) => (
-        <View
-          key={y}
-          style={{
-            width: screenWidth,
-            height: pixelSize,
-            backgroundColor: bands[Math.floor(y / bandSize)],
-          }}
-        />
-      ))}
+    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+      <View
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: currentPixel,
+          // no border
+        }}
+      />
     </View>
   );
 }
