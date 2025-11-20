@@ -148,7 +148,7 @@ export default function ModeZero() {
             fill={segmentColor}
           />
         ))}
-        {/* Draw faint thin lines from top left, top right, and bottom to center using segmentColor */}
+        {/* Draw thin lines from top left, top right, and bottom to center using segmentColor, fully opaque */}
         <Line
           x1={hexPoints[5].x}
           y1={hexPoints[5].y}
@@ -156,7 +156,7 @@ export default function ModeZero() {
           y2={centerY}
           stroke={segmentColor}
           strokeWidth={2}
-          opacity={0.25}
+          opacity={1}
         />
         <Line
           x1={hexPoints[1].x}
@@ -165,7 +165,7 @@ export default function ModeZero() {
           y2={centerY}
           stroke={segmentColor}
           strokeWidth={2}
-          opacity={0.25}
+          opacity={1}
         />
         <Line
           x1={hexPoints[3].x}
@@ -174,7 +174,14 @@ export default function ModeZero() {
           y2={centerY}
           stroke={segmentColor}
           strokeWidth={2}
-          opacity={0.25}
+          opacity={1}
+        />
+        {/* Add a center dot with the same thickness as endpoint circles */}
+        <Circle
+          cx={centerX}
+          cy={centerY}
+          r={5}
+          fill={segmentColor}
         />
       </Svg>
     </View>
