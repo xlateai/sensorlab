@@ -111,8 +111,9 @@ public class SensorlibModule: Module {
       Events("onLoad")
     }
 
-    // Register ConvolutionView as a native view
+    // Register ConvolutionView as a native view with explicit name
     View(ConvolutionView.self) {
+      .name("ConvolutionView")
       // Example: add props/events as needed later
     }
   }
@@ -195,7 +196,7 @@ public class ConvolutionView: MTKView {
         }
     }
 
-    override func draw(_ rect: CGRect) {
+  public override func draw(_ rect: CGRect) {
         guard initialized, let device = self.device, let commandQueue = self.commandQueue, let pipelineState = self.pipelineState else { return }
         guard let drawable = self.currentDrawable else { return }
         let commandBuffer = commandQueue.makeCommandBuffer()
