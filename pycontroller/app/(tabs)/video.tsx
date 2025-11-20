@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { getItem, setItem } from '../storage';
 import { StatusBar } from 'react-native';
 import ModeZero from '../../components/magnetovision/modeZero';
 import ModeOne from '../../components/magnetovision/modeOne';
@@ -6,16 +7,28 @@ import ModeTwo from '../../components/magnetovision/modeTwo';
 import ModeThree from '../../components/magnetovision/modeThree';
 import ModeFour from '../../components/magnetovision/modeFour';
 import { Dimensions, View, Animated, PanResponder, TouchableOpacity } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Magnetometer } from 'expo-sensors';
-
-const PIXEL_WIDTH = 256;
+import { useNavigation } from '@react-navigation/native';
 
 export default function VideoScreen() {
   // State for menu expansion
   const [menuExpanded, setMenuExpanded] = useState(false);
-  // Mode state (0-3)
+  // Mode state (0-4), persisted
   const [mode, setMode] = useState(0);
+
+  // Load mode from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      const savedMode = await getItem('selectedMode');
+      if (savedMode !== null) {
+        setMode(Number(savedMode));
+      }
+    })();
+  }, []);
+
+  // Save mode to AsyncStorage whenever it changes
+  useEffect(() => {
+    setItem('selectedMode', String(mode));
+  }, [mode]);
   // Fullscreen state
   const [fullscreen, setFullscreen] = useState(false);
   const tapTimesRef = useRef<number[]>([]);
@@ -43,7 +56,7 @@ export default function VideoScreen() {
       case 4:
         return <ModeFour key="mode-four" />;
       default:
-        return null;
+        return <ModeZero key="mode-zero" />;
     }
   }, [mode]);
 

@@ -1,15 +1,21 @@
 
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { playChimeHaptic } from '../haptics';
 import { StatusBar, View, PanResponder, Dimensions, Platform } from 'react-native';
 import * as ExpoStatusBar from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
 import ModeZero from '../../components/magnetovision/modeZero';
+import ModeOne from '../../components/magnetovision/modeOne';
+import ModeTwo from '../../components/magnetovision/modeTwo';
+import ModeThree from '../../components/magnetovision/modeThree';
+import ModeFour from '../../components/magnetovision/modeFour';
+import { getItem } from '../storage';
 
 export default function HomeScreen() {
   // Fullscreen state, default enabled
   const [fullscreen, setFullscreen] = useState(true);
+  const [mode, setMode] = useState(0);
   const navigation = useNavigation();
   const screenWidth = Dimensions.get('window').width;
   const toggledRef = useRef(false);
@@ -18,6 +24,16 @@ export default function HomeScreen() {
   const swipeActiveRef = useRef(false); // Is swipe finger still down
   // No need for tapTimesRef, just track if tap happened
   const tapDetectedRef = useRef(false);
+
+  // Load mode from storage on mount
+  useEffect(() => {
+    (async () => {
+      const savedMode = await getItem('selectedMode');
+      if (savedMode !== null) {
+        setMode(Number(savedMode));
+      }
+    })();
+  }, []);
 
   // PanResponder for left-to-right swipe to toggle fullscreen (only once per gesture)
   const panResponder = useRef(
@@ -105,14 +121,32 @@ export default function HomeScreen() {
   }, [fullscreen, navigation]);
 
 
+  // Render the correct mode component based on mode index
+  const renderMode = useMemo(() => {
+    switch (mode) {
+      case 0:
+        return <ModeZero key="mode-zero" />;
+      case 1:
+        return <ModeOne key="mode-one" />;
+      case 2:
+        return <ModeTwo key="mode-two" />;
+      case 3:
+        return <ModeThree key="mode-three" />;
+      case 4:
+        return <ModeFour key="mode-four" />;
+      default:
+        return <ModeZero key="mode-zero" />;
+    }
+  }, [mode]);
+
   return (
     <View
       style={{ flex: 1, backgroundColor: '#000' }}
       {...panResponder.panHandlers}
     >
-  <StatusBar hidden={fullscreen} animated />
+      <StatusBar hidden={fullscreen} animated />
       <View style={{ flex: 1 }}>
-        <ModeZero />
+        {renderMode}
       </View>
     </View>
   );
