@@ -10,12 +10,13 @@ import ModeOne from '../../components/magnetovision/modeOne';
 import ModeTwo from '../../components/magnetovision/modeTwo';
 import ModeThree from '../../components/magnetovision/modeThree';
 import ModeFour from '../../components/magnetovision/modeFour';
-import { getItem } from '../storage';
+import { useStorage } from '../StorageContext';
 
 export default function HomeScreen() {
   // Fullscreen state, default enabled
   const [fullscreen, setFullscreen] = useState(true);
-  const [mode, setMode] = useState(0);
+  const { get, set } = useStorage();
+  const [mode, setMode] = useState(() => Number(get('selectedMode') ?? 0));
   const navigation = useNavigation();
   const screenWidth = Dimensions.get('window').width;
   const toggledRef = useRef(false);
@@ -25,15 +26,18 @@ export default function HomeScreen() {
   // No need for tapTimesRef, just track if tap happened
   const tapDetectedRef = useRef(false);
 
-  // Load mode from storage on mount
+  // Sync mode from context when it changes in storage
+  const selectedMode = get('selectedMode');
   useEffect(() => {
-    (async () => {
-      const savedMode = await getItem('selectedMode');
-      if (savedMode !== null) {
-        setMode(Number(savedMode));
-      }
-    })();
-  }, []);
+    if (selectedMode !== undefined && Number(selectedMode) !== mode) {
+      setMode(Number(selectedMode));
+    }
+  }, [selectedMode]);
+
+  // Persist mode changes to context/storage
+  useEffect(() => {
+    set('selectedMode', String(mode));
+  }, [mode, set]);
 
   // PanResponder for left-to-right swipe to toggle fullscreen (only once per gesture)
   const panResponder = useRef(
