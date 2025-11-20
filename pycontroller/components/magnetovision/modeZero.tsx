@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
 
 const PIXEL_WIDTH = 256;
-const BUFFER_SIZE = 64;
+const BUFFER_SIZE = 16;
 
 export default function ModeZero() {
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -88,18 +88,63 @@ export default function ModeZero() {
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
-  // Render a single centered circle with the latest value color
+  // Generate 6 permutations of [X, Y, Z] mapped to [R, G, B]
+  const permutations: [string, string, string][] = [
+    ["x", "y", "z"],
+    ["x", "z", "y"],
+    ["y", "x", "z"],
+    ["y", "z", "x"],
+    ["z", "x", "y"],
+    ["z", "y", "x"],
+  ];
+
+  // Compute RGB for each permutation
+  const getRGB = (order: [string, string, string]) => {
+    if (!magnetometer) return "rgb(128,128,128)";
+    const norm = (val: number, min: number, max: number) => {
+      if (max === min) return 0.5;
+      return Math.max(0, Math.min(1, (val - min) / (max - min)));
+    };
+    const values: Record<string, number> = {
+      x: norm(magnetometer.x, minMax.minX, minMax.maxX),
+      y: norm(magnetometer.y, minMax.minY, minMax.maxY),
+      z: norm(magnetometer.z, minMax.minZ, minMax.maxZ),
+    };
+    const rgb = order.map(axis => Math.round(values[axis] * 255));
+    return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  };
+
+  // Hexagon layout
+  const radius = 40;
+  const circleSize = 28;
+  const centerX = 0;
+  const centerY = 0;
+  const hexPoints = Array.from({ length: 6 }, (_, i) => {
+    const angle = (Math.PI / 3) * i - Math.PI / 2;
+    return {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle),
+    };
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: currentPixel,
-          // no border
-        }}
-      />
+      <View style={{ width: radius * 2 + circleSize, height: radius * 2 + circleSize, position: "relative" }}>
+        {hexPoints.map((pt, i) => (
+          <View
+            key={i}
+            style={{
+              position: "absolute",
+              left: pt.x + radius,
+              top: pt.y + radius,
+              width: circleSize,
+              height: circleSize,
+              borderRadius: circleSize / 2,
+              backgroundColor: getRGB(permutations[i]),
+            }}
+          />
+        ))}
+      </View>
     </View>
   );
 }
