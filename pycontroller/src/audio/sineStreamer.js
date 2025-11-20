@@ -1,11 +1,5 @@
-import { NativeModules } from 'react-native';
-
-let AudioBridge = null;
-try {
-  AudioBridge = requireNativeModule('AudioBridge');
-} catch {
-  AudioBridge = null;
-}
+import { requireNativeModule } from 'expo-modules-core';
+const AudioEngine = requireNativeModule('AudioEngine');
 
 
 const SAMPLE_RATE = 48000;
@@ -31,14 +25,13 @@ let running = false;
 
 async function loop() {
   if (!running) return;
-  
-  const buffered = await AudioBridge.getBufferedSamples();
+  const buffered = await AudioEngine.getBufferedSamples();
   const seconds = buffered / SAMPLE_RATE;
   let timeout = 2;
   if (seconds < 0.3) timeout = 0;
   else if (seconds > 0.8) timeout = 10;
   const chunk = generateSineChunk();
-  AudioBridge.pushSamples(Array.from(chunk));
+  AudioEngine.pushSamples(Array.from(chunk));
   setTimeout(loop, timeout);
 }
 
