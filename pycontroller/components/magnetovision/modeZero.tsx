@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
 import { Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -70,18 +70,9 @@ export default function ModeZero() {
     return ((val - min) / (max - min)) * 2 - 1;
   };
 
-  // 3x3 kernel (static random values)
+  // Kernel is last 9 magnetometer samples (flattened)
   const KERNEL_SIZE = 3;
-  const kernel = useMemo(() => {
-    const arr: number[][] = [];
-    for (let i = 0; i < KERNEL_SIZE; i++) {
-      arr[i] = [];
-      for (let j = 0; j < KERNEL_SIZE; j++) {
-        arr[i][j] = Math.random();
-      }
-    }
-    return arr;
-  }, []);
+  // No need for random kernel, will use convBuffer
 
   // Buffer for last 9 magnetometer readings
   const [convBuffer, setConvBuffer] = useState<{x: number, y: number, z: number}[]>([]);
@@ -102,59 +93,72 @@ export default function ModeZero() {
   const GRID_SIZE = 8;
   const squareSize = screenWidth / GRID_SIZE;
 
+  // Initial randomized grid
+  const [imageGrid, setImageGrid] = useState<number[][]>(() => {
+    return Array.from({ length: GRID_SIZE }, () =>
+      Array.from({ length: GRID_SIZE }, () => Math.random())
+    );
+  });
+
+  // On each update, apply convolution using convBuffer as kernel
+  useEffect(() => {
+    if (convBuffer.length < 9) return;
+    // Flatten kernel: use normalized magnetometer samples
+    const flatKernel = convBuffer.map((sample, i) => {
+      // Use x channel for kernel value, normalized
+      return norm(sample.x, minMax.minX, minMax.maxX);
+    });
+    // Slide over imageGrid and apply convolution
+    setImageGrid(prevGrid => {
+      // For each cell, apply 3x3 conv with kernel
+      const newGrid = prevGrid.map((row, r) =>
+        row.map((val, c) => {
+          let acc = 0;
+          let k = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const rr = r + dr;
+              const cc = c + dc;
+              if (rr >= 0 && rr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
+                acc += prevGrid[rr][cc] * flatKernel[k];
+              }
+              k++;
+            }
+          }
+          // Clamp and normalize
+          return Math.max(0, Math.min(1, acc));
+        })
+      );
+      return newGrid;
+    });
+  }, [convBuffer, minMax]);
+
   if (!isFocused) {
     return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
 
-  // Convolve kernel with last 9 magnetometer readings
-  // For each grid square, use the convolution result as RGB
-  // If not enough history, use gray
-  const getConvolvedRGB = () => {
-    if (convBuffer.length < 9) return [0, 0, 0];
-    // Flatten kernel and buffer
-    const flatKernel = kernel.flat();
-    const flatBuffer = convBuffer;
-    // Convolve for each channel, normalized to [-1, +1]
-    let r = 0, g = 0, b = 0;
-    for (let i = 0; i < 9; i++) {
-      r += flatKernel[i] * norm(flatBuffer[i].x, minMax.minX, minMax.maxX);
-      g += flatKernel[i] * norm(flatBuffer[i].y, minMax.minY, minMax.maxY);
-      b += flatKernel[i] * norm(flatBuffer[i].z, minMax.minZ, minMax.maxZ);
-    }
-    // Weighted average (sum of kernel weights)
-    const kernelSum = flatKernel.reduce((a, b) => a + b, 0) || 1;
-    r /= kernelSum;
-    g /= kernelSum;
-    b /= kernelSum;
-    return [r, g, b]; // still in [-1, +1]
-  };
-
-  // For plotting, scale all grid squares relative to each other
-  // Here, all squares use the same value, but we could extend to per-square convolution
-  const [convR, convG, convB] = getConvolvedRGB();
-
-  // Map [-1, +1] to [0, 255] for display
-  const mapColor = (v: number) => Math.round((v + 1) * 0.5 * 255);
+  // Map [0, 1] to [0, 255] for display
+  const mapColor = (v: number) => Math.round(v * 255);
 
   // Render grid
   return (
     <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
       {/* Main grid */}
       <View style={{ width: screenWidth, height: squareSize * GRID_SIZE, flexDirection: 'column' }}>
-        {Array.from({ length: GRID_SIZE }).map((_, row) => (
-          <View key={row} style={{ flexDirection: 'row' }}>
-            {Array.from({ length: GRID_SIZE }).map((_, col) => {
-              // All squares use the same convolved color for now
-              const color = `rgb(${mapColor(convR)},${mapColor(convG)},${mapColor(convB)})`;
+        {imageGrid.map((row, r) => (
+          <View key={r} style={{ flexDirection: 'row' }}>
+            {row.map((val, c) => {
+              // Use grayscale for now, could extend to RGB
+              const color = `rgb(${mapColor(val)},${mapColor(val)},${mapColor(val)})`;
               return (
                 <View
-                  key={col}
+                  key={c}
                   style={{
                     width: squareSize,
                     height: squareSize,
                     backgroundColor: color,
                     borderWidth: 0.25,
-                    borderColor: 'rgba(0,0,0,1.0)', // faint black grid line
+                    borderColor: 'rgba(0,0,0,1.0)',
                   }}
                 />
               );
@@ -165,27 +169,36 @@ export default function ModeZero() {
       {/* Kernel grid below main grid */}
       <View style={{ marginTop: 16 }}>
         <View style={{ flexDirection: 'column', alignItems: 'center' }}>
-          {kernel.map((row, i) => (
-            <View key={i} style={{ flexDirection: 'row' }}>
-              {row.map((val, j) => (
-                <View
-                  key={j}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    backgroundColor: '#222',
-                    borderWidth: 1,
-                    borderColor: 'rgba(0,0,0,0.3)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    margin: 1,
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 14 }}>{val.toFixed(2)}</Text>
+          {/* Show kernel as 3x3 grid of last 9 magnetometer x values */}
+          {convBuffer.length === 9 && (
+            <View>
+              {Array.from({ length: 3 }).map((_, row) => (
+                <View key={row} style={{ flexDirection: 'row' }}>
+                  {Array.from({ length: 3 }).map((_, col) => {
+                    const idx = row * 3 + col;
+                    const sample = convBuffer[idx];
+                    return (
+                      <View
+                        key={col}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: '#222',
+                          borderWidth: 1,
+                          borderColor: 'rgba(0,0,0,0.3)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          margin: 1,
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 10, textAlign: 'center' }}>{sample.x.toFixed(2)}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               ))}
             </View>
-          ))}
+          )}
         </View>
       </View>
     </View>
