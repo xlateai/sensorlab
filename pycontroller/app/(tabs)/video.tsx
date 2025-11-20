@@ -4,6 +4,7 @@ import ModeZero from '../../components/magnetovision/modeZero';
 import ModeOne from '../../components/magnetovision/modeOne';
 import ModeTwo from '../../components/magnetovision/modeTwo';
 import ModeThree from '../../components/magnetovision/modeThree';
+import ModeFour from '../../components/magnetovision/modeFour';
 import { Dimensions, View, Animated, PanResponder, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
@@ -39,6 +40,8 @@ export default function VideoScreen() {
         return <ModeTwo key="mode-two" />;
       case 3:
         return <ModeThree key="mode-three" />;
+      case 4:
+        return <ModeFour key="mode-four" />;
       default:
         return null;
     }
