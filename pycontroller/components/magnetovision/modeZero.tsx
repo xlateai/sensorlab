@@ -113,7 +113,7 @@ export default function ModeOne() {
           cy={centerY}
           r={ringRadius}
           fill="none"
-          stroke={currentPixel}
+          stroke={`rgba(${smoothR},${smoothG},${smoothB},0.25)`}
           strokeWidth={ringThickness}
         />
         {/* Inner circle */}
