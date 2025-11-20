@@ -33,6 +33,7 @@ export default function Slider({ value, onValueChange, trackColor }: { value: nu
       }}
     >
       <View
+        pointerEvents="none"
         style={{
           position: 'absolute',
           left: Math.max(0, Math.min(value * (containerWidth - 24), containerWidth - 24)),
