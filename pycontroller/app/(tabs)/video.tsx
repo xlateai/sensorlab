@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { getItem, setItem } from '../storage';
+import { useStorage } from '../StorageContext';
 import { StatusBar } from 'react-native';
 import ModeZero from '../../components/magnetovision/modeZero';
 import ModeOne from '../../components/magnetovision/modeOne';
@@ -12,23 +12,22 @@ import { useNavigation } from '@react-navigation/native';
 export default function VideoScreen() {
   // State for menu expansion
   const [menuExpanded, setMenuExpanded] = useState(false);
-  // Mode state (0-4), persisted
-  const [mode, setMode] = useState(0);
+  // Mode state (0-4), synced with StorageContext
+  const { get, set } = useStorage();
+  const [mode, setMode] = useState(() => Number(get('selectedMode') ?? 0));
 
-  // Load mode from AsyncStorage on mount
+  // Sync mode from context when it changes in storage
   useEffect(() => {
-    (async () => {
-      const savedMode = await getItem('selectedMode');
-      if (savedMode !== null) {
-        setMode(Number(savedMode));
-      }
-    })();
-  }, []);
+    const stored = get('selectedMode');
+    if (stored !== undefined && Number(stored) !== mode) {
+      setMode(Number(stored));
+    }
+  }, [get, mode]);
 
-  // Save mode to AsyncStorage whenever it changes
+  // Persist mode changes to context/storage
   useEffect(() => {
-    setItem('selectedMode', String(mode));
-  }, [mode]);
+    set('selectedMode', String(mode));
+  }, [mode, set]);
   // Fullscreen state
   const [fullscreen, setFullscreen] = useState(false);
   const tapTimesRef = useRef<number[]>([]);

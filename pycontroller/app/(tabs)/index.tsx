@@ -10,7 +10,6 @@ import ModeOne from '../../components/magnetovision/modeOne';
 import ModeTwo from '../../components/magnetovision/modeTwo';
 import ModeThree from '../../components/magnetovision/modeThree';
 import ModeFour from '../../components/magnetovision/modeFour';
-import { getItem } from '../storage';
 
 export default function HomeScreen() {
   // Fullscreen state, default enabled
@@ -25,15 +24,7 @@ export default function HomeScreen() {
   // No need for tapTimesRef, just track if tap happened
   const tapDetectedRef = useRef(false);
 
-  // Load mode from storage on mount
-  useEffect(() => {
-    (async () => {
-      const savedMode = await getItem('selectedMode');
-      if (savedMode !== null) {
-        setMode(Number(savedMode));
-      }
-    })();
-  }, []);
+  // No storage: mode is now only in React state
 
   // PanResponder for left-to-right swipe to toggle fullscreen (only once per gesture)
   const panResponder = useRef(
