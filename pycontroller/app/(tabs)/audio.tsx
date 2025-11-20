@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Button } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { playContinuousHaptic } from '../haptics';
+import { playSimpleHaptic } from '../haptics';
 import Slider from '../../components/ui/slider';
 
 export default function AudioTab() {
@@ -9,7 +9,7 @@ export default function AudioTab() {
   const [sharpness, setSharpness] = useState(0.5);
   const duration = 1.0;
   const handlePlay = async () => {
-    await playContinuousHaptic(intensity, sharpness, duration);
+    await playSimpleHaptic(intensity, sharpness, duration);
   };
 
   return (

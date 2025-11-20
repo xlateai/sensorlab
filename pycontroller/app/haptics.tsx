@@ -24,7 +24,7 @@ try {
 }
 
 
-export async function playContinuousHaptic(intensity: number, sharpness: number, duration: number) {
+export async function playSimpleHaptic(intensity: number, sharpness: number, duration: number) {
   if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
     await ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
     return;
