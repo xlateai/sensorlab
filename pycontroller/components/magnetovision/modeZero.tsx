@@ -90,7 +90,7 @@ export default function ModeOne() {
   // Render a single centered circle with the latest value color
   // Outer ring logic
   const baseRadius = Math.min(screenWidth, canvasHeight) / 6;
-  const innerRadius = baseRadius * 0.7; // 30% smaller
+  const innerRadius = baseRadius * 0.5; // 50% smaller
   const minRadius = innerRadius;
   const maxRadius = innerRadius * 1.333;
   const avgRGB = (smoothR + smoothG + smoothB) / 3;
