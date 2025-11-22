@@ -24,24 +24,26 @@ export default function RangedSlider({
   const dragStartRef = useRef<{ min: number; max: number; touchX: number; touchY: number } | null>(null);
 
   const isVertical = orientation === 'vertical';
-  const thumbSize = isVertical ? 30 : 24;
+  // Match single slider dimensions
+  const thumbWidth = isVertical ? 50 : 24;
+  const thumbHeight = isVertical ? 30 : 32;
   const trackThickness = isVertical ? 50 : 32;
 
   const valueToPosition = (value: number) => {
     if (isVertical) {
-      return (1 - value) * (containerHeight - thumbSize);
+      return (1 - value) * (containerHeight - thumbHeight);
     } else {
-      return value * (containerWidth - thumbSize);
+      return value * (containerWidth - thumbWidth);
     }
   };
 
   const positionToValue = (position: number) => {
     if (isVertical) {
       if (containerHeight === 0) return 0;
-      return Math.max(0, Math.min(1, 1 - (position / (containerHeight - thumbSize))));
+      return Math.max(0, Math.min(1, 1 - (position / (containerHeight - thumbHeight))));
     } else {
       if (containerWidth === 0) return 0;
-      return Math.max(0, Math.min(1, position / (containerWidth - thumbSize)));
+      return Math.max(0, Math.min(1, position / (containerWidth - thumbWidth)));
     }
   };
 
@@ -51,27 +53,29 @@ export default function RangedSlider({
     
     if (isVertical) {
       const touchPos = touchY;
-      const minThumbCenter = minPos + thumbSize / 2;
-      const maxThumbCenter = maxPos + thumbSize / 2;
-      const thumbHitRadius = thumbSize / 2 + 10; // Add some hit area
+      // For vertical: minValue is at bottom (higher Y), maxValue is at top (lower Y)
+      // So minPos > maxPos
+      const minThumbCenter = minPos + thumbHeight / 2;
+      const maxThumbCenter = maxPos + thumbHeight / 2;
+      const thumbHitRadius = Math.max(thumbHeight / 2, thumbWidth / 2) + 10; // Add some hit area
       
-      // Check if touching min thumb
+      // Check if touching min thumb (bottom, higher Y)
       if (Math.abs(touchPos - minThumbCenter) < thumbHitRadius) {
         return 'min';
       }
-      // Check if touching max thumb
+      // Check if touching max thumb (top, lower Y)
       if (Math.abs(touchPos - maxThumbCenter) < thumbHitRadius) {
         return 'max';
       }
-      // Check if touching the range between them
-      if (touchPos > minThumbCenter && touchPos < maxThumbCenter) {
+      // Check if touching the range between them (maxPos is top, minPos is bottom)
+      if (touchPos > maxThumbCenter && touchPos < minThumbCenter) {
         return 'range';
       }
     } else {
       const touchPos = touchX;
-      const minThumbCenter = minPos + thumbSize / 2;
-      const maxThumbCenter = maxPos + thumbSize / 2;
-      const thumbHitRadius = thumbSize / 2 + 10; // Add some hit area
+      const minThumbCenter = minPos + thumbWidth / 2;
+      const maxThumbCenter = maxPos + thumbWidth / 2;
+      const thumbHitRadius = Math.max(thumbWidth / 2, thumbHeight / 2) + 10; // Add some hit area
       
       // Check if touching min thumb
       if (Math.abs(touchPos - minThumbCenter) < thumbHitRadius) {
@@ -130,7 +134,7 @@ export default function RangedSlider({
       // Move both thumbs by the same delta from the original start position
       const currentPos = isVertical ? locationY : locationX;
       const startPos = isVertical ? dragStartRef.current.touchY : dragStartRef.current.touchX;
-      const containerSize = isVertical ? (containerHeight - thumbSize) : (containerWidth - thumbSize);
+      const containerSize = isVertical ? (containerHeight - thumbHeight) : (containerWidth - thumbWidth);
       
       const delta = isVertical
         ? (startPos - currentPos) / containerSize
@@ -191,75 +195,67 @@ export default function RangedSlider({
         minWidth: isVertical ? trackThickness : undefined,
       }}
     >
-      {/* Active range track between the two thumbs */}
+      {/* Gray connection track between the two thumbs - rendered first (beneath) */}
       <View
         pointerEvents="none"
         style={isVertical ? {
           position: 'absolute',
           left: 0,
-          top: Math.max(0, Math.min(maxPos, containerHeight - thumbSize)),
+          top: Math.max(0, Math.min(maxPos, containerHeight - thumbHeight)),
           width: trackThickness,
-          height: Math.max(thumbSize, Math.abs(minPos - maxPos) + thumbSize),
+          height: Math.max(thumbHeight, Math.abs(minPos - maxPos) + thumbHeight),
+          borderRadius: 15,
+          backgroundColor: '#444', // Grayish connection
+        } : {
+          position: 'absolute',
+          left: Math.max(0, Math.min(minPos, containerWidth - thumbWidth)),
+          top: 0,
+          width: Math.max(thumbWidth, maxPos - minPos + thumbWidth),
+          height: trackThickness,
+          borderRadius: 16,
+          backgroundColor: '#444', // Grayish connection
+        }}
+      />
+      {/* Min thumb - colored like single slider */}
+      <View
+        pointerEvents="none"
+        style={isVertical ? {
+          position: 'absolute',
+          left: 0,
+          top: Math.max(0, Math.min(minPos, containerHeight - thumbHeight)),
+          width: thumbWidth,
+          height: thumbHeight,
           borderRadius: 15,
           backgroundColor: trackColor,
         } : {
           position: 'absolute',
-          left: Math.max(0, Math.min(minPos, containerWidth - thumbSize)),
+          left: Math.max(0, Math.min(minPos, containerWidth - thumbWidth)),
           top: 0,
-          width: Math.max(thumbSize, maxPos - minPos + thumbSize),
-          height: trackThickness,
+          width: thumbWidth,
+          height: thumbHeight,
           borderRadius: 16,
           backgroundColor: trackColor,
         }}
       />
-      {/* Min thumb */}
+      {/* Max thumb - colored like single slider */}
       <View
         pointerEvents="none"
         style={isVertical ? {
           position: 'absolute',
-          left: (trackThickness - thumbSize) / 2,
-          top: Math.max(0, Math.min(minPos, containerHeight - thumbSize)),
-          width: thumbSize,
-          height: thumbSize,
-          borderRadius: thumbSize / 2,
-          backgroundColor: '#fff',
-          borderWidth: 2,
-          borderColor: trackColor,
+          left: 0,
+          top: Math.max(0, Math.min(maxPos, containerHeight - thumbHeight)),
+          width: thumbWidth,
+          height: thumbHeight,
+          borderRadius: 15,
+          backgroundColor: trackColor,
         } : {
           position: 'absolute',
-          left: Math.max(0, Math.min(minPos, containerWidth - thumbSize)),
-          top: (trackThickness - thumbSize) / 2,
-          width: thumbSize,
-          height: thumbSize,
-          borderRadius: thumbSize / 2,
-          backgroundColor: '#fff',
-          borderWidth: 2,
-          borderColor: trackColor,
-        }}
-      />
-      {/* Max thumb */}
-      <View
-        pointerEvents="none"
-        style={isVertical ? {
-          position: 'absolute',
-          left: (trackThickness - thumbSize) / 2,
-          top: Math.max(0, Math.min(maxPos, containerHeight - thumbSize)),
-          width: thumbSize,
-          height: thumbSize,
-          borderRadius: thumbSize / 2,
-          backgroundColor: '#fff',
-          borderWidth: 2,
-          borderColor: trackColor,
-        } : {
-          position: 'absolute',
-          left: Math.max(0, Math.min(maxPos, containerWidth - thumbSize)),
-          top: (trackThickness - thumbSize) / 2,
-          width: thumbSize,
-          height: thumbSize,
-          borderRadius: thumbSize / 2,
-          backgroundColor: '#fff',
-          borderWidth: 2,
-          borderColor: trackColor,
+          left: Math.max(0, Math.min(maxPos, containerWidth - thumbWidth)),
+          top: 0,
+          width: thumbWidth,
+          height: thumbHeight,
+          borderRadius: 16,
+          backgroundColor: trackColor,
         }}
       />
     </View>
