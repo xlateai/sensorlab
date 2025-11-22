@@ -11,20 +11,35 @@ const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
 export default function ModeZero() {
+  // Animated rotation value for smooth transitions
+  const rotationAnim = useRef(new Animated.Value(0)).current;
+  const [rawRotation, setRawRotation] = useState(0);
   // Device orientation state
   const [deviceRotation, setDeviceRotation] = useState(0); // in radians
   useEffect(() => {
     let sub = DeviceMotion.addListener(motion => {
-      // Use alpha (rotation around Z axis, 0 to 2π) for full 360° rotation
+      let rot = 0;
       if (motion?.rotation?.alpha !== undefined) {
-        setDeviceRotation(motion.rotation.alpha);
+        rot = motion.rotation.alpha;
       } else if (motion?.rotation?.gamma !== undefined) {
-        setDeviceRotation(motion.rotation.gamma);
+        rot = motion.rotation.gamma;
       }
+      setRawRotation(rot);
     });
     DeviceMotion.setUpdateInterval(33);
     return () => { sub && sub.remove(); };
   }, []);
+
+  // Animate rotation value smoothly
+  useEffect(() => {
+  const rotationDeg = (rawRotation * 180) / Math.PI + 30;
+    Animated.timing(rotationAnim, {
+      toValue: rotationDeg,
+      duration: 120,
+      useNativeDriver: true,
+      easing: t => t,
+    }).start();
+  }, [rawRotation]);
   // Gesture state for double-tap-and-hold
   const [showLines, setShowLines] = useState(false);
   const lastTapRef = useRef<number>(0);
@@ -397,8 +412,6 @@ export default function ModeZero() {
         }
         const tipX = edge.x - edge.dx * tickLength;
         const tipY = edge.y - edge.dy * tickLength;
-    // Rotation in degrees, allow full 360+ rotation
-  let rotationDeg = (deviceRotation * 180) / Math.PI + 45;
         return (
           <Animated.View
             key={needle.Title}
@@ -406,7 +419,13 @@ export default function ModeZero() {
               position: 'absolute',
               left: tipX - 20,
               top: tipY - 12,
-              transform: [{ rotate: `${rotationDeg}deg` }],
+              transform: [{
+                rotate: rotationAnim.interpolate({
+                  inputRange: [-360, 360],
+                  outputRange: ['-360deg', '360deg'],
+                  extrapolate: 'clamp',
+                })
+              }],
             }}
           >
             <Text style={{ color: '#fff', fontSize: 18 }}>{needle.Title}</Text>
