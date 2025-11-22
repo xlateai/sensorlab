@@ -264,7 +264,7 @@ export default function TypeRacerScreen() {
           />
         )}
         {/* Modal for selecting example */}
-  {showListModal && (
+        {showListModal && (
           <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, justifyContent: 'center', alignItems: 'center'}}>
             <View style={{maxHeight: '80%', width: 340, backgroundColor: '#181818', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#333'}}>
               <Text style={{color: '#39FF14', fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center'}}>Select Example</Text>
@@ -281,7 +281,7 @@ export default function TypeRacerScreen() {
                     }}
                   >
                     <Text style={{color: idx === currentIndex ? '#39FF14' : '#fff', fontSize: 17}}>
-                      {ex.level ? `Level: ${ex.level}` : ''} {ex.casual ? `| ${ex.casual}` : ''}
+                      {[ex.level ? `Level: ${ex.level}` : null, ex.casual ? `| ${ex.casual}` : null].filter(Boolean).join(' ')}
                     </Text>
                     <Text style={{color: '#b0b0b0', fontSize: 15}} numberOfLines={1}>
                       {Array.isArray(ex.tokens) ? ex.tokens.map(t => t.string).join('') : ''}
@@ -299,7 +299,7 @@ export default function TypeRacerScreen() {
           </View>
         )}
 
-  {showHistoryModal && (
+        {showHistoryModal && (
           <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, justifyContent: 'center', alignItems: 'center'}}>
             <View style={{maxHeight: '80%', width: 340, backgroundColor: '#181818', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#333'}}>
               <Text style={{color: '#39FF14', fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center'}}>History</Text>
@@ -315,7 +315,7 @@ export default function TypeRacerScreen() {
                       }}
                     >
                       <Text style={{color: i === historyPos ? '#39FF14' : '#fff', fontSize: 17}}>
-                        {textExamplesJSONData[idx]?.level ? `Level: ${textExamplesJSONData[idx].level}` : ''} {textExamplesJSONData[idx]?.casual ? `| ${textExamplesJSONData[idx].casual}` : ''}
+                        {[textExamplesJSONData[idx]?.level ? `Level: ${textExamplesJSONData[idx].level}` : null, textExamplesJSONData[idx]?.casual ? `| ${textExamplesJSONData[idx].casual}` : null].filter(Boolean).join(' ')}
                       </Text>
                       <Text style={{color: '#b0b0b0', fontSize: 15}} numberOfLines={1}>
                         {Array.isArray(textExamplesJSONData[idx]?.tokens) ? textExamplesJSONData[idx].tokens.map(t => t.string).join('') : ''}
@@ -332,7 +332,7 @@ export default function TypeRacerScreen() {
             </View>
           </View>
         )}
-  <ScrollView contentContainerStyle={[styles.scrollContainer, {paddingBottom: 192}] /* align scroll bottom with media area top */}>
+        <ScrollView contentContainerStyle={[styles.scrollContainer, {paddingBottom: 192}] /* align scroll bottom with media area top */}>
           {/* Info bar at top of main area */}
           <TypeStatsBar
             level={example?.level}
@@ -477,93 +477,6 @@ export default function TypeRacerScreen() {
             </View>
           )}
           </ScrollView>
-      </View>
-      {/* Media area fixed at bottom */}
-      {/* Media area removed as requested */}
-      {/* Media controls at the bottom of the main area, scrolls with content */}
-      <TypeRacerControlMenu
-        onRetryPress={() => {
-          // Reset the current example from the beginning
-          setInput('');
-          setStatus('typing');
-          setKeyboardDisabled(false);
-          setShowCompletionSection(false);
-          setCompletedString('');
-          setShowCompletedChunk('');
-          setLastIncorrect('');
-          setTransliterator(new Transliterator(getObjectsForIndex(currentIndex)));
-          setInputFocused(false);
-          setResetKey(prev => prev + 1);
-          setIncorrectCount(0);
-          setStartTime(null);
-          setEndTime(null);
-          setCps(0);
-          setElapsed(0);
-          if (inputRef.current) {
-            inputRef.current.blur();
-          }
-        }}
-        onPlayPress={() => {
-          // If sentence is complete, go to next sample and focus keyboard
-          const isComplete = status === 'success' || completedString === getSentenceString(getObjectsForIndex(currentIndex));
-          if (isComplete) {
-            let nextIdx = currentIndex;
-            if (shuffleMode && Array.isArray(textExamplesJSONData) && textExamplesJSONData.length > 1) {
-              while (nextIdx === currentIndex) {
-                nextIdx = Math.floor(Math.random() * textExamplesJSONData.length);
-              }
-            } else {
-              nextIdx = (currentIndex + 1) % textExamplesJSONData.length;
-            }
-            setHistory([...history, nextIdx]);
-            setHistoryPos(history.length);
-            setCurrentIndex(nextIdx);
-            setTimeout(() => {
-              if (inputRef.current) {
-                inputRef.current.focus();
-              }
-            }, 300);
-          } else {
-            if (inputRef.current) {
-              inputRef.current.focus();
-            }
-          }
-        }}
-        onListPress={() => setShowListModal(true)}
-        onPrevPress={() => {
-          if (historyPos > 0) {
-            setHistoryPos(historyPos - 1);
-            setCurrentIndex(history[historyPos - 1]);
-          }
-        }}
-        onShufflePress={() => setShuffleMode(s => !s)}
-        onSkipPress={() => {
-          if (historyPos < history.length - 1) {
-            setHistoryPos(historyPos + 1);
-            setCurrentIndex(history[historyPos + 1]);
-          } else if (Array.isArray(textExamplesJSONData) && textExamplesJSONData.length > 0) {
-            let nextIdx = currentIndex;
-            if (shuffleMode && textExamplesJSONData.length > 1) {
-              while (nextIdx === currentIndex) {
-                nextIdx = Math.floor(Math.random() * textExamplesJSONData.length);
-              }
-            } else {
-              nextIdx = (currentIndex + 1) % textExamplesJSONData.length;
-            }
-            setHistory([...history, nextIdx]);
-            setHistoryPos(history.length);
-            setCurrentIndex(nextIdx);
-          }
-        }}
-        shuffleMode={shuffleMode}
-        historyPos={historyPos}
-        history={history}
-        currentIndex={currentIndex}
-        textExamplesJSONData={Array.isArray(textExamplesJSONData) ? textExamplesJSONData : []}
-      />
-        {/* ...existing code... */}
-  // Shuffle mode state
-  const [shuffleMode, setShuffleMode] = useState(true);
           <TextInput
             key={resetKey}
             ref={inputRef}
@@ -673,8 +586,92 @@ export default function TypeRacerScreen() {
           */}
           {/* Notification bubble for 'Correct!' will be shown here */}
           {/* Notification bubble for 'Correct!' will be shown here */}
+      </View>
+      {/* Media area fixed at bottom */}
+      {/* Media area removed as requested */}
+      {/* Media controls at the bottom of the main area, scrolls with content */}
+      <TypeRacerControlMenu
+        onRetryPress={() => {
+          // Reset the current example from the beginning
+          setInput('');
+          setStatus('typing');
+          setKeyboardDisabled(false);
+          setShowCompletionSection(false);
+          setCompletedString('');
+          setShowCompletedChunk('');
+          setLastIncorrect('');
+          setTransliterator(new Transliterator(getObjectsForIndex(currentIndex)));
+          setInputFocused(false);
+          setResetKey(prev => prev + 1);
+          setIncorrectCount(0);
+          setStartTime(null);
+          setEndTime(null);
+          setCps(0);
+          setElapsed(0);
+          if (inputRef.current) {
+            inputRef.current.blur();
+          }
+        }}
+        onPlayPress={() => {
+          // If sentence is complete, go to next sample and focus keyboard
+          const isComplete = status === 'success' || completedString === getSentenceString(getObjectsForIndex(currentIndex));
+          if (isComplete) {
+            let nextIdx = currentIndex;
+            if (shuffleMode && Array.isArray(textExamplesJSONData) && textExamplesJSONData.length > 1) {
+              while (nextIdx === currentIndex) {
+                nextIdx = Math.floor(Math.random() * textExamplesJSONData.length);
+              }
+            } else {
+              nextIdx = (currentIndex + 1) % textExamplesJSONData.length;
+            }
+            setHistory([...history, nextIdx]);
+            setHistoryPos(history.length);
+            setCurrentIndex(nextIdx);
+            setTimeout(() => {
+              if (inputRef.current) {
+                inputRef.current.focus();
+              }
+            }, 300);
+          } else {
+            if (inputRef.current) {
+              inputRef.current.focus();
+            }
+          }
+        }}
+        onListPress={() => setShowListModal(true)}
+        onPrevPress={() => {
+          if (historyPos > 0) {
+            setHistoryPos(historyPos - 1);
+            setCurrentIndex(history[historyPos - 1]);
+          }
+        }}
+        onShufflePress={() => setShuffleMode(s => !s)}
+        onSkipPress={() => {
+          if (historyPos < history.length - 1) {
+            setHistoryPos(historyPos + 1);
+            setCurrentIndex(history[historyPos + 1]);
+          } else if (Array.isArray(textExamplesJSONData) && textExamplesJSONData.length > 0) {
+            let nextIdx = currentIndex;
+            if (shuffleMode && textExamplesJSONData.length > 1) {
+              while (nextIdx === currentIndex) {
+                nextIdx = Math.floor(Math.random() * textExamplesJSONData.length);
+              }
+            } else {
+              nextIdx = (currentIndex + 1) % textExamplesJSONData.length;
+            }
+            setHistory([...history, nextIdx]);
+            setHistoryPos(history.length);
+            setCurrentIndex(nextIdx);
+          }
+        }}
+        shuffleMode={shuffleMode}
+        historyPos={historyPos}
+        history={history}
+        currentIndex={currentIndex}
+        textExamplesJSONData={Array.isArray(textExamplesJSONData) ? textExamplesJSONData : []}
+      />
       </SafeAreaView>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
