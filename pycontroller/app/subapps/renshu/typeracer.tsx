@@ -12,6 +12,7 @@ import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollVi
 import { FuriganaViewer } from './furigana-viewer';
 import textExamplesJSONData from './assets/data/japanese_text_examples.json';
 import { InputAccessoryView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSimpleHaptic } from '@/app/haptics';
 
 
@@ -61,6 +62,7 @@ const TOTAL_ENGLISH_CHARS = getTotalEnglishChars(JAPANESE_OBJECTS);
 const JAPANESE_SENTENCE = getSentenceString(JAPANESE_OBJECTS);
 
 export default function TypeRacerScreen() {
+  const insets = useSafeAreaInsets();
   // Navigation history: back/forward stacks
   const [history, setHistory] = useState([0]); // visited indices
   const [historyPos, setHistoryPos] = useState(0); // current position in history
@@ -535,7 +537,7 @@ export default function TypeRacerScreen() {
           )}
           {Platform.OS === 'ios' && (
             <InputAccessoryView nativeID={inputAccessoryViewID}>
-              <View style={{width: '100%', alignItems: 'center', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingTop: 0}}>
+              <View style={{width: '100%', alignItems: 'center', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: insets.bottom / 2, paddingTop: 0}}>
                 {/* Target flash display: shows next obj.string to type */}
                 {status !== 'success' && (
                   <TouchableOpacity
