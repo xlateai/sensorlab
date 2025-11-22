@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Slider from '../../../components/ui/slider';
+import Slider from '../../components/ui/slider';
 
 const screenHeight = Dimensions.get('window').height;
 

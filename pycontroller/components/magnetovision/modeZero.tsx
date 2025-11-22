@@ -6,9 +6,8 @@ import { Dimensions, View, Pressable, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
-import Settings from '../../app/components/widgets/settings';
-import Docs from '../../app/components/widgets/docs';
-
+import Settings from '../../app/widgets/settings';
+import Docs from '../../app/widgets/docs';
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
