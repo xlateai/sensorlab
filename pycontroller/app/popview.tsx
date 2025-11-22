@@ -66,9 +66,9 @@ export default function PopView({
   const pressMovedRef = useRef<boolean>(false);
   const pressStartPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Use custom orientation detection hook
+  // Use custom orientation detection hook - only active when browser is selected and visible
   const isBrowser = selectedNeedle === 3;
-  const { orientation, rotationDeg, isLandscape } = useDeviceOrientation(isVisible && isBrowser);
+  const { orientation, rotationDeg, isLandscape } = useDeviceOrientation(isVisible && selectedNeedle === 3);
   const rotationAnim = useRef(new Animated.Value(0)).current;
 
   // Update rotation animation when orientation changes
@@ -315,10 +315,53 @@ export default function PopView({
           }}
           pointerEvents={isVisible ? "auto" : "none"}
         >
-          {selectedNeedle === 0 && <Settings />}
-          {selectedNeedle === 1 && <Notes />}
-          {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
-          {selectedNeedle === 3 && (() => {
+          {/* Settings - always rendered, only visible when selected */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: screenHeight * 0.066,
+              opacity: selectedNeedle === 0 && isVisible ? 1 : 0,
+              pointerEvents: selectedNeedle === 0 && isVisible ? "auto" : "none",
+            }}
+          >
+            <Settings />
+          </View>
+          
+          {/* Notes - always rendered, only visible when selected */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: screenHeight * 0.066,
+              opacity: selectedNeedle === 1 && isVisible ? 1 : 0,
+              pointerEvents: selectedNeedle === 1 && isVisible ? "auto" : "none",
+            }}
+          >
+            <Notes />
+          </View>
+          
+          {/* TypeRacerScreen - always rendered, only visible when selected */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: screenHeight * 0.066,
+              opacity: selectedNeedle === 2 && isVisible ? 1 : 0,
+              pointerEvents: selectedNeedle === 2 && isVisible ? "auto" : "none",
+            }}
+          >
+            <TypeRacerScreen isVisible={selectedNeedle === 2 && isVisible} />
+          </View>
+          
+          {/* Browser - always rendered, only visible when selected */}
+          {(() => {
             // Calculate available container dimensions
             const containerWidth = dimensions.width;
             const containerHeight = menuHeight - (screenHeight * 0.066);
@@ -330,10 +373,16 @@ export default function PopView({
             return (
               <View
                 style={{
-                  flex: 1,
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: screenHeight * 0.066,
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
+                  opacity: selectedNeedle === 3 && isVisible ? 1 : 0,
+                  pointerEvents: selectedNeedle === 3 && isVisible ? "auto" : "none",
                 }}
               >
                 <Animated.View
@@ -348,7 +397,7 @@ export default function PopView({
                     ],
                   }}
                 >
-                  <Browser isVisible={isVisible} isLandscape={isLandscape} orientation={orientation} />
+                  <Browser isVisible={selectedNeedle === 3 && isVisible} isLandscape={isLandscape} orientation={orientation} />
                 </Animated.View>
               </View>
             );

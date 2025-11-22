@@ -233,9 +233,6 @@ export default function Browser({ isVisible = true, isLandscape = false, orienta
   const handleBack = () => {
     if (canGoBack && webViewRef.current) {
       webViewRef.current.goBack();
-    } else {
-      // If no history, go back to home (initial screen)
-      handleGoHome();
     }
   };
 
@@ -554,13 +551,14 @@ export default function Browser({ isVisible = true, isLandscape = false, orienta
         {/* Navigation buttons */}
         <View style={styles.navButtons}>
           <TouchableOpacity
-            style={styles.navButton}
+            style={[styles.navButton, !canGoBack && styles.navButtonDisabled]}
             onPress={handleBack}
+            disabled={!canGoBack}
           >
             <MaterialIcons 
-              name={canGoBack ? "arrow-back" : "home"} 
+              name="arrow-back" 
               size={20} 
-              color="#fff" 
+              color={canGoBack ? '#fff' : '#666'} 
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -579,6 +577,12 @@ export default function Browser({ isVisible = true, isLandscape = false, orienta
             onPress={handleRefresh}
           >
             <MaterialIcons name="refresh" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={handleGoHome}
+          >
+            <MaterialIcons name="home" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
         {/* Address bar */}
@@ -679,6 +683,7 @@ const styles = StyleSheet.create({
   navButtons: {
     flexDirection: 'row',
     marginRight: 8,
+    minWidth: 140, // Reserve space for 4 buttons (32px each + 4px margins)
   },
   navButton: {
     width: 32,
@@ -697,6 +702,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 32,
+    minWidth: 0, // Allow shrinking below flex: 1
   },
   addressBar: {
     flex: 1,
