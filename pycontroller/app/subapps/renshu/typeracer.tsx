@@ -1,7 +1,19 @@
-// Simple typing animation component (animated dots)
-
-
 import { Animated as RNAnimated } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { BlurView } from 'expo-blur';
+import { Animated } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { TypeRacerControlMenu } from './typeracer-control-menu';
+import { TypeStatsBar } from './type-stats-bar';
+import { Transliterator } from './romaji-transliterator';
+import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
+import { FuriganaViewer } from './furigana-viewer';
+import textExamplesJSONData from './assets/data/japanese_text_examples.json';
+import { InputAccessoryView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { playSimpleHaptic } from '@/app/haptics';
+
 
 function BlinkingCursor({ style, buffer }: { style?: any, buffer: string }) {
   const [visible, setVisible] = useState(true);
@@ -29,22 +41,6 @@ function BlinkingCursor({ style, buffer }: { style?: any, buffer: string }) {
     </View>
   );
 }
-
-
-import React, { useState, useRef, useEffect } from 'react';
-import { BlurView } from 'expo-blur';
-import { Animated } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { TypeRacerControlMenu } from './typeracer-control-menu';
-import { TypeStatsBar } from './type-stats-bar';
-import { Transliterator } from './romaji-transliterator';
-import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
-import { FuriganaViewer } from './furigana-viewer';
-import textExamplesJSONData from './assets/data/japanese_text_examples.json';
-import { InputAccessoryView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { playSimpleHaptic } from '@/app/haptics';
 
 // Load the first example from japanese_text_examples.json
 const FIRST_EXAMPLE = Array.isArray(textExamplesJSONData) ? textExamplesJSONData[0] : null;
