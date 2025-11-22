@@ -12,6 +12,8 @@ try {
 
 export default function Browser() {
   const [url, setUrl] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
 
   useEffect(() => {
     // Try to get URL from clipboard when component mounts
@@ -76,16 +78,39 @@ export default function Browser() {
 
   return (
     <View style={styles.container}>
+      {loading && (
+        <View style={styles.loadingBarContainer}>
+          <View style={[styles.loadingBar, { width: `${loadingProgress * 100}%` }]} />
+        </View>
+      )}
+      {/* Black overlay that covers the WebView while loading to prevent white flash */}
+      {loading && (
+        <View style={styles.loadingOverlay} pointerEvents="none" />
+      )}
       <WebView
         source={{ uri: url }}
         style={styles.webview}
         startInLoadingState={true}
         backgroundColor="#000000"
         renderLoading={() => (
-          <View style={styles.loadingContainer}>
-            <View style={styles.loadingBackground} />
+          <View style={styles.loadingScreen}>
+            <View style={styles.loadingScreenBackground} />
           </View>
         )}
+        onLoadStart={() => {
+          setLoading(true);
+          setLoadingProgress(0);
+        }}
+        onLoadProgress={(event: any) => {
+          setLoadingProgress(event.nativeEvent.progress);
+        }}
+        onLoadEnd={() => {
+          setLoading(false);
+          setLoadingProgress(1);
+        }}
+        onError={() => {
+          setLoading(false);
+        }}
       />
     </View>
   );
@@ -100,7 +125,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  loadingContainer: {
+  loadingBarContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000000',
+    zIndex: 1000,
+  },
+  loadingBar: {
+    height: '100%',
+    backgroundColor: '#ffffff',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    zIndex: 999,
+  },
+  loadingScreen: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -108,7 +155,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#000000',
   },
-  loadingBackground: {
+  loadingScreenBackground: {
     flex: 1,
     backgroundColor: '#000000',
   },
