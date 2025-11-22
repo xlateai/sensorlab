@@ -50,13 +50,11 @@ export default function ModeZero() {
   const [joystickOrigin, setJoystickOrigin] = useState<{x: number, y: number} | null>(null);
   const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
   // Animated state for circle and needle
-  const [animatedOffset, setAnimatedOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
   const iconScaleAnim = useRef([new Animated.Value(1), new Animated.Value(1)]).current;
   const iconOpacityAnim = useRef([new Animated.Value(0.45), new Animated.Value(0.45)]).current;
-  // Motion blur trail - track recent positions
-  const trailRef = useRef<{x: number, y: number}[]>([]);
-  const [trail, setTrail] = useState<{x: number, y: number}[]>([]);
+  // Glass blob state - smooth animation toward target
+  const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -95,6 +93,8 @@ export default function ModeZero() {
     iconOpacityAnim.forEach((anim) => {
       anim.setValue(0.45);
     });
+    // Reset blob
+    setBlobOffset({ x: 0, y: 0 });
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
@@ -261,32 +261,40 @@ export default function ModeZero() {
     const dy = fingerPosition.y - origin.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const maxDist = 18;
+    const closeDist = 10; // Distance threshold for bouncing back
     const driftDist = maxDist * 2;
-    if (dist > driftDist) {
-      const driftFrac = 0.18;
-      origin = {
-        x: origin.x + (fingerPosition.x - origin.x) * driftFrac,
-        y: origin.y + (fingerPosition.y - origin.y) * driftFrac,
-      };
-      setJoystickOrigin(origin);
-    }
-    const moveDist = Math.min(dist, maxDist);
-    const angleRad = Math.atan2(dy, dx);
-    targetOffset.x = Math.cos(angleRad) * moveDist;
-    targetOffset.y = Math.sin(angleRad) * moveDist;
-    joystickAtMax = dist >= maxDist - 0.5;
-    if (joystickAtMax) {
-      joystickAngle = (angleRad * 180 / Math.PI);
-      if (joystickAngle < 0) joystickAngle += 360;
-      let minDiff = 999;
-      needles.forEach((needle, idx) => {
-        let diff = Math.abs(needle.angle - joystickAngle!);
-        if (diff > 180) diff = 360 - diff;
-        if (diff < minDiff) {
-          minDiff = diff;
-          targetNeedleIdx = idx;
-        }
-      });
+    
+    // If within close distance, bounce back and don't select
+    if (dist < closeDist) {
+      targetOffset = { x: 0, y: 0 };
+      targetNeedleIdx = null;
+    } else {
+      if (dist > driftDist) {
+        const driftFrac = 0.18;
+        origin = {
+          x: origin.x + (fingerPosition.x - origin.x) * driftFrac,
+          y: origin.y + (fingerPosition.y - origin.y) * driftFrac,
+        };
+        setJoystickOrigin(origin);
+      }
+      const moveDist = Math.min(dist, maxDist);
+      const angleRad = Math.atan2(dy, dx);
+      targetOffset.x = Math.cos(angleRad) * moveDist;
+      targetOffset.y = Math.sin(angleRad) * moveDist;
+      joystickAtMax = dist >= maxDist - 0.5;
+      if (joystickAtMax) {
+        joystickAngle = (angleRad * 180 / Math.PI);
+        if (joystickAngle < 0) joystickAngle += 360;
+        let minDiff = 999;
+        needles.forEach((needle, idx) => {
+          let diff = Math.abs(needle.angle - joystickAngle!);
+          if (diff > 180) diff = 360 - diff;
+          if (diff < minDiff) {
+            minDiff = diff;
+            targetNeedleIdx = idx;
+          }
+        });
+      }
     }
   } else {
     targetOffset = { x: 0, y: 0 };
@@ -338,38 +346,22 @@ export default function ModeZero() {
     setSelectedNeedle(targetNeedleIdx);
   }, [targetNeedleIdx]);
 
-  // Animation loop for joystick offset with motion blur trail
+  // Animation loop for glass blob - smooth melting effect
   useEffect(() => {
     let running = true;
     function animate() {
-      setAnimatedOffset(prev => {
+      setBlobOffset(prev => {
         const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-        const newOffset = {
-          x: lerp(prev.x, targetOffset.x, 0.85),
-          y: lerp(prev.y, targetOffset.y, 0.85)
+        return {
+          x: lerp(prev.x, targetOffset.x, 0.25),
+          y: lerp(prev.y, targetOffset.y, 0.25)
         };
-        
-        // Update motion blur trail
-        if (showLines) {
-          trailRef.current.push({ ...newOffset });
-          // Keep last 8 positions for trail
-          if (trailRef.current.length > 8) {
-            trailRef.current.shift();
-          }
-          setTrail([...trailRef.current]);
-        } else {
-          // Clear trail when joystick is released
-          trailRef.current = [];
-          setTrail([]);
-        }
-        
-        return newOffset;
       });
       if (running) requestAnimationFrame(animate);
     }
     animate();
     return () => { running = false; };
-  }, [targetOffset.x, targetOffset.y, showLines]);
+  }, [targetOffset.x, targetOffset.y]);
 
   // Render ticks as dots at the tips
   const ticks = tickAngles.map((angle, idx) => {
@@ -430,37 +422,69 @@ export default function ModeZero() {
           backgroundColor: 'transparent',
         }}
       />
-      {/* Motion blur trail - render previous positions with decreasing opacity */}
-      {trail.map((trailPos, idx) => {
-        const opacity = (idx + 1) / (trail.length + 1) * 0.4; // Fade from 0.4 to 0
-        return (
-          <View
-            key={`trail-${idx}`}
-            style={{
-              position: 'absolute',
-              left: centerX + trailPos.x - innerRadius,
-              top: centerY + trailPos.y - innerRadius,
-              width: innerRadius * 2,
-              height: innerRadius * 2,
-              borderRadius: innerRadius,
-              backgroundColor: currentPixel,
-              opacity: opacity,
-            }}
-          />
-        );
-      })}
-      {/* Center joystick (inner circle, joystick offset) */}
+      {/* Center circle (stationary) */}
       <View
         style={{
           position: 'absolute',
-          left: centerX + animatedOffset.x - innerRadius,
-          top: centerY + animatedOffset.y - innerRadius,
+          left: centerX - innerRadius,
+          top: centerY - innerRadius,
           width: innerRadius * 2,
           height: innerRadius * 2,
           borderRadius: innerRadius,
           backgroundColor: currentPixel,
         }}
       />
+      {/* Control point circle */}
+      {showLines && joystickOrigin && (
+        <View
+          style={{
+            position: 'absolute',
+            left: joystickOrigin.x - 6,
+            top: joystickOrigin.y - 6,
+            width: 12,
+            height: 12,
+            borderRadius: 6,
+            backgroundColor: `rgba(${smoothR},${smoothG},${smoothB},0.6)`,
+            borderWidth: 1.5,
+            borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.8)`,
+          }}
+        />
+      )}
+      {/* Simple circle that extends from center in joystick direction */}
+      {showLines && (blobOffset.x !== 0 || blobOffset.y !== 0) && (() => {
+        const dist = Math.sqrt(blobOffset.x * blobOffset.x + blobOffset.y * blobOffset.y);
+        const angle = Math.atan2(blobOffset.y, blobOffset.x);
+        // Circle extends from center in the direction of joystick
+        const maxDist = 18;
+        const distRatio = Math.min(dist / maxDist, 1); // 0 to 1
+        // Blend into main circle: smaller and more transparent when close
+        const baseRadius = innerRadius * 0.4;
+        const circleRadius = baseRadius * (0.3 + distRatio * 0.7); // Scale from 30% to 100%
+        const circleDistance = innerRadius + dist * 0.5;
+        const circleX = centerX + Math.cos(angle) * circleDistance;
+        const circleY = centerY + Math.sin(angle) * circleDistance;
+        // Opacity blends from 0.2 (close) to 0.5 (far)
+        const opacity = 0.2 + distRatio * 0.3;
+        
+        // Don't render if too small (when distRatio is very low)
+        if (distRatio < 0.15) {
+          return null;
+        }
+        
+        return (
+          <View
+            style={{
+              position: 'absolute',
+              left: circleX - circleRadius,
+              top: circleY - circleRadius,
+              width: circleRadius * 2,
+              height: circleRadius * 2,
+              borderRadius: circleRadius,
+              backgroundColor: `rgba(${smoothR},${smoothG},${smoothB},${opacity})`,
+            }}
+          />
+        );
+      })()}
       {/* Render needle titles at the tip of each needle, only when needles are shown */}
       {showLines && needles.map((needle, i) => {
         const rad = degToRad(needle.angle);
