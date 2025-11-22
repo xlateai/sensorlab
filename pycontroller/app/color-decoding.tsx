@@ -87,22 +87,3 @@ export function calculateColorFromMagnetometer(
   return { r, g, b };
 }
 
-/**
- * Blends current RGB values with previous values for smooth transitions
- */
-export function blendRGB(
-  current: { r: number; g: number; b: number },
-  previous: [number, number, number],
-  blendFactor: number = 0.2
-): { r: number; g: number; b: number; rgbString: string } {
-  const smoothR = Math.round(previous[0] * (1 - blendFactor) + current.r * blendFactor);
-  const smoothG = Math.round(previous[1] * (1 - blendFactor) + current.g * blendFactor);
-  const smoothB = Math.round(previous[2] * (1 - blendFactor) + current.b * blendFactor);
-  
-  return {
-    r: smoothR,
-    g: smoothG,
-    b: smoothB,
-    rgbString: `rgb(${smoothR},${smoothG},${smoothB})`,
-  };
-}
