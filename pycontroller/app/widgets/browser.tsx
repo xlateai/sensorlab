@@ -33,6 +33,7 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const addressBarRef = useRef<TextInput>(null);
   const searchInputRef = useRef<TextInput>(null);
   const inputAccessoryViewID = useRef(`addressBarAccessoryView-${Date.now()}-${Math.random()}`).current;
+  const searchAccessoryViewID = useRef(`searchAccessoryView-${Date.now()}-${Math.random()}`).current;
 
   // Check clipboard when component becomes visible
   useEffect(() => {
@@ -174,14 +175,46 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     );
   }
 
-  // Show initial screen with search bar and clipboard button when no URL is loaded
+  // Show initial screen with search button and clipboard button when no URL is loaded
   if (!url) {
     return (
-      <View style={styles.container}>
-        <View style={styles.initialScreen}>
+      <TouchableWithoutFeedback onPress={() => {
+        Keyboard.dismiss();
+        if (searchInputRef.current) {
+          searchInputRef.current.blur();
+        }
+      }}>
+        <View style={styles.container}>
+          <View style={styles.initialScreen}>
+            <TouchableOpacity
+              style={styles.searchButton}
+              onPress={() => {
+                if (searchInputRef.current) {
+                  searchInputRef.current.focus();
+                }
+              }}
+            >
+              <View style={{ marginRight: 8 }}>
+                <MaterialIcons name="search" size={20} color="#fff" />
+              </View>
+              <Text style={styles.searchButtonText}>Search on Google</Text>
+            </TouchableOpacity>
+            {clipboardContent && (
+              <TouchableOpacity
+                style={styles.clipboardButton}
+                onPress={handleOpenFromClipboard}
+              >
+                <View style={{ marginRight: 8 }}>
+                  <MaterialIcons name="content-paste" size={18} color="#fff" />
+                </View>
+                <Text style={styles.clipboardButtonText}>Open link from clipboard</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {/* Hidden search input that triggers keyboard with accessory view */}
           <TextInput
             ref={searchInputRef}
-            style={styles.searchBar}
+            style={styles.hiddenInput}
             value={searchText}
             onChangeText={setSearchText}
             onSubmitEditing={handleSearch}
@@ -189,21 +222,42 @@ export default function Browser({ isVisible = true }: BrowserProps) {
             placeholderTextColor="#666"
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="default"
             returnKeyType="search"
+            inputAccessoryViewID={Platform.OS === 'ios' ? searchAccessoryViewID : undefined}
           />
-          {clipboardContent && (
-            <TouchableOpacity
-              style={styles.clipboardButton}
-              onPress={handleOpenFromClipboard}
-            >
-              <View style={{ marginRight: 8 }}>
-                <MaterialIcons name="content-paste" size={18} color="#fff" />
+          {/* Input accessory view for search */}
+          {Platform.OS === 'ios' && (
+            <InputAccessoryView nativeID={searchAccessoryViewID}>
+              <View style={styles.inputAccessory}>
+                <TextInput
+                  style={styles.inputAccessoryInput}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  onSubmitEditing={handleSearch}
+                  placeholder="Search on Google"
+                  placeholderTextColor="#666"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="default"
+                  returnKeyType="search"
+                />
+                <TouchableOpacity
+                  style={styles.inputAccessoryButton}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    if (searchInputRef.current) {
+                      searchInputRef.current.blur();
+                    }
+                  }}
+                >
+                  <Text style={styles.inputAccessoryButtonText}>Done</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.clipboardButtonText}>Open link from clipboard</Text>
-            </TouchableOpacity>
+            </InputAccessoryView>
           )}
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     );
   }
 
@@ -593,18 +647,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 40,
   },
-  searchBar: {
-    width: '100%',
-    height: 48,
+  searchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#222',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#444',
+    marginBottom: 16,
+  },
+  searchButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    opacity: 0,
+    width: 0,
+    height: 0,
   },
   clipboardButton: {
     flexDirection: 'row',
