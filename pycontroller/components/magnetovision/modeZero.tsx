@@ -263,7 +263,7 @@ export default function ModeZero() {
     }
   }, [showMenu]);
 
-  // Make background color and orb visibility respond to drag in real-time
+  // Lock orb states when menu closes
   useEffect(() => {
     if (!showMenu) {
       // When menu closes, only lock orb states if we're not manually closing (to allow animation to complete)
@@ -273,42 +273,8 @@ export default function ModeZero() {
         orbTopScale.setValue(0);
         orbCenterScale.setValue(1);
       }
-      return;
     }
-    
-    const threshold = screenHeight * 0.2; // Same threshold as dismiss
-    let isActive = true; // Flag to prevent listener from running after cleanup
-    
-    const listenerId = menuPanY.addListener(({ value }) => {
-      // Don't update if menu has closed or if we're manually closing
-      if (!isActive || isManuallyClosingRef.current) return;
-      
-      // Interpolate background color: 0 drag = full light (#0a0a0a), threshold drag = black (#000)
-      const bgProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
-      // Update target for smooth interpolation
-      bgColorTargetRef.current = bgProgress;
-      
-      // Interpolate orb visibility and scale: 0 drag = top visible (1), center invisible (0)
-      // threshold drag = top invisible (0), center visible (1)
-      const orbProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
-      orbTopOpacity.setValue(orbProgress);
-      orbCenterOpacity.setValue(1 - orbProgress);
-      orbTopScale.setValue(orbProgress);
-      orbCenterScale.setValue(1 - orbProgress);
-    });
-    
-    return () => {
-      isActive = false; // Disable listener before removing
-      menuPanY.removeListener(listenerId);
-      // Only lock orb states when listener is removed if we're not manually closing
-      if (!isManuallyClosingRef.current) {
-        orbTopOpacity.setValue(0);
-        orbCenterOpacity.setValue(1);
-        orbTopScale.setValue(0);
-        orbCenterScale.setValue(1);
-      }
-    };
-  }, [showMenu, screenHeight]);
+  }, [showMenu]);
   
   // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
   const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
@@ -591,18 +557,11 @@ export default function ModeZero() {
     // Set flag to prevent useEffect from interfering
     isManuallyClosingRef.current = true;
     
-    // Stop any ongoing pan animations
-    menuPanY.stopAnimation();
-    
     // Stop any ongoing orb animations to prevent conflicts
     orbTopOpacity.stopAnimation();
     orbTopScale.stopAnimation();
     orbCenterOpacity.stopAnimation();
     orbCenterScale.stopAnimation();
-    
-    // Flatten any offset from dragging
-    menuPanY.flattenOffset();
-    menuPanY.setValue(0);
     
     // Force orbs to the "menu open" state first (top visible, center hidden)
     // This ensures we always animate from the correct starting point
@@ -689,74 +648,6 @@ export default function ModeZero() {
     }).start();
   };
 
-  // Pan responder for swipe-down to dismiss
-  const menuPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to downward swipes
-        return gestureState.dy > 5;
-      },
-      onPanResponderGrant: () => {
-        menuPanY.setOffset((menuPanY as any)._value || 0);
-        menuPanY.setValue(0);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        // Only allow downward movement
-        if (gestureState.dy > 0) {
-          menuPanY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        const currentDragY = gestureState.dy;
-        const threshold = screenHeight * 0.2; // Dismiss if dragged down 20% of screen
-        if (currentDragY > threshold || gestureState.vy > 0.5) {
-          // Dismiss menu immediately from current position (before flattening)
-          closeMenu(currentDragY);
-        } else {
-          // Snap back up and animate background/orb back to open state
-          menuPanY.flattenOffset();
-          menuPanY.setValue(0);
-          // Animate back to open state
-          bgColorTargetRef.current = 1;
-          // The animation loop will smoothly lerp to this target
-          Animated.parallel([
-            // Sequential orb fade: first fade out center (with shrink), then fade in top (with grow)
-            Animated.sequence([
-              Animated.parallel([
-                Animated.timing(orbCenterOpacity, {
-                  toValue: 0,
-                  duration: 200,
-                  useNativeDriver: true,
-                  easing: Easing.out(Easing.ease),
-                }),
-                Animated.timing(orbCenterScale, {
-                  toValue: 0,
-                  duration: 200,
-                  useNativeDriver: true,
-                  easing: Easing.out(Easing.ease),
-                }),
-              ]),
-              Animated.parallel([
-                Animated.timing(orbTopOpacity, {
-                  toValue: 1,
-                  duration: 200,
-                  useNativeDriver: true,
-                  easing: Easing.out(Easing.ease),
-                }),
-                Animated.timing(orbTopScale, {
-                  toValue: 1,
-                  duration: 200,
-                  useNativeDriver: true,
-                  easing: Easing.out(Easing.ease),
-                }),
-              ]),
-            ]),
-          ]).start();
-        }
-      },
-    })
-  ).current;
 
   // Animation loop for glass blob - smooth melting effect
   useEffect(() => {
@@ -1064,7 +955,6 @@ export default function ModeZero() {
       {/* Slide-up menu */}
       {showMenu && (
         <Animated.View
-          {...menuPanResponder.panHandlers}
           style={{
             position: 'absolute',
             bottom: 0,
@@ -1074,16 +964,9 @@ export default function ModeZero() {
             backgroundColor: '#000',
             borderTopLeftRadius: 35,
             borderTopRightRadius: 35,
-            opacity: Animated.multiply(
-              menuOpacity,
-              menuPanY.interpolate({
-                inputRange: [0, screenHeight * 0.12], // Fade out over 12% of screen height
-                outputRange: [1, 0],
-                extrapolate: 'clamp',
-              })
-            ),
+            opacity: menuOpacity,
             transform: [
-              { translateY: Animated.add(menuSlideAnim, menuPanY) },
+              { translateY: menuSlideAnim },
             ],
           }}
         >
