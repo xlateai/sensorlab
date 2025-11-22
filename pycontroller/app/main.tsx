@@ -78,9 +78,6 @@ export default function Main() {
   const orbCenterScale = useRef(new Animated.Value(0)).current;
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
-  
-  // Height percentage state for calculating top orb position
-  const [heightPercentage, setHeightPercentage] = useState(0.7); // Default to 70%
 
   // Handler for double-tap-and-hold gesture
   const handlePressIn = (event: any) => {
@@ -657,46 +654,37 @@ export default function Main() {
           transform: [{ scale: orbCenterScale }],
         }}
       />
-      {/* Top orb - positioned at top of menu area based on height percentage */}
-      {(() => {
-        // Calculate top orb position based on height percentage
-        // 0% = viewport center (50%), 100% = full screen (0%)
-        // Orb center is positioned 1.2x radius higher than the menu top edge
-        const menuTop = screenHeight * (1 - heightPercentage);
-        const topY = menuTop - (ringRadius * 1.3);
-        return (
-          <>
-            <Animated.View
-              style={{
-                position: 'absolute',
-                left: centerX - ringRadius,
-                top: topY - ringRadius,
-                width: ringRadius * 2,
-                height: ringRadius * 2,
-                borderRadius: ringRadius,
-                borderWidth: ringThickness,
-                borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
-                backgroundColor: 'transparent',
-                opacity: orbTopOpacity,
-                transform: [{ scale: orbTopScale }],
-              }}
-            />
-            <Animated.View
-              style={{
-                position: 'absolute',
-                left: centerX - innerRadius,
-                top: topY - innerRadius,
-                width: innerRadius * 2,
-                height: innerRadius * 2,
-                borderRadius: innerRadius,
-                backgroundColor: currentPixel,
-                opacity: orbTopOpacity,
-                transform: [{ scale: orbTopScale }],
-              }}
-            />
-          </>
-        );
-      })()}
+      {/* Top orb - fixed at top center, positioned at 15% viewport height */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: centerX - ringRadius,
+          top: screenHeight * 0.15 - ringRadius,
+          width: ringRadius * 2,
+          height: ringRadius * 2,
+          borderRadius: ringRadius,
+          borderWidth: ringThickness,
+          borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
+          backgroundColor: 'transparent',
+          opacity: orbTopOpacity,
+          transform: [{ scale: orbTopScale }],
+          zIndex: 1000,
+        }}
+      />
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: centerX - innerRadius,
+          top: screenHeight * 0.15 - innerRadius,
+          width: innerRadius * 2,
+          height: innerRadius * 2,
+          borderRadius: innerRadius,
+          backgroundColor: currentPixel,
+          opacity: orbTopOpacity,
+          transform: [{ scale: orbTopScale }],
+          zIndex: 1000,
+        }}
+      />
       {/* Control point circle - hidden */}
       {/* Simple circle that extends from center in joystick direction */}
       {showLines && (blobOffset.x !== 0 || blobOffset.y !== 0) && (() => {
@@ -778,7 +766,6 @@ export default function Main() {
         orbCenterScale={orbCenterScale}
         orbTopOpacity={orbTopOpacity}
         orbTopScale={orbTopScale}
-        onHeightPercentageChange={setHeightPercentage}
       />
     </View>
   );

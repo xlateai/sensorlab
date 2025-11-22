@@ -16,15 +16,14 @@ interface PopViewProps {
   orbCenterScale?: Animated.Value;
   orbTopOpacity?: Animated.Value;
   orbTopScale?: Animated.Value;
-  onHeightPercentageChange?: (percentage: number) => void;
 }
 
 // Height percentage configuration for each component
 // 0% = viewport center (50%), 100% = full screen (0%)
 const HEIGHT_PERCENTAGES: { [key: number]: number } = {
-  0: 0.6,  // Settings: 60%
-  1: 0.7,  // Notes: 70% (default, can be adjusted)
-  2: 0.8,  // Renshu (TypeRacerScreen): 80%
+  0: 0.75,  // Settings: 60%
+  1: 0.75,  // Notes: 70% (default, can be adjusted)
+  2: 0.75,  // Renshu (TypeRacerScreen): 80%
 };
 
 export default function PopView({
@@ -38,7 +37,6 @@ export default function PopView({
   orbCenterScale: orbCenterScaleProp,
   orbTopOpacity: orbTopOpacityProp,
   orbTopScale: orbTopScaleProp,
-  onHeightPercentageChange,
 }: PopViewProps) {
   const { height: screenHeight } = Dimensions.get('window');
   
@@ -107,12 +105,6 @@ export default function PopView({
     };
   }, [onBackgroundColorChange]);
 
-  // Notify parent of height percentage change
-  useEffect(() => {
-    if (selectedNeedle !== null && onHeightPercentageChange) {
-      onHeightPercentageChange(heightPercentage);
-    }
-  }, [selectedNeedle, heightPercentage, onHeightPercentageChange]);
 
   // Handle menu open animation
   useEffect(() => {
