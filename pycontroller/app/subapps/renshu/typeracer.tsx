@@ -5,7 +5,7 @@ import { Animated } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RainbowProgressBar } from './rainbow-progress-bar';
-import { TypeRacerControlMenu } from './typeracer-control-menu';
+import TypeRacerControlMenu, { TypeRacerMediaControlMenu } from './typeracer-media-control-menu';
 import { TypeStatsBar } from './type-stats-bar';
 import { Transliterator } from './romaji-transliterator';
 import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
@@ -592,7 +592,7 @@ export default function TypeRacerScreen() {
       {/* Media area fixed at bottom */}
       {/* Media area removed as requested */}
       {/* Media controls at the bottom of the main area, scrolls with content */}
-      <TypeRacerControlMenu
+      <TypeRacerMediaControlMenu
         onRetryPress={() => {
           // Reset the current example from the beginning
           setInput('');

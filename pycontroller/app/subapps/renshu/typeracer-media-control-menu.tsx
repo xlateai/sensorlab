@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-interface TypeRacerControlMenuProps {
+interface TypeRacerMediaControlMenuProps {
   onRetryPress?: () => void;
   onPlayPress?: () => void;
   onListPress?: () => void;
@@ -16,7 +16,7 @@ interface TypeRacerControlMenuProps {
   textExamplesJSONData?: any[];
 }
 
-export const TypeRacerControlMenu: React.FC<TypeRacerControlMenuProps> = ({
+export const TypeRacerMediaControlMenu: React.FC<TypeRacerMediaControlMenuProps> = ({
   onRetryPress,
   onPlayPress,
   onListPress,
@@ -114,4 +114,4 @@ export const TypeRacerControlMenu: React.FC<TypeRacerControlMenuProps> = ({
   </View>
 );
 
-export default TypeRacerControlMenu;
+export default TypeRacerMediaControlMenu;
