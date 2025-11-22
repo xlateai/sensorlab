@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Slider from '../../components/ui/slider';
+import RangedSlider from '../../components/ui/ranged-slider';
 
 const screenHeight = Dimensions.get('window').height;
 
@@ -8,6 +9,12 @@ export default function Settings() {
   const [r, setR] = useState(0.5);
   const [g, setG] = useState(0.5);
   const [b, setB] = useState(0.5);
+  
+  // Ranged slider states
+  const [rangeMin, setRangeMin] = useState(0.2);
+  const [rangeMax, setRangeMax] = useState(0.8);
+  const [verticalRangeMin, setVerticalRangeMin] = useState(0.3);
+  const [verticalRangeMax, setVerticalRangeMax] = useState(0.7);
 
   return (
     <View style={styles.container}>
@@ -36,6 +43,31 @@ export default function Settings() {
             orientation="vertical"
           />
         </View>
+        <View style={styles.sliderContainer}>
+          <RangedSlider
+            minValue={verticalRangeMin}
+            maxValue={verticalRangeMax}
+            onRangeChange={(min, max) => {
+              setVerticalRangeMin(min);
+              setVerticalRangeMax(max);
+            }}
+            trackColor="#ff00ff"
+            orientation="vertical"
+          />
+        </View>
+      </View>
+      <View style={styles.horizontalRangeContainer}>
+        <Text style={styles.label}>Range: {rangeMin.toFixed(2)} - {rangeMax.toFixed(2)}</Text>
+        <RangedSlider
+          minValue={rangeMin}
+          maxValue={rangeMax}
+          onRangeChange={(min, max) => {
+            setRangeMin(min);
+            setRangeMax(max);
+          }}
+          trackColor="#ffff00"
+          orientation="horizontal"
+        />
       </View>
     </View>
   );
@@ -67,5 +99,15 @@ const styles = StyleSheet.create({
     maxWidth: 60,
     height: '100%',
     alignItems: 'center',
+  },
+  horizontalRangeContainer: {
+    marginTop: 40,
+    paddingHorizontal: 20,
+  },
+  label: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 12,
+    textAlign: 'center',
   },
 });
