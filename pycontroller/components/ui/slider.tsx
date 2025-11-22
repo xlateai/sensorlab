@@ -19,11 +19,13 @@ export default function Slider({
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (evt) => {
       if (isVertical) {
         if (containerHeight === 0) return;
         // For vertical, value increases from bottom to top (inverted)
-        const percent = Math.max(0, Math.min(1, 1 - (evt.nativeEvent.locationY / containerHeight)));
+        const y = evt.nativeEvent.locationY;
+        const percent = Math.max(0, Math.min(1, 1 - (y / containerHeight)));
         onValueChange(Number(percent.toFixed(2)));
       } else {
         if (containerWidth === 0) return;
@@ -35,7 +37,8 @@ export default function Slider({
       if (isVertical) {
         if (containerHeight === 0) return;
         // For vertical, value increases from bottom to top (inverted)
-        const percent = Math.max(0, Math.min(1, 1 - (evt.nativeEvent.locationY / containerHeight)));
+        const y = evt.nativeEvent.locationY;
+        const percent = Math.max(0, Math.min(1, 1 - (y / containerHeight)));
         onValueChange(Number(percent.toFixed(2)));
       } else {
         if (containerWidth === 0) return;
@@ -48,19 +51,22 @@ export default function Slider({
   return (
     <View
       onLayout={e => {
-        setContainerWidth(e.nativeEvent.layout.width);
-        setContainerHeight(e.nativeEvent.layout.height);
+        const { width, height } = e.nativeEvent.layout;
+        if (width > 0) setContainerWidth(width);
+        if (height > 0) setContainerHeight(height);
       }}
       {...panResponder.panHandlers}
       style={{
-        width: isVertical ? 32 : '100%',
+        width: isVertical ? 50 : '100%',
         height: isVertical ? '100%' : 32,
         backgroundColor: '#222',
-        borderRadius: 16,
+        borderRadius: isVertical ? 25 : 16,
         marginVertical: isVertical ? 0 : 8,
         marginHorizontal: isVertical ? 8 : 0,
         justifyContent: 'center',
         position: 'relative',
+        minHeight: isVertical ? 100 : 32,
+        minWidth: isVertical ? 50 : undefined,
       }}
     >
       <View
@@ -68,10 +74,10 @@ export default function Slider({
         style={isVertical ? {
           position: 'absolute',
           left: 0,
-          top: Math.max(0, Math.min((1 - value) * (containerHeight - 24), containerHeight - 24)),
-          width: 32,
-          height: 24,
-          borderRadius: 12,
+          top: containerHeight > 0 ? Math.max(0, Math.min((1 - value) * (containerHeight - 30), containerHeight - 30)) : 0,
+          width: 50,
+          height: 30,
+          borderRadius: 15,
           backgroundColor: trackColor,
         } : {
           position: 'absolute',

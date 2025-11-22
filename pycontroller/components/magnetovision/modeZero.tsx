@@ -372,8 +372,8 @@ export default function ModeZero() {
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
   const needles: { angle: number; Title: string; icon: 'description' | 'settings' }[] = [
-    { angle: 0, Title: 'Hi', icon: 'description' },      // Left needle (0 degrees)
-    { angle: 180, Title: 'There', icon: 'settings' },    // Right needle (180 degrees)
+    { angle: 0, Title: 'Hi', icon: 'description' },      // Left needle (0 degrees) - Docs
+    { angle: 180, Title: 'There', icon: 'settings' },    // Right needle (180 degrees) - Settings
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;

@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    justifyContent: 'center',
   },
   title: {
     fontSize: 32,
@@ -63,7 +64,8 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     flex: 1,
-    maxWidth: 50,
+    maxWidth: 60,
     height: '100%',
+    alignItems: 'center',
   },
 });
