@@ -968,6 +968,8 @@ export default function ModeZero() {
               backgroundColor: '#000',
               borderTopLeftRadius: 35,
               borderTopRightRadius: 35,
+              borderWidth: 1,
+              borderColor: currentPixel,
               opacity: menuOpacity,
               transform: [
                 { translateY: menuSlideAnim },
