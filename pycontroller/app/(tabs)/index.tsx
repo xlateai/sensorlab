@@ -5,7 +5,7 @@ import { playChimeHaptic } from '../haptics';
 import { StatusBar, View, PanResponder, Dimensions, Platform } from 'react-native';
 import * as ExpoStatusBar from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
-import ModeZero from '../../components/magnetovision/modeZero';
+import Main from '../main';
 import { useStorage } from '../StorageContext';
 
 export default function HomeScreen() {
@@ -121,7 +121,7 @@ export default function HomeScreen() {
     >
       <StatusBar hidden={fullscreen} animated />
       <View style={{ flex: 1 }}>
-        <ModeZero key="mode-zero" />
+        <Main key="mode-zero" />
       </View>
     </View>
   );

@@ -1,290 +1,18 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Animated, Easing } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-// ...existing code...
-import { Dimensions, View, Pressable, Text } from 'react-native';
+import { TouchableWithoutFeedback } from 'react-native';
+import { Dimensions, View } from 'react-native';
+import { Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Magnetometer, DeviceMotion } from 'expo-sensors';
-// Removed all SVG imports; will use only View and styles
-import Settings from '../../app/widgets/settings';
-import Docs from '../../app/widgets/docs';
+import { Magnetometer } from 'expo-sensors';
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
 export default function ModeZero() {
-  // Animated rotation value for smooth transitions
-  const rotationAnim = useRef(new Animated.Value(0)).current;
-  const [rawRotation, setRawRotation] = useState(0);
-  // Device orientation state
-  const [deviceRotation, setDeviceRotation] = useState(0); // in radians
-  useEffect(() => {
-    let sub = DeviceMotion.addListener(motion => {
-      let rot = 0;
-      if (motion?.rotation?.alpha !== undefined) {
-        rot = motion.rotation.alpha;
-      } else if (motion?.rotation?.gamma !== undefined) {
-        rot = motion.rotation.gamma;
-      }
-      setRawRotation(rot);
-    });
-    DeviceMotion.setUpdateInterval(33);
-    return () => { sub && sub.remove(); };
-  }, []);
-
-  // Animate rotation value smoothly
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    const rotationDeg = (rawRotation * 180) / Math.PI + 30;
-    Animated.timing(rotationAnim, {
-      toValue: rotationDeg,
-      duration: 120,
-      useNativeDriver: true,
-      easing: t => t,
-    }).start();
-  }, [rawRotation]);
-  // Gesture state for double-tap-and-hold
-  const [showLines, setShowLines] = useState(false);
-  const lastTapRef = useRef<number>(0);
-  const tapTimeoutRef = useRef<any>(null);
-  const [tapPosition, setTapPosition] = useState<{x: number, y: number} | null>(null);
-  // Joystick origin that can drift
-  const [joystickOrigin, setJoystickOrigin] = useState<{x: number, y: number} | null>(null);
-  const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
-  // Track the active touch identifier to ignore other touches
-  const activeTouchIdRef = useRef<number | null>(null);
-  // Animated state for circle and needle
-  const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
-  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
-  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
-  // Glass blob state - smooth animation toward target
-  const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
-  // Slide-up menu state
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
-  const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  const menuOpacity = useRef(new Animated.Value(0)).current;
-  // Background colors - explicitly set
-  const bgColor = '#000000'; // Pitch black
-  const bgColorLightened = '#080808'; // ~5% lighter than black
-  // Background color animation: 0 = bgColor, 1 = bgColorLightened
-  const bgColorAnim = useRef(new Animated.Value(0)).current;
-  const [currentBgColor, setCurrentBgColor] = useState(bgColor);
-  // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
-  const orbCenterOpacity = useRef(new Animated.Value(1)).current;
-  const orbCenterScale = useRef(new Animated.Value(1)).current;
-  const orbTopOpacity = useRef(new Animated.Value(0)).current;
-  const orbTopScale = useRef(new Animated.Value(0)).current;
-  // Flag to track if we're manually closing the menu (to prevent useEffect from interfering)
-  const isManuallyClosingRef = useRef(false);
-
-  // Handler for double-tap-and-hold
-  const handlePressIn = (event: any) => {
-    const now = Date.now();
-    const { locationX, locationY } = event.nativeEvent;
-    const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
-    const { height: screenH } = Dimensions.get('window');
-    
-    // If menu is open, handle single tap to close
-    if (showMenu) {
-      // Check if tap is outside menu (in top 30% area)
-      const tapY = locationY;
-      const menuTopY = screenH * 0.30;
-      if (tapY < menuTopY) {
-        // Tap is outside menu - close it
-        closeMenu();
-        return;
-      }
-      // If tap is inside menu, let menu handle it (don't interfere)
-      return;
-    }
-    
-    if (now - lastTapRef.current < 350) {
-      // Double-tap detected
-      activeTouchIdRef.current = touchId;
-      setShowLines(true);
-      setTapPosition({ x: locationX, y: locationY });
-      setJoystickOrigin({ x: locationX, y: locationY });
-      setFingerPosition({ x: locationX, y: locationY });
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-    } else {
-      // First tap
-      lastTapRef.current = now;
-      // Reset if no second tap within 350ms
-      tapTimeoutRef.current = setTimeout(() => {
-        lastTapRef.current = 0;
-      }, 350);
-      setTapPosition(null);
-      setJoystickOrigin(null);
-      setFingerPosition(null);
-    }
-  };
-  const handlePressOut = (event?: any) => {
-    // Only respond if this is the active touch or if no active touch is set
-    if (activeTouchIdRef.current !== null && event) {
-      const touchId = event.nativeEvent?.identifier || event.nativeEvent?.changedTouches?.[0]?.identifier;
-      if (touchId !== undefined && touchId !== activeTouchIdRef.current) {
-        return; // Ignore other touches
-      }
-    }
-    
-    // Check if we have a selected needle before clearing state
-    const hadSelection = selectedNeedle !== null;
-    
-    setShowLines(false);
-    setTapPosition(null);
-    setFingerPosition(null);
-    setJoystickOrigin(null);
-    activeTouchIdRef.current = null;
-    // Explicitly reset selection
-    setSelectedNeedle(null);
-    // Reset animations immediately
-    iconScaleAnim.forEach((anim) => {
-      anim.setValue(0);
-    });
-    iconOpacityAnim.forEach((anim) => {
-      anim.setValue(0);
-    });
-    // Reset blob
-    setBlobOffset({ x: 0, y: 0 });
-    
-    // Open menu only if we released while a needle was selected
-    if (hadSelection) {
-      // Start from -10% y offset and 0 opacity, then animate in
-      const screenH = Dimensions.get('window').height;
-      const menuHeight = screenH * 0.7; // Menu takes 70% of screen (30% at top)
-      const startY = menuHeight * 0.1; // -10% offset
-      menuSlideAnim.setValue(startY);
-      menuOpacity.setValue(0);
-      setMenuSelectedNeedle(selectedNeedle);
-      setShowMenu(true);
-      // Animate background color to lighter black when menu opens
-      Animated.timing(bgColorAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: false,
-        easing: Easing.out(Easing.ease),
-      }).start();
-      // Animate menu slide and opacity
-      Animated.parallel([
-        Animated.timing(menuSlideAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.timing(menuOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-      ]).start();
-      // Sequential orb fade: first fade out center completely (with shrink), then fade in top (with grow)
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(orbCenterOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterScale, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(orbTopOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbTopScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-      ]).start();
-    }
-  };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
-  
-  // Animate orb visibility when menu closes (fade out top, then fade in center)
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    if (!showMenu && !isManuallyClosingRef.current) {
-      // Get current values from the drag state
-      const currentTopOpacity = (orbTopOpacity as any)._value || 0;
-      const currentCenterOpacity = (orbCenterOpacity as any)._value || 0;
-      
-      // Always animate smoothly from current state to final state
-      // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(orbTopOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbTopScale, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(orbCenterOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-      ]).start(() => {
-        if (!isMountedRef.current) return;
-        // After animation completes, ensure top orb stays at 0 and center at 1
-        // This prevents any flash-back
-        orbTopOpacity.setValue(0);
-        orbCenterOpacity.setValue(1);
-        orbTopScale.setValue(0);
-        orbCenterScale.setValue(1);
-      });
-    }
-  }, [showMenu]);
-
-  // Lock orb states when menu closes
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    if (!showMenu) {
-      // When menu closes, only lock orb states if we're not manually closing (to allow animation to complete)
-      if (!isManuallyClosingRef.current) {
-        orbTopOpacity.setValue(0);
-        orbCenterOpacity.setValue(1);
-        orbTopScale.setValue(0);
-        orbCenterScale.setValue(1);
-      }
-    }
-  }, [showMenu]);
-  
-  // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
-  const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
 
   const bufferRef = useRef<{x: number, y: number, z: number}[]>([]);
   const magnetometerRef = useRef<{x: number, y: number, z: number} | null>(null);
@@ -293,28 +21,23 @@ export default function ModeZero() {
 
 
   const [isFocused, setIsFocused] = useState(true);
-  const isMountedRef = useRef(true);
   useFocusEffect(
     React.useCallback(() => {
-      isMountedRef.current = true;
       setIsFocused(true);
       const sub = Magnetometer.addListener(data => {
-        if (!isMountedRef.current) return;
         bufferRef.current.push(data);
         if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
         magnetometerRef.current = data;
       });
       Magnetometer.setUpdateInterval(24);
       const interval = setInterval(() => {
-        if (!isMountedRef.current) return;
         setBuffer([...bufferRef.current]);
         setMagnetometer(magnetometerRef.current);
       }, 33);
       return () => {
-        isMountedRef.current = false;
+        setIsFocused(false);
         sub && sub.remove();
         clearInterval(interval);
-        // Don't update state during unmount to avoid hooks mismatch
       };
     }, [])
   );
@@ -341,712 +64,179 @@ export default function ModeZero() {
     setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
   }, [buffer]);
 
-  // Interpolate between colors for smooth transitions
-  const prevRGBRef = useRef<[number, number, number]>([0, 0, 0]);
-  let r = 0, g = 0, b = 0;
-  if (magnetometer !== null) {
-    const norm = (val: number, min: number, max: number) => {
-      if (max === min) return 0.5;
-      return Math.max(0, Math.min(1, (val - min) / (max - min)));
-    };
-    r = Math.round(norm(magnetometer.x, minMax.minX, minMax.maxX) * 255);
-    g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
-    b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
-  }
-  // Blend previous and current RGB
-  const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
-  const prev = prevRGBRef.current;
-  const smoothR = Math.round(prev[0] * (1 - blend) + r * blend);
-  const smoothG = Math.round(prev[1] * (1 - blend) + g * blend);
-  const smoothB = Math.round(prev[2] * (1 - blend) + b * blend);
-  prevRGBRef.current = [smoothR, smoothG, smoothB];
-  const currentPixel = `rgb(${smoothR},${smoothG},${smoothB})`;
+  // Helper to normalize magnetometer values to [-1, +1]
+  const norm = (val: number, min: number, max: number) => {
+    if (max === min) return 0;
+    // Map val from [min, max] to [-1, +1]
+    return ((val - min) / (max - min)) * 2 - 1;
+  };
 
+  // Kernel is last 9 magnetometer samples (flattened)
+  const KERNEL_SIZE = 3;
+  // No need for random kernel, will use convBuffer
+
+  // Buffer for last 9 magnetometer readings
+  const [convBuffer, setConvBuffer] = useState<{x: number, y: number, z: number}[]>([]);
+
+  // On each magnetometer update, add to convBuffer, keep last 9
+  useEffect(() => {
+    if (magnetometer) {
+      setConvBuffer(prev => {
+        const next = [...prev, magnetometer];
+        if (next.length > 9) next.shift();
+        return next;
+      });
+    }
+  }, [magnetometer]);
+
+
+  // 16x16 grid setup
+  // 24x24 grid setup
+  const GRID_SIZE = 24;
+  const squareSize = screenWidth / GRID_SIZE;
+
+  // Helper to create a new random grid
+  const createRandomGrid = () =>
+    Array.from({ length: GRID_SIZE }, () =>
+      Array.from({ length: GRID_SIZE }, () => Math.random())
+    );
+
+  // Initial randomized grid
+  const [imageGrid, setImageGrid] = useState<number[][]>(createRandomGrid);
+
+  // Double-tap handler to reset grid
+  const lastTapRef = useRef<number>(0);
+  const handleGridTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap detected
+      setImageGrid(createRandomGrid());
+    }
+    lastTapRef.current = now;
+  };
+
+  // On each update, apply convolution using convBuffer as kernel
+  useEffect(() => {
+    if (convBuffer.length < 9) return;
+    // Normalize kernel values to [-1, 1] using instantaneous group of 9
+    const xs = convBuffer.map(sample => sample.x);
+    const minK = Math.min(...xs);
+    const maxK = Math.max(...xs);
+    const flatKernel = xs.map(x => {
+      if (maxK === minK) return 0;
+      return ((x - minK) / (maxK - minK)) * 2 - 1;
+    });
+    setImageGrid(prevGrid => {
+      // For each cell, apply 3x3 conv with kernel
+      const newGrid = prevGrid.map((row, r) =>
+        row.map((val, c) => {
+          let acc = 0;
+          let k = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const rr = r + dr;
+              const cc = c + dc;
+              if (rr >= 0 && rr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
+                acc += prevGrid[rr][cc] * flatKernel[k];
+              }
+              k++;
+            }
+          }
+          // Clamp and normalize
+          return Math.max(0, Math.min(1, acc));
+        })
+      );
+      // If all values are zero, reinitialize
+      const allZero = newGrid.every(row => row.every(v => v === 0));
+      if (allZero) {
+        return createRandomGrid();
+      }
+      return newGrid;
+    });
+  }, [convBuffer, minMax]);
 
   if (!isFocused) {
-  return <View style={{ flex: 1, backgroundColor: '#000' }} />;
-  }
-  // Render a single centered circle with the latest value color
-  // Outer ring logic
-  const baseRadius = Math.min(screenWidth, canvasHeight) / 6;
-  const innerRadius = baseRadius * 0.5; // 50% smaller
-  const minRadius = innerRadius;
-  const maxRadius = innerRadius * 1.333;
-  const avgRGB = (smoothR + smoothG + smoothB) / 3;
-  const ringRadius = minRadius + ((maxRadius - minRadius) * (avgRGB / 255));
-  const ringThickness = 1.5;
-
-  const centerX = screenWidth / 2;
-  const centerY = canvasHeight / 2;
-
-  // Dial tick rendering
-  const tickThickness = 2.5; // thicker lines
-  const tickColor = 'rgba(216,216,216,0.45)'; // silvery and faded
-  // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
-  const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
-  // Needles array with explicit angles
-  const needles: { angle: number; Title: string; icon: 'description' | 'settings' }[] = [
-    { angle: 0, Title: 'Hi', icon: 'settings' },      // Left needle (0 degrees) - Settings
-    { angle: 180, Title: 'There', icon: 'description' },    // Right needle (180 degrees) - Docs
-  ];
-  // Convert degrees to radians
-  const degToRad = (deg: number) => deg * Math.PI / 180;
-  // Calculate tick positions
-  // Helper to find intersection with viewport edge
-  function getEdgeIntersection(angleRad: number) {
-    // Calculate intersection with screen bounds
-    const dx = Math.cos(angleRad);
-    const dy = Math.sin(angleRad);
-    let tArray = [];
-    // Left edge (x=0)
-    if (dx !== 0) {
-      const t = (0 - centerX) / dx;
-      const y = centerY + t * dy;
-      if (y >= 0 && y <= canvasHeight) tArray.push(t);
-    }
-    // Right edge (x=screenWidth)
-    if (dx !== 0) {
-      const t = (screenWidth - centerX) / dx;
-      const y = centerY + t * dy;
-      if (y >= 0 && y <= canvasHeight) tArray.push(t);
-    }
-    // Top edge (y=0)
-    if (dy !== 0) {
-      const t = (0 - centerY) / dy;
-      const x = centerX + t * dx;
-      if (x >= 0 && x <= screenWidth) tArray.push(t);
-    }
-    // Bottom edge (y=canvasHeight)
-    if (dy !== 0) {
-      const t = (canvasHeight - centerY) / dy;
-      const x = centerX + t * dx;
-      if (x >= 0 && x <= screenWidth) tArray.push(t);
-    }
-    // Find the closest positive t (outward from center)
-    const tEdge = Math.max(...tArray.filter(t => t > 0));
-    return {
-      x: centerX + tEdge * dx,
-      y: centerY + tEdge * dy,
-      t: tEdge,
-      dx,
-      dy,
-    };
+    return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
 
-  // Highlight logic for nearest needle (with animation)
-  let highlightIdx: number | null = null;
-  let highlightProps = { fill: tickColor, scale: 1 };
-  // Joystick state for highlight
-  let joystickAngle: number | null = null;
-  let joystickAtMax = false;
-  let targetOffset = { x: 0, y: 0 };
-  // Always interpolate to target scale/brightness, even when unselected
-  let targetNeedleIdx: number | null = null;
-  if (showLines && joystickOrigin && fingerPosition) {
-    let origin = joystickOrigin;
-    const dx = fingerPosition.x - origin.x;
-    const dy = fingerPosition.y - origin.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = 20; // Increased for bigger range
-    const closeDist = 15; // Distance threshold for bouncing back (bigger resting spot)
-    const driftDist = maxDist * 2;
-    
-    // If within close distance, bounce back and don't select
-    if (dist < closeDist) {
-      targetOffset = { x: 0, y: 0 };
-      targetNeedleIdx = null;
-    } else {
-      if (dist > driftDist) {
-        const driftFrac = 0.18;
-        origin = {
-          x: origin.x + (fingerPosition.x - origin.x) * driftFrac,
-          y: origin.y + (fingerPosition.y - origin.y) * driftFrac,
-        };
-        setJoystickOrigin(origin);
-      }
-      const moveDist = Math.min(dist, maxDist);
-      const angleRad = Math.atan2(dy, dx);
-      targetOffset.x = Math.cos(angleRad) * moveDist;
-      targetOffset.y = Math.sin(angleRad) * moveDist;
-      // Selection threshold matches visibility threshold (distRatio >= 0.15)
-      const visibilityThreshold = maxDist * 0.15;
-      joystickAtMax = dist >= visibilityThreshold;
-      if (joystickAtMax) {
-        joystickAngle = (angleRad * 180 / Math.PI);
-        if (joystickAngle < 0) joystickAngle += 360;
-        let minDiff = 999;
-        needles.forEach((needle, idx) => {
-          let diff = Math.abs(needle.angle - joystickAngle!);
-          if (diff > 180) diff = 360 - diff;
-          if (diff < minDiff) {
-            minDiff = diff;
-            targetNeedleIdx = idx;
-          }
-        });
-      }
-    }
-  } else {
-    targetOffset = { x: 0, y: 0 };
-    targetNeedleIdx = null;
-  }
+  // Map [0, 1] to [0, 255] for display
+  const mapColor = (v: number) => Math.round(v * 255);
 
-  // Bounce fade-in animation when icons first appear
-  useEffect(() => {
-    if (showLines) {
-      // Bounce fade-in animation
-      iconScaleAnim.forEach((anim) => {
-        anim.setValue(0);
-        Animated.sequence([
-          Animated.spring(anim, {
-            toValue: 1.3,
-            useNativeDriver: true,
-            friction: 4,
-            tension: 100,
-          }),
-          Animated.spring(anim, {
-            toValue: 1,
-            useNativeDriver: true,
-            friction: 6,
-            tension: 120,
-          }),
-        ]).start();
-      });
-      iconOpacityAnim.forEach((anim) => {
-        anim.setValue(0);
-        Animated.timing(anim, {
-          toValue: 0.65,
-          duration: 300,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }).start();
-      });
-    } else {
-      // Fade out when hiding
-      iconScaleAnim.forEach((anim) => {
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-          easing: Easing.in(Easing.ease),
-        }).start();
-      });
-      iconOpacityAnim.forEach((anim) => {
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-          easing: Easing.in(Easing.ease),
-        }).start();
-      });
-      setSelectedNeedle(null);
-    }
-  }, [showLines]);
-
-  // Animate icon scale and opacity for selection (only when icons are visible)
-  useEffect(() => {
-    if (!showLines) return;
-    iconScaleAnim.forEach((anim, idx) => {
-      Animated.spring(anim, {
-        toValue: targetNeedleIdx === idx ? 1.7 : 1,
-        useNativeDriver: true,
-        friction: 5,
-        tension: 120,
-      }).start();
-    });
-    iconOpacityAnim.forEach((anim, idx) => {
-      Animated.timing(anim, {
-        toValue: targetNeedleIdx === idx ? 0.85 : 0.65,
-        duration: 180,
-        useNativeDriver: true,
-        easing: Easing.inOut(Easing.ease),
-      }).start();
-    });
-    setSelectedNeedle(targetNeedleIdx);
-  }, [targetNeedleIdx, showLines]);
-
-  // Handle menu close when needed (e.g., if user taps outside)
-  const closeMenu = (currentDragY: number = 0) => {
-    // Set flag to prevent useEffect from interfering
-    isManuallyClosingRef.current = true;
-    
-    // Stop any ongoing orb animations to prevent conflicts
-    orbTopOpacity.stopAnimation();
-    orbTopScale.stopAnimation();
-    orbCenterOpacity.stopAnimation();
-    orbCenterScale.stopAnimation();
-    
-    // Force orbs to the "menu open" state first (top visible, center hidden)
-    // This ensures we always animate from the correct starting point
-    orbTopOpacity.setValue(1);
-    orbTopScale.setValue(1);
-    orbCenterOpacity.setValue(0);
-    orbCenterScale.setValue(0);
-    
-    // Animate menu closing: slide down and fade out
-    const screenH = Dimensions.get('window').height;
-    const menuHeight = screenH * 0.7; // Menu takes 70% of screen
-    const endY = menuHeight * 0.1; // Slide down to -10% offset
-    
-    // Start orb animations immediately (fade out top, fade in center)
-    // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(orbTopOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbTopScale, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(orbCenterOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbCenterScale, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-    ]).start(() => {
-      // After orb animation completes, ensure states are locked
-      orbTopOpacity.setValue(0);
-      orbCenterOpacity.setValue(1);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
-      // Reset flag after animation completes
-      isManuallyClosingRef.current = false;
-    });
-    
-    // Animate menu slide down and fade out
-    Animated.parallel([
-      Animated.timing(menuSlideAnim, {
-        toValue: endY,
-        duration: 200,
-        useNativeDriver: true,
-        easing: Easing.in(Easing.ease),
-      }),
-      Animated.timing(menuOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-        easing: Easing.in(Easing.ease),
-      }),
-    ]).start(() => {
-      // After animation completes, hide menu and reset values
-      setShowMenu(false);
-      setMenuSelectedNeedle(null);
-      menuSlideAnim.setValue(0);
-      menuOpacity.setValue(0);
-    });
-    
-    // Animate background color back to black smoothly
-    Animated.timing(bgColorAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: false,
-      easing: Easing.out(Easing.ease),
-    }).start();
-  };
-
-
-  // Animation loop for glass blob - smooth melting effect
-  useEffect(() => {
-    let running = true;
-    function animate() {
-      if (!running || !isMountedRef.current) return;
-      setBlobOffset(prev => {
-        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-        return {
-          x: lerp(prev.x, targetOffset.x, 0.25),
-          y: lerp(prev.y, targetOffset.y, 0.25)
-        };
-      });
-      if (running && isMountedRef.current) requestAnimationFrame(animate);
-    }
-    animate();
-    return () => { running = false; };
-  }, [targetOffset.x, targetOffset.y]);
-
-  // Render ticks as dots at the tips
-  const ticks = tickAngles.map((angle, idx) => {
-    const rad = degToRad(angle);
-    const edge = getEdgeIntersection(rad);
-    const dotRadius = selectedNeedle === idx ? 18 : 12;
-    const dotColor = selectedNeedle === idx
-      ? `rgba(255,255,255,0.85)`
-      : tickColor;
-    return (
-      <View
-        key={angle}
-        style={{
-          position: 'absolute',
-          left: edge.x - dotRadius,
-          top: edge.y - dotRadius,
-          width: dotRadius * 2,
-          height: dotRadius * 2,
-          backgroundColor: dotColor,
-          borderRadius: dotRadius,
-        }}
-      />
-    );
-  });
-
-  // Helper function to interpolate between two hex colors
-  const interpolateHexColor = (color1: string, color2: string, t: number): string => {
-    // Remove # and convert to RGB
-    const hex1 = color1.replace('#', '');
-    const hex2 = color2.replace('#', '');
-    const r1 = parseInt(hex1.substring(0, 2), 16);
-    const g1 = parseInt(hex1.substring(2, 4), 16);
-    const b1 = parseInt(hex1.substring(4, 6), 16);
-    const r2 = parseInt(hex2.substring(0, 2), 16);
-    const g2 = parseInt(hex2.substring(2, 4), 16);
-    const b2 = parseInt(hex2.substring(4, 6), 16);
-    
-    // Interpolate
-    const r = Math.round(r1 + (r2 - r1) * t);
-    const g = Math.round(g1 + (g2 - g1) * t);
-    const b = Math.round(b1 + (b2 - b1) * t);
-    
-    // Convert back to hex
-    const toHex = (n: number) => n.toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  };
-
-  // Update background color from animated value
-  useEffect(() => {
-    const listenerId = bgColorAnim.addListener(({ value }) => {
-      // Interpolate between bgColor and bgColorLightened
-      const interpolatedColor = interpolateHexColor(bgColor, bgColorLightened, value);
-      setCurrentBgColor(interpolatedColor);
-    });
-    return () => {
-      bgColorAnim.removeListener(listenerId);
-    };
-  }, []);
-
-  // No animation for tap circle; render at joystickOrigin directly
-
+  // Render grid
   return (
-    <View
-      style={{ 
-        flex: 1, 
-        backgroundColor: currentBgColor,
-      }}
-      onStartShouldSetResponder={(evt) => {
-        // If menu is open, allow responder to handle taps outside menu
-        if (showMenu) {
-          const { height: screenH } = Dimensions.get('window');
-          const tapY = evt.nativeEvent.locationY;
-          const menuTopY = screenH * 0.30;
-          // Only capture taps in the top 30% area (outside menu)
-          return tapY < menuTopY;
-        }
-        // If already in selection mode, detect if another touch is starting
-        if (showLines) {
-          // Cancel selection if another touch occurs
-          handlePressOut();
-          return false;
-        }
-        // Allow gestures anywhere except left edge (let parent handle swipe gesture)
-        const touchX = evt.nativeEvent.locationX;
-        return touchX >= LEFT_EDGE_THRESHOLD;
-      }}
-      onMoveShouldSetResponder={(evt) => {
-        // If menu is open, don't move responder (let menu handle its own gestures)
-        if (showMenu) {
-          return false;
-        }
-        // Check for multiple touches during selection
-        if (showLines) {
-          const touches = evt.nativeEvent.touches || [];
-          if (touches.length > 1) {
-            // Multiple touches detected - cancel selection
-            handlePressOut();
-            return false;
-          }
-          return true; // Maintain responder during selection
-        }
-        return false;
-      }}
-      onResponderGrant={handlePressIn}
-      onResponderRelease={handlePressOut}
-      onResponderTerminate={handlePressOut}
-      onResponderMove={event => {
-        // Don't handle move if menu is open
-        if (showMenu) {
-          return;
-        }
-        if (showLines && tapPosition) {
-          // Check for multiple touches
-          const touches = event.nativeEvent.touches || [];
-          if (touches.length > 1) {
-            // Multiple touches detected - cancel selection
-            handlePressOut();
-            return;
-          }
-          const { locationX, locationY } = event.nativeEvent;
-          setFingerPosition({ x: locationX, y: locationY });
-        }
-      }}
-    >
-  {/* No outer-most tick circles, just icons for those positions */}
-      {/* Center orb - at center position */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: centerX - ringRadius,
-          top: centerY - ringRadius,
-          width: ringRadius * 2,
-          height: ringRadius * 2,
-          borderRadius: ringRadius,
-          borderWidth: ringThickness,
-          borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
-          backgroundColor: 'transparent',
-          opacity: orbCenterOpacity,
-          transform: [{ scale: orbCenterScale }],
-        }}
-      />
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: centerX - innerRadius,
-          top: centerY - innerRadius,
-          width: innerRadius * 2,
-          height: innerRadius * 2,
-          borderRadius: innerRadius,
-          backgroundColor: currentPixel,
-          opacity: orbCenterOpacity,
-          transform: [{ scale: orbCenterScale }],
-        }}
-      />
-      {/* Top orb - at top position (16% from top, centered in 30% top region) */}
-      {(() => {
-        const topY = screenHeight * 0.16 + (ringRadius * 0.3);
-        return (
-          <>
-            <Animated.View
-              style={{
-                position: 'absolute',
-                left: centerX - ringRadius,
-                top: topY - ringRadius,
-                width: ringRadius * 2,
-                height: ringRadius * 2,
-                borderRadius: ringRadius,
-                borderWidth: ringThickness,
-                borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
-                backgroundColor: 'transparent',
-                opacity: orbTopOpacity,
-                transform: [{ scale: orbTopScale }],
-              }}
-            />
-            <Animated.View
-              style={{
-                position: 'absolute',
-                left: centerX - innerRadius,
-                top: topY - innerRadius,
-                width: innerRadius * 2,
-                height: innerRadius * 2,
-                borderRadius: innerRadius,
-                backgroundColor: currentPixel,
-                opacity: orbTopOpacity,
-                transform: [{ scale: orbTopScale }],
-              }}
-            />
-          </>
-        );
-      })()}
-      {/* Control point circle - hidden */}
-      {/* Simple circle that extends from center in joystick direction */}
-      {showLines && (blobOffset.x !== 0 || blobOffset.y !== 0) && (() => {
-        const dist = Math.sqrt(blobOffset.x * blobOffset.x + blobOffset.y * blobOffset.y);
-        const angle = Math.atan2(blobOffset.y, blobOffset.x);
-        // Circle extends from center in the direction of joystick
-        const maxDist = 20; // Match the activation threshold
-        const distRatio = Math.min(dist / maxDist, 1); // 0 to 1
-        // Blend into main circle: smaller and more transparent when close
-        const baseRadius = innerRadius * 0.4;
-        const circleRadius = baseRadius * (0.3 + distRatio * 0.7); // Scale from 30% to 100%
-        // Position selector circle center on the circumference of the main circle
-        const circleDistance = innerRadius;
-        const circleX = centerX + Math.cos(angle) * circleDistance;
-        const circleY = centerY + Math.sin(angle) * circleDistance;
-        // Opacity blends from 0.2 (close) to 0.5 (far)
-        const opacity = 0.2 + distRatio * 0.3;
-        
-        // Don't render if too small (when distRatio is very low)
-        if (distRatio < 0.15) {
-          return null;
-        }
-        
-        return (
-          <View
-            style={{
-              position: 'absolute',
-              left: circleX - circleRadius,
-              top: circleY - circleRadius,
-              width: circleRadius * 2,
-              height: circleRadius * 2,
-              borderRadius: circleRadius,
-              backgroundColor: `rgba(${smoothR},${smoothG},${smoothB},${opacity})`,
-            }}
-          />
-        );
-      })()}
-      {/* Render needle titles at the tip of each needle, only when needles are shown */}
-      {showLines && needles.map((needle, i) => {
-        const rad = degToRad(needle.angle);
-        const edge = getEdgeIntersection(rad);
-        const distToCenter = Math.sqrt(
-          Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
-        );
-        // Move icons closer to center: 55% of the way from center to edge
-        let tickLength = distToCenter * 0.55;
-        const tipX = centerX + Math.cos(rad) * tickLength;
-        const tipY = centerY + Math.sin(rad) * tickLength;
-        // Icon size: normal 32, enlarged 32*1.36=43.52
-        const iconSize = 32;
-        return (
-          <Animated.View
-            key={needle.Title}
-            style={{
-              position: 'absolute',
-              left: tipX - iconSize / 2,
-              top: tipY - iconSize / 2,
-              width: iconSize,
-              height: iconSize,
-              alignItems: 'center',
-              justifyContent: 'center',
-              transform: [{ scale: iconScaleAnim[i].interpolate({ inputRange: [1, 1.7], outputRange: [1, 1.36] }) }],
-              opacity: iconOpacityAnim[i],
-            }}
-          >
-            <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
-          </Animated.View>
-        );
-      })}
-      {/* Transparent overlay to detect taps outside menu */}
-      {showMenu && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: screenHeight * 0.30, // Top 30% area
-            backgroundColor: 'transparent',
-          }}
-          onStartShouldSetResponder={() => true}
-          onResponderRelease={() => {
-            // Close menu when tapping outside
-            closeMenu();
-          }}
-        />
-      )}
-      {/* Slide-up menu */}
-      {showMenu && (
-        <>
-          {/* Glow effect behind popover */}
-          <Animated.View
-            style={{
-              position: 'absolute',
-              bottom: -4,
-              left: -2,
-              right: -2,
-              top: screenHeight * 0.30 - 8,
-              borderTopLeftRadius: 35,
-              borderTopRightRadius: 35,
-              backgroundColor: 'transparent',
-              opacity: menuOpacity,
-              shadowColor: currentPixel,
-              shadowOffset: { width: 0, height: -12 },
-              shadowOpacity: 0.8,
-              shadowRadius: 35,
-              transform: [
-                { translateY: menuSlideAnim },
-              ],
-            }}
-          />
-          <Animated.View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              top: screenHeight * 0.30, // Leave 30% space at the top
-              backgroundColor: '#000',
-              borderTopLeftRadius: 35,
-              borderTopRightRadius: 35,
-              borderWidth: 1,
-              borderColor: currentPixel,
-              opacity: menuOpacity,
-              shadowColor: currentPixel,
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.4,
-              shadowRadius: 8,
-              transform: [
-                { translateY: menuSlideAnim },
-              ],
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
-              }}
-            >
-              {menuSelectedNeedle === 0 && <Settings />}
-              {menuSelectedNeedle === 1 && <Docs />}
+    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+      {/* Main grid with double-tap gesture */}
+      <TouchableWithoutFeedback onPress={handleGridTap}>
+        <View style={{ width: screenWidth, height: squareSize * GRID_SIZE, flexDirection: 'column' }}>
+          {imageGrid.map((row, r) => (
+            <View key={r} style={{ flexDirection: 'row' }}>
+              {row.map((val, c) => {
+                // Use grayscale for now, could extend to RGB
+                const color = `rgb(${mapColor(val)},${mapColor(val)},${mapColor(val)})`;
+                return (
+                  <View
+                    key={c}
+                    style={{
+                      width: squareSize,
+                      height: squareSize,
+                      backgroundColor: color,
+                      borderWidth: 0.25,
+                      borderColor: 'rgba(0,0,0,1.0)',
+                    }}
+                  />
+                );
+              })}
             </View>
-          </Animated.View>
-          {/* Black region at bottom 12% */}
-          <Animated.View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: screenHeight * 0.12,
-              backgroundColor: '#000',
-              opacity: menuOpacity,
-              transform: [
-                { translateY: menuSlideAnim },
-              ],
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              paddingTop: 16,
-              zIndex: 1000,
-            }}
-          >
-            <Pressable
-              onPress={() => closeMenu()}
-              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-              style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                minWidth: 120,
-                minHeight: 44,
-                zIndex: 1001,
-              }}
-            >
-              <Text style={{ color: '#888', fontWeight: '500', fontSize: 15, textAlign: 'center' }}>Dismiss</Text>
-            </Pressable>
-          </Animated.View>
-        </>
-      )}
+          ))}
+        </View>
+      </TouchableWithoutFeedback>
+      {/* Kernel grid below main grid */}
+      <View style={{ marginTop: 16 }}>
+        <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+          {/* Show kernel as 3x3 grid of last 9 magnetometer x values */}
+          {convBuffer.length === 9 && (
+            <View>
+              {Array.from({ length: 3 }).map((_, row) => (
+                <View key={row} style={{ flexDirection: 'row' }}>
+                  {Array.from({ length: 3 }).map((_, col) => {
+                    const idx = row * 3 + col;
+                    const sample = convBuffer[idx];
+                    return (
+                      <View
+                        key={col}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: '#222',
+                          borderWidth: 1,
+                          borderColor: 'rgba(0,0,0,0.3)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          margin: 1,
+                        }}
+                      >
+                        {/* Show normalized value between -1 and 1 */}
+                        {convBuffer.length === 9 && (
+                          <Text style={{ color: '#fff', fontSize: 10, textAlign: 'center' }}>
+                            {(() => {
+                              const xs = convBuffer.map(s => s.x);
+                              const minK = Math.min(...xs);
+                              const maxK = Math.max(...xs);
+                              if (maxK === minK) return '0.00';
+                              const normVal = ((sample.x - minK) / (maxK - minK)) * 2 - 1;
+                              return normVal.toFixed(2);
+                            })()}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
     </View>
   );
 }
