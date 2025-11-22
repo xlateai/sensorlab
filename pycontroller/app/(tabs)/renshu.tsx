@@ -1,8 +1,10 @@
-import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import TypeRacerScreen from '../subapps/renshu/typeracer';
 
 export default function RenshuScreen() {
   return (
-    <TypeRacerScreen></TypeRacerScreen>
+    <SafeAreaView style={{ flex: 1 }}>
+      <TypeRacerScreen></TypeRacerScreen>
+    </SafeAreaView>
   );
 }
