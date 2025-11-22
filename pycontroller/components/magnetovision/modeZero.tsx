@@ -3,7 +3,7 @@ import { Pressable } from 'react-native';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
-import { Svg, Circle, Line } from 'react-native-svg';
+import { Svg, Circle, Line, Defs, LinearGradient, Stop, Path } from 'react-native-svg';
 
 
 const PIXEL_WIDTH = 256;
@@ -132,7 +132,7 @@ export default function ModeZero() {
   const centerY = canvasHeight / 2;
 
   // Dial tick rendering
-  const tickThickness = 1.1; // slightly thinner
+  const tickThickness = 2.5; // thicker lines
   const tickColor = 'rgba(216,216,216,0.45)'; // silvery and faded
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -180,31 +180,34 @@ export default function ModeZero() {
     };
   }
 
-  const ticks = tickAngles.map(angle => {
+  // Triangle ticks with tip at inner end and thin base at outer edge
+  const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
-    // Distance from edge intersection to center
     const distToCenter = Math.sqrt(
       Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
     );
-    // Line length is 15% of that distance
-    const lineLength = distToCenter * 0.25;
-    // Start at edge intersection
-    const startX = edge.x;
-    const startY = edge.y;
-    // End point is inward toward center by 'lineLength' pixels
-    const endX = edge.x - edge.dx * lineLength;
-    const endY = edge.y - edge.dy * lineLength;
+    const tickLength = distToCenter * 0.25;
+    const tipX = edge.x - edge.dx * tickLength;
+    const tipY = edge.y - edge.dy * tickLength;
+    // Base width (super thin)
+    const baseWidth = 4; // px, adjust for thinness
+    // Perpendicular direction
+    const perpDx = -edge.dy;
+    const perpDy = edge.dx;
+    // Base points
+    const baseX1 = edge.x + perpDx * (baseWidth / 2);
+    const baseY1 = edge.y + perpDy * (baseWidth / 2);
+    const baseX2 = edge.x - perpDx * (baseWidth / 2);
+    const baseY2 = edge.y - perpDy * (baseWidth / 2);
+    // Triangle path
+    const trianglePath = `M${baseX1},${baseY1} L${baseX2},${baseY2} L${tipX},${tipY} Z`;
     return (
-      <Line
+      <Path
         key={angle}
-        x1={startX}
-        y1={startY}
-        x2={endX}
-        y2={endY}
-        stroke={tickColor}
-        strokeWidth={tickThickness}
-        strokeLinecap="round"
+        d={trianglePath}
+        fill={tickColor}
+        opacity={0.8}
       />
     );
   });
