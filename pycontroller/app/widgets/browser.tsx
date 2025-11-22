@@ -35,13 +35,6 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const inputAccessoryViewID = useRef(`addressBarAccessoryView-${Date.now()}-${Math.random()}`).current;
   const searchAccessoryViewID = useRef(`searchAccessoryView-${Date.now()}-${Math.random()}`).current;
 
-  // Check clipboard when component becomes visible
-  useEffect(() => {
-    if (isVisible) {
-      checkClipboard();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVisible]);
 
   // Update address bar when current URL changes
   useEffect(() => {
@@ -50,23 +43,29 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     }
   }, [currentUrl]);
 
-  const checkClipboard = async () => {
+  const checkClipboard = async (): Promise<string> => {
     try {
       const clipboardText = await Clipboard.getStringAsync();
       if (clipboardText && clipboardText.trim()) {
-        setClipboardContent(clipboardText.trim());
+        const trimmed = clipboardText.trim();
+        setClipboardContent(trimmed);
+        return trimmed;
       } else {
         setClipboardContent('');
+        return '';
       }
     } catch (error) {
       console.error('Error reading clipboard:', error);
       setClipboardContent('');
+      return '';
     }
   };
 
-  const handleOpenFromClipboard = () => {
-    if (clipboardContent) {
-      const trimmed = clipboardContent.trim();
+  const handleOpenFromClipboard = async () => {
+    // Check clipboard when button is clicked
+    const clipboardText = await checkClipboard();
+    if (clipboardText) {
+      const trimmed = clipboardText.trim();
       const normalized = normalizeUrl(trimmed);
       if (isValidUrl(normalized)) {
         // If it's a valid URL, navigate to it
@@ -188,8 +187,6 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     setCanGoBack(false);
     setCanGoForward(false);
     setIsInvalidUrl(false);
-    // Re-check clipboard when going home
-    checkClipboard();
   };
 
   const handleForward = () => {
@@ -239,17 +236,15 @@ export default function Browser({ isVisible = true }: BrowserProps) {
               </View>
               <Text style={styles.searchButtonText}>Search on Google</Text>
             </TouchableOpacity>
-            {clipboardContent && (
-              <TouchableOpacity
-                style={styles.clipboardButton}
-                onPress={handleOpenFromClipboard}
-              >
-                <View style={{ marginRight: 8 }}>
-                  <MaterialIcons name="content-paste" size={18} color="#fff" />
-                </View>
-                <Text style={styles.clipboardButtonText}>Open link from clipboard</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.clipboardButton}
+              onPress={handleOpenFromClipboard}
+            >
+              <View style={{ marginRight: 8 }}>
+                <MaterialIcons name="content-paste" size={18} color="#fff" />
+              </View>
+              <Text style={styles.clipboardButtonText}>Search from clipboard</Text>
+            </TouchableOpacity>
           </View>
           {/* Hidden search input that triggers keyboard with accessory view */}
           <TextInput
