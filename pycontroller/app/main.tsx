@@ -477,7 +477,7 @@ export default function Main() {
     }
     // Only play haptic when highlighting a new icon (not when unhighlighting)
     if (targetNeedleIdx !== null && targetNeedleIdx !== prevTargetNeedleIdxRef.current) {
-      playSimpleHaptic(0.6, 0.3, 0.1);
+      playSimpleHaptic(0.6, 0.5, 0.1);
     }
     prevTargetNeedleIdxRef.current = targetNeedleIdx;
   }, [targetNeedleIdx, showLines]);
