@@ -159,7 +159,7 @@ export default function ModeZero() {
   useEffect(() => {
     const centerX = screenWidth / 2;
     const centerY = canvasHeight / 2;
-    const topY = screenHeight * 0.1; // 10% from top
+    const topY = screenHeight * 0.13; // 13% from top
     
     if (showMenu) {
       // Move to top center: translate from center to top
