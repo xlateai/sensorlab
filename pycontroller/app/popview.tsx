@@ -60,6 +60,11 @@ export default function PopView({
   const isManuallyClosingRef = useRef(false);
   const isAnimatingRef = useRef(false);
   const hasMountedRef = useRef(false);
+  
+  // Track press state for quick tap detection
+  const pressStartTimeRef = useRef<number | null>(null);
+  const pressMovedRef = useRef<boolean>(false);
+  const pressStartPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // Use custom orientation detection hook
   const isBrowser = selectedNeedle === 3;
@@ -187,6 +192,55 @@ export default function PopView({
     });
   };
 
+  // Handle press start for quick tap detection
+  const handlePressIn = (event: any) => {
+    pressStartTimeRef.current = Date.now();
+    pressMovedRef.current = false;
+    const { pageX, pageY } = event.nativeEvent;
+    pressStartPositionRef.current = { x: pageX, y: pageY };
+  };
+
+  // Handle press end - only dismiss if it was a quick tap without movement
+  const handlePressOut = () => {
+    if (pressStartTimeRef.current === null) return;
+    
+    const pressDuration = Date.now() - pressStartTimeRef.current;
+    const MAX_TAP_DURATION = 200; // Maximum 200ms for a "quick tap"
+    const MAX_MOVE_DISTANCE = 10; // Maximum 10 pixels movement
+    
+    // Check if finger moved
+    let movedTooMuch = false;
+    if (pressStartPositionRef.current) {
+      // We can't get end position from onPressOut, so we rely on pressMovedRef
+      movedTooMuch = pressMovedRef.current;
+    }
+    
+    // Only dismiss if it was a quick tap and didn't move
+    if (pressDuration < MAX_TAP_DURATION && !movedTooMuch && !pressMovedRef.current) {
+      handleClose();
+    }
+    
+    // Reset press state
+    pressStartTimeRef.current = null;
+    pressMovedRef.current = false;
+    pressStartPositionRef.current = null;
+  };
+
+  // Handle touch move - mark as moved if finger moves
+  const handleTouchMove = (event: any) => {
+    if (pressStartPositionRef.current && pressStartTimeRef.current !== null) {
+      const { pageX, pageY } = event.nativeEvent;
+      const dx = Math.abs(pageX - pressStartPositionRef.current.x);
+      const dy = Math.abs(pageY - pressStartPositionRef.current.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Mark as moved if moved more than 10 pixels
+      if (distance > 10) {
+        pressMovedRef.current = true;
+      }
+    }
+  };
+
   if (selectedNeedle === null) {
     return null;
   }
@@ -205,10 +259,9 @@ export default function PopView({
           opacity: isVisible ? 1 : 0,
           pointerEvents: isVisible ? 'auto' : 'none',
         }}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleClose();
-        }}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onTouchMove={handleTouchMove}
       />
       {/* Slide-up menu */}
       {/* Glow effect behind popover */}
@@ -295,7 +348,7 @@ export default function PopView({
                     ],
                   }}
                 >
-                  <Browser isVisible={isVisible} />
+                  <Browser isVisible={isVisible} isLandscape={isLandscape} orientation={orientation} />
                 </Animated.View>
               </View>
             );
@@ -338,7 +391,9 @@ export default function PopView({
         pointerEvents={isVisible ? "box-none" : "none"}
       >
         <Pressable
-          onPress={handleClose}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          onTouchMove={handleTouchMove}
           hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           style={{
             alignItems: 'center',

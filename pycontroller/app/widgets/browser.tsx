@@ -15,9 +15,11 @@ try {
 
 interface BrowserProps {
   isVisible?: boolean;
+  isLandscape?: boolean;
+  orientation?: 'portrait' | 'landscape-left' | 'landscape-right';
 }
 
-export default function Browser({ isVisible = true }: BrowserProps) {
+export default function Browser({ isVisible = true, isLandscape = false, orientation = 'portrait' }: BrowserProps) {
   const [url, setUrl] = useState<string>('');
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [addressBarText, setAddressBarText] = useState<string>('');
@@ -34,6 +36,64 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const searchInputRef = useRef<TextInput>(null);
   const inputAccessoryViewID = useRef(`addressBarAccessoryView-${Date.now()}-${Math.random()}`).current;
   const searchAccessoryViewID = useRef(`searchAccessoryView-${Date.now()}-${Math.random()}`).current;
+  const lastOrientationRef = useRef(orientation);
+
+  // Reset viewport and zoom when orientation changes
+  useEffect(() => {
+    if (lastOrientationRef.current !== orientation && webViewRef.current) {
+      lastOrientationRef.current = orientation;
+      
+      // Inject JavaScript to reset viewport and zoom
+      const resetViewportScript = `
+        (function() {
+          // Reset viewport zoom
+          const viewport = document.querySelector('meta[name="viewport"]');
+          if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+          }
+          
+          // Reset body zoom and position
+          document.body.style.zoom = '1';
+          document.body.style.transform = 'scale(1)';
+          document.body.style.transformOrigin = 'center center';
+          
+          // Reset html zoom
+          document.documentElement.style.zoom = '1';
+          document.documentElement.style.transform = 'scale(1)';
+          document.documentElement.style.transformOrigin = 'center center';
+          
+          // Reset any video elements
+          const videos = document.querySelectorAll('video');
+          videos.forEach(video => {
+            video.style.width = '100%';
+            video.style.height = 'auto';
+            video.style.objectFit = 'contain';
+            video.style.transform = 'scale(1)';
+            video.style.transformOrigin = 'center center';
+          });
+          
+          // Reset iframes (like YouTube)
+          const iframes = document.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            iframe.style.width = '100%';
+            iframe.style.height = 'auto';
+            iframe.style.transform = 'scale(1)';
+            iframe.style.transformOrigin = 'center center';
+          });
+          
+          // Force a resize event
+          window.dispatchEvent(new Event('resize'));
+          window.dispatchEvent(new Event('orientationchange'));
+        })();
+        true;
+      `;
+      
+      // Small delay to ensure WebView is ready
+      setTimeout(() => {
+        webViewRef.current?.injectJavaScript(resetViewportScript);
+      }, 100);
+    }
+  }, [orientation]);
 
 
   // Update address bar when current URL changes
@@ -329,9 +389,26 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         allowsInlineMediaPlayback={true}
         // Prevent fullscreen video on Android
         allowsFullscreenVideo={false}
-        // Inject JavaScript to prevent YouTube fullscreen
+        // Inject JavaScript to prevent YouTube fullscreen and handle viewport
         injectedJavaScript={`
           (function() {
+            // Set proper viewport meta tag
+            let viewport = document.querySelector('meta[name="viewport"]');
+            if (!viewport) {
+              viewport = document.createElement('meta');
+              viewport.setAttribute('name', 'viewport');
+              document.head.appendChild(viewport);
+            }
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+            
+            // Reset zoom and position
+            document.body.style.zoom = '1';
+            document.body.style.transform = 'scale(1)';
+            document.body.style.transformOrigin = 'center center';
+            document.documentElement.style.zoom = '1';
+            document.documentElement.style.transform = 'scale(1)';
+            document.documentElement.style.transformOrigin = 'center center';
+            
             // Override fullscreen API to prevent YouTube from going fullscreen
             if (document.documentElement.requestFullscreen) {
               document.documentElement.requestFullscreen = function() {
@@ -374,6 +451,35 @@ export default function Browser({ isVisible = true }: BrowserProps) {
                 console.log('YouTube fullscreen command blocked');
               }
             }, true);
+            
+            // Listen for orientation changes and reset viewport
+            window.addEventListener('orientationchange', function() {
+              setTimeout(function() {
+                document.body.style.zoom = '1';
+                document.body.style.transform = 'scale(1)';
+                document.body.style.transformOrigin = 'center center';
+                document.documentElement.style.zoom = '1';
+                document.documentElement.style.transform = 'scale(1)';
+                document.documentElement.style.transformOrigin = 'center center';
+                
+                const videos = document.querySelectorAll('video');
+                videos.forEach(video => {
+                  video.style.width = '100%';
+                  video.style.height = 'auto';
+                  video.style.objectFit = 'contain';
+                  video.style.transform = 'scale(1)';
+                  video.style.transformOrigin = 'center center';
+                });
+                
+                const iframes = document.querySelectorAll('iframe');
+                iframes.forEach(iframe => {
+                  iframe.style.width = '100%';
+                  iframe.style.height = 'auto';
+                  iframe.style.transform = 'scale(1)';
+                  iframe.style.transformOrigin = 'center center';
+                });
+              }, 100);
+            });
             
             // Override YouTube player fullscreen button
             const observer = new MutationObserver(function(mutations) {
