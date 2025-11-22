@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, TextInput } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RainbowProgressBar } from '../subapps/renshu/rainbow-progress-bar';
+import CopyButton from '../subapps/renshu/copy-button';
 
 // Try to import WebView, fallback to a message if not available
 let WebView: any = null;
@@ -17,15 +19,28 @@ interface BrowserProps {
 
 export default function Browser({ isVisible = true }: BrowserProps) {
   const [url, setUrl] = useState<string>('');
+  const [currentUrl, setCurrentUrl] = useState<string>('');
+  const [addressBarText, setAddressBarText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [canGoBack, setCanGoBack] = useState<boolean>(false);
+  const [canGoForward, setCanGoForward] = useState<boolean>(false);
+  const webViewRef = useRef<any>(null);
 
   useEffect(() => {
     // Try to get URL from clipboard when component mounts or becomes visible
     if (isVisible) {
       loadFromClipboard();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
+
+  // Update address bar when current URL changes
+  useEffect(() => {
+    if (currentUrl) {
+      setAddressBarText(currentUrl);
+    }
+  }, [currentUrl]);
 
   const loadFromClipboard = async () => {
     try {
@@ -64,6 +79,44 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     return 'https://' + trimmed;
   };
 
+  const handleNavigate = (inputUrl: string) => {
+    const normalized = normalizeUrl(inputUrl);
+    if (isValidUrl(normalized)) {
+      setUrl(normalized);
+      setCurrentUrl(normalized);
+      setAddressBarText(normalized);
+    }
+  };
+
+  const handlePasteAndGo = async () => {
+    try {
+      const clipboardText = await Clipboard.getStringAsync();
+      if (clipboardText) {
+        handleNavigate(clipboardText.trim());
+      }
+    } catch (error) {
+      console.error('Error pasting from clipboard:', error);
+    }
+  };
+
+  const handleBack = () => {
+    if (webViewRef.current && canGoBack) {
+      webViewRef.current.goBack();
+    }
+  };
+
+  const handleForward = () => {
+    if (webViewRef.current && canGoForward) {
+      webViewRef.current.goForward();
+    }
+  };
+
+  const handleRefresh = () => {
+    if (webViewRef.current) {
+      webViewRef.current.reload();
+    }
+  };
+
   if (!WebView) {
     return (
       <View style={styles.container}>
@@ -95,6 +148,7 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         <View style={styles.loadingOverlay} pointerEvents="none" />
       )}
       <WebView
+        ref={webViewRef}
         source={{ uri: url }}
         style={styles.webview}
         startInLoadingState={true}
@@ -202,14 +256,84 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         onLoadProgress={(event: any) => {
           setLoadingProgress(event.nativeEvent.progress);
         }}
-        onLoadEnd={() => {
+        onLoadEnd={(event: any) => {
           setLoading(false);
           setLoadingProgress(1);
+          if (event.nativeEvent.url) {
+            setCurrentUrl(event.nativeEvent.url);
+          }
         }}
         onError={() => {
           setLoading(false);
         }}
+        onNavigationStateChange={(navState: any) => {
+          setCanGoBack(navState.canGoBack);
+          setCanGoForward(navState.canGoForward);
+          if (navState.url) {
+            setCurrentUrl(navState.url);
+          }
+        }}
       />
+      {/* Status bar at the bottom */}
+      <View style={styles.statusBar}>
+        {/* Navigation buttons */}
+        <View style={styles.navButtons}>
+          <TouchableOpacity
+            style={[styles.navButton, !canGoBack && styles.navButtonDisabled]}
+            onPress={handleBack}
+            disabled={!canGoBack}
+          >
+            <MaterialIcons 
+              name="arrow-back" 
+              size={20} 
+              color={canGoBack ? '#fff' : '#666'} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.navButton, !canGoForward && styles.navButtonDisabled]}
+            onPress={handleForward}
+            disabled={!canGoForward}
+          >
+            <MaterialIcons 
+              name="arrow-forward" 
+              size={20} 
+              color={canGoForward ? '#fff' : '#666'} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={handleRefresh}
+          >
+            <MaterialIcons name="refresh" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        {/* Address bar */}
+        <View style={styles.addressBarContainer}>
+          <TextInput
+            style={styles.addressBar}
+            value={addressBarText}
+            onChangeText={setAddressBarText}
+            onSubmitEditing={(e) => handleNavigate(e.nativeEvent.text)}
+            placeholder="Enter URL or paste"
+            placeholderTextColor="#666"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="go"
+          />
+          <TouchableOpacity
+            style={styles.pasteButton}
+            onPress={handlePasteAndGo}
+          >
+            <MaterialIcons name="content-paste" size={18} color="#fff" />
+          </TouchableOpacity>
+          <CopyButton
+            textToCopy={currentUrl || url}
+            size={18}
+            style={{ marginLeft: 4 }}
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -222,6 +346,63 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: '#000000',
+    marginBottom: 50, // Space for status bar
+  },
+  statusBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: '#111',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  navButtons: {
+    flexDirection: 'row',
+    marginRight: 8,
+  },
+  navButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#222',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  navButtonDisabled: {
+    opacity: 0.5,
+  },
+  addressBarContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 32,
+  },
+  addressBar: {
+    flex: 1,
+    height: 32,
+    backgroundColor: '#222',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: '#fff',
+    fontSize: 13,
+    marginRight: 4,
+  },
+  pasteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#222',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingBarContainer: {
     position: 'absolute',

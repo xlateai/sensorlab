@@ -14,6 +14,7 @@ import textExamplesJSONData from './assets/data/japanese_text_examples.json';
 import { InputAccessoryView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSimpleHaptic } from '@/app/haptics';
+import CopyButton from './copy-button';
 
 
 function BlinkingCursor({ style, buffer }: { style?: any, buffer: string }) {
@@ -78,8 +79,6 @@ export default function TypeRacerScreen({ isVisible = true }: TypeRacerScreenPro
   const [shuffleMode, setShuffleMode] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [example, setExample] = useState(Array.isArray(textExamplesJSONData) ? textExamplesJSONData[0] : null);
-  const [copied, setCopied] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   // Stats
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -160,7 +159,7 @@ export default function TypeRacerScreen({ isVisible = true }: TypeRacerScreenPro
   }, [currentIndex]);
   // Live timer for elapsed time and CPS
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+    let timer: any = null;
     if (status === 'typing' && startTime !== null) {
       timer = setInterval(() => {
         const now = Date.now();
@@ -373,39 +372,14 @@ export default function TypeRacerScreen({ isVisible = true }: TypeRacerScreenPro
                   </Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={{marginRight: 0, marginLeft: 7.2, paddingVertical: 5.4, paddingHorizontal: 9, borderRadius: 14.4, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center', height: 28.8}}
-                onPress={async () => {
-                  // Copy the current example's tokens, not the initial ones
-                  if (example && Array.isArray(example.tokens)) {
-                    await Clipboard.setStringAsync(example.tokens.map(o => o.string).join(''));
-                  } else {
-                    await Clipboard.setStringAsync('');
-                  }
-                  setCopied(true);
-                  Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                  }).start();
-                  setTimeout(() => {
-                    Animated.timing(fadeAnim, {
-                      toValue: 0,
-                      duration: 300,
-                      useNativeDriver: true,
-                    }).start(() => setCopied(false));
-                  }, 1000);
-                }}
-                accessibilityLabel={copied ? "Copied!" : "Copy sentence"}
-              >
-                {copied ? (
-                  <Animated.View style={{opacity: fadeAnim}}>
-                    <MaterialIcons name="check" size={16.2} color="#fff" />
-                  </Animated.View>
-                ) : (
-                  <MaterialIcons name="content-copy" size={16.2} color="#fff" />
-                )}
-              </TouchableOpacity>
+              <CopyButton
+                textToCopy={example && Array.isArray(example.tokens) 
+                  ? example.tokens.map(o => o.string).join('') 
+                  : ''}
+                size={16.2}
+                style={{marginRight: 0, marginLeft: 7.2}}
+                accessibilityLabel="Copy sentence"
+              />
             </View>
           </View>
           {/* Top flash box: only show completion message when completed, and only above the sentence display */}
