@@ -62,6 +62,9 @@ export default function ModeZero() {
   const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const menuPanY = useRef(new Animated.Value(0)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
+  // Background color animation: 0 = black (#000), 1 = dark gray (#0f0f0f)
+  const bgColorAnim = useRef(new Animated.Value(0)).current;
+  const [bgColor, setBgColor] = useState('#000');
   // Orb position animation - moves to top center when menu opens
   // Using translateX/translateY for native driver support
   const orbTranslateX = useRef(new Animated.Value(0)).current;
@@ -134,6 +137,12 @@ export default function ModeZero() {
       menuSlideAnim.setValue(startY);
       menuOpacity.setValue(0);
       setShowMenu(true);
+      // Set initial values for drag-responsive animations
+      const centerY = canvasHeight / 2;
+      const topY = screenHeight * 0.13;
+      const translateYValue = topY - centerY;
+      orbTranslateY.setValue(translateYValue);
+      bgColorAnim.setValue(1);
       // Animate both position and opacity simultaneously
       Animated.parallel([
         Animated.timing(menuSlideAnim, {
@@ -156,7 +165,7 @@ export default function ModeZero() {
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
   
-  // Animate orb position when menu opens/closes
+  // Animate orb position when menu opens/closes (initial animation only)
   useEffect(() => {
     const centerX = screenWidth / 2;
     const centerY = canvasHeight / 2;
@@ -241,6 +250,30 @@ export default function ModeZero() {
       });
     }
   }, [showMenu]);
+
+  // Make background color and orb position respond to drag in real-time
+  useEffect(() => {
+    if (!showMenu) return;
+    
+    const centerY = canvasHeight / 2;
+    const topY = screenHeight * 0.13;
+    const translateYValue = topY - centerY;
+    const threshold = screenHeight * 0.2; // Same threshold as dismiss
+    
+    const listenerId = menuPanY.addListener(({ value }) => {
+      // Interpolate background color: 0 drag = full light (#0f0f0f), threshold drag = black (#000)
+      const bgProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
+      bgColorAnim.setValue(bgProgress);
+      
+      // Interpolate orb position: 0 drag = top position, threshold drag = center (0)
+      const orbProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
+      orbTranslateY.setValue(translateYValue * orbProgress);
+    });
+    
+    return () => {
+      menuPanY.removeListener(listenerId);
+    };
+  }, [showMenu, canvasHeight, screenHeight]);
   
   // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
   const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
@@ -525,11 +558,13 @@ export default function ModeZero() {
     menuSlideAnim.stopAnimation();
     menuOpacity.stopAnimation();
     
-    // Just hide it instantly
+    // Background and orb position are already at correct values from drag listener
+    // Just hide the menu
     setShowMenu(false);
     menuPanY.setValue(0);
     menuSlideAnim.setValue(0);
     menuOpacity.setValue(0);
+    bgColorAnim.setValue(0);
   };
 
   // Pan responder for swipe-down to dismiss
@@ -557,9 +592,27 @@ export default function ModeZero() {
           // Dismiss menu immediately from current position (before flattening)
           closeMenu(currentDragY);
         } else {
-          // Snap back up instantly
+          // Snap back up and animate background/orb back to open state
           menuPanY.flattenOffset();
           menuPanY.setValue(0);
+          const centerY = canvasHeight / 2;
+          const topY = screenHeight * 0.13;
+          const translateYValue = topY - centerY;
+          // Animate back to open state
+          Animated.parallel([
+            Animated.timing(bgColorAnim, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: false,
+              easing: Easing.out(Easing.ease),
+            }),
+            Animated.timing(orbTranslateY, {
+              toValue: translateYValue,
+              duration: 200,
+              useNativeDriver: true,
+              easing: Easing.out(Easing.ease),
+            }),
+          ]).start();
         }
       },
     })
@@ -606,11 +659,27 @@ export default function ModeZero() {
     );
   });
 
+  // Update background color based on animation value
+  useEffect(() => {
+    const listenerId = bgColorAnim.addListener(({ value }) => {
+      // Interpolate: 0 = #000, 1 = #0f0f0f
+      const grayValue = Math.round(value * 15);
+      const hex = grayValue.toString(16).padStart(2, '0');
+      setBgColor(`#${hex}${hex}${hex}`);
+    });
+    return () => {
+      bgColorAnim.removeListener(listenerId);
+    };
+  }, []);
+
   // No animation for tap circle; render at joystickOrigin directly
 
   return (
     <View
-      style={{ flex: 1, backgroundColor: '#000' }}
+      style={{ 
+        flex: 1, 
+        backgroundColor: bgColor,
+      }}
       onStartShouldSetResponder={(evt) => {
         // If already in selection mode, detect if another touch is starting
         if (showLines) {
@@ -770,7 +839,7 @@ export default function ModeZero() {
             left: 0,
             right: 0,
             top: screenHeight * 0.20, // Leave 20% space at the top
-            backgroundColor: '#0f0f0f',
+            backgroundColor: '#000',
             borderTopLeftRadius: 35,
             borderTopRightRadius: 35,
             opacity: Animated.multiply(
