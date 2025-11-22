@@ -260,7 +260,7 @@ export default function ModeZero() {
     const dx = fingerPosition.x - origin.x;
     const dy = fingerPosition.y - origin.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = 18;
+    const maxDist = 15;
     const closeDist = 10; // Distance threshold for bouncing back
     const driftDist = maxDist * 2;
     
@@ -281,7 +281,9 @@ export default function ModeZero() {
       const angleRad = Math.atan2(dy, dx);
       targetOffset.x = Math.cos(angleRad) * moveDist;
       targetOffset.y = Math.sin(angleRad) * moveDist;
-      joystickAtMax = dist >= maxDist - 0.5;
+      // Selection threshold matches visibility threshold (distRatio >= 0.15)
+      const visibilityThreshold = maxDist * 0.15;
+      joystickAtMax = dist >= visibilityThreshold;
       if (joystickAtMax) {
         joystickAngle = (angleRad * 180 / Math.PI);
         if (joystickAngle < 0) joystickAngle += 360;
@@ -434,33 +436,18 @@ export default function ModeZero() {
           backgroundColor: currentPixel,
         }}
       />
-      {/* Control point circle */}
-      {showLines && joystickOrigin && (
-        <View
-          style={{
-            position: 'absolute',
-            left: joystickOrigin.x - 6,
-            top: joystickOrigin.y - 6,
-            width: 12,
-            height: 12,
-            borderRadius: 6,
-            backgroundColor: `rgba(${smoothR},${smoothG},${smoothB},0.6)`,
-            borderWidth: 1.5,
-            borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.8)`,
-          }}
-        />
-      )}
+      {/* Control point circle - hidden */}
       {/* Simple circle that extends from center in joystick direction */}
       {showLines && (blobOffset.x !== 0 || blobOffset.y !== 0) && (() => {
         const dist = Math.sqrt(blobOffset.x * blobOffset.x + blobOffset.y * blobOffset.y);
         const angle = Math.atan2(blobOffset.y, blobOffset.x);
         // Circle extends from center in the direction of joystick
-        const maxDist = 18;
+        const maxDist = 15;
         const distRatio = Math.min(dist / maxDist, 1); // 0 to 1
         // Blend into main circle: smaller and more transparent when close
         const baseRadius = innerRadius * 0.4;
         const circleRadius = baseRadius * (0.3 + distRatio * 0.7); // Scale from 30% to 100%
-        const circleDistance = innerRadius + dist * 0.5;
+        const circleDistance = innerRadius + dist * 0.3;
         const circleX = centerX + Math.cos(angle) * circleDistance;
         const circleY = centerY + Math.sin(angle) * circleDistance;
         // Opacity blends from 0.2 (close) to 0.5 (far)
