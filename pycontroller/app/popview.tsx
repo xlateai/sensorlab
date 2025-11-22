@@ -235,7 +235,7 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
-        pointerEvents={isVisible ? "box-none" : "none"}
+        pointerEvents={isVisible ? "auto" : "none"}
       >
         <View
           style={{

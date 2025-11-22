@@ -471,6 +471,11 @@ export default function Main() {
 
   // Determines if the main view should capture touch start events
   const shouldStartResponder = (evt: any): boolean => {
+    // Don't capture touches when menu is visible
+    if (showMenu) {
+      return false;
+    }
+    
     // Cancel selection if another touch starts during selection mode
     if (showLines) {
       handlePressOut();
@@ -484,6 +489,11 @@ export default function Main() {
 
   // Determines if the main view should capture touch move events
   const shouldMoveResponder = (evt: any): boolean => {
+    // Don't capture touches when menu is visible
+    if (showMenu) {
+      return false;
+    }
+    
     if (showLines) {
       const touches = evt.nativeEvent.touches || [];
       if (touches.length > 1) {

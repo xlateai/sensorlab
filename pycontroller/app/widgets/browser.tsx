@@ -80,6 +80,34 @@ export default function Browser() {
         source={{ uri: url }}
         style={styles.webview}
         startInLoadingState={true}
+        backgroundColor="#000000"
+        // Inject CSS to force dark mode and black background
+        injectedJavaScript={`
+          (function() {
+            const style = document.createElement('style');
+            style.innerHTML = \`
+              body {
+                background-color: #000000 !important;
+                color: #ffffff !important;
+              }
+              html {
+                background-color: #000000 !important;
+              }
+              * {
+                background-color: inherit;
+              }
+            \`;
+            document.head.appendChild(style);
+            
+            // Also set meta theme-color for browser UI
+            const meta = document.createElement('meta');
+            meta.name = 'theme-color';
+            meta.content = '#000000';
+            document.head.appendChild(meta);
+          })();
+          true; // note: this is required, or you'll sometimes get silent failures
+        `}
+        onMessage={() => {}}
       />
     </View>
   );
