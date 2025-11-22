@@ -65,12 +65,11 @@ export default function ModeZero() {
   // Background color animation: 0 = black (#000), 1 = dark gray (#0f0f0f)
   const bgColorAnim = useRef(new Animated.Value(0)).current;
   const [bgColor, setBgColor] = useState('#000');
-  // Orb position animation - moves to top center when menu opens
-  // Using translateX/translateY for native driver support
-  const orbTranslateX = useRef(new Animated.Value(0)).current;
-  const orbTranslateY = useRef(new Animated.Value(0)).current;
-  const orbOpacity = useRef(new Animated.Value(1)).current;
-  const orbScale = useRef(new Animated.Value(1)).current;
+  // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
+  const orbCenterOpacity = useRef(new Animated.Value(1)).current;
+  const orbCenterScale = useRef(new Animated.Value(1)).current;
+  const orbTopOpacity = useRef(new Animated.Value(0)).current;
+  const orbTopScale = useRef(new Animated.Value(1)).current;
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -138,12 +137,8 @@ export default function ModeZero() {
       menuOpacity.setValue(0);
       setShowMenu(true);
       // Set initial values for drag-responsive animations
-      const centerY = canvasHeight / 2;
-      const topY = screenHeight * 0.13;
-      const translateYValue = topY - centerY;
-      orbTranslateY.setValue(translateYValue);
       bgColorAnim.setValue(1);
-      // Animate both position and opacity simultaneously
+      // Fade out center orb, fade in top orb simultaneously
       Animated.parallel([
         Animated.timing(menuSlideAnim, {
           toValue: 0,
@@ -157,6 +152,18 @@ export default function ModeZero() {
           useNativeDriver: true,
           easing: Easing.out(Easing.ease),
         }),
+        Animated.timing(orbCenterOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.timing(orbTopOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
       ]).start();
     }
   };
@@ -165,115 +172,49 @@ export default function ModeZero() {
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
   
-  // Animate orb position when menu opens/closes (initial animation only)
+  // Animate orb visibility when menu closes (fade out top, fade in center)
   useEffect(() => {
-    const centerX = screenWidth / 2;
-    const centerY = canvasHeight / 2;
-    const topY = screenHeight * 0.13; // 13% from top
-    
-    if (showMenu) {
-      // Shrink to singularity and fade out, then move position instantly, then expand and fade in
-      const translateYValue = topY - centerY;
-      Animated.sequence([
-        // Shrink to point and fade out (super fast)
-        Animated.parallel([
-          Animated.timing(orbScale, {
-            toValue: 0,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.in(Easing.ease),
-          }),
-          Animated.timing(orbOpacity, {
-            toValue: 0,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.in(Easing.ease),
-          }),
-        ]),
-      ]).start(() => {
-        // Instantly move position (no animation) - happens in callback
-        orbTranslateX.setValue(0);
-        orbTranslateY.setValue(translateYValue);
-        // Expand from point and fade in (super fast)
-        Animated.parallel([
-          Animated.timing(orbScale, {
-            toValue: 1,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.ease),
-          }),
-          Animated.timing(orbOpacity, {
-            toValue: 1,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.ease),
-          }),
-        ]).start();
-      });
-    } else {
-      // Reverse: shrink, move back to center, expand
-      Animated.sequence([
-        // Shrink to point and fade out
-        Animated.parallel([
-          Animated.timing(orbScale, {
-            toValue: 0,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.in(Easing.ease),
-          }),
-          Animated.timing(orbOpacity, {
-            toValue: 0,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.in(Easing.ease),
-          }),
-        ]),
-      ]).start(() => {
-        // Instantly move position back to center - happens in callback
-        orbTranslateX.setValue(0);
-        orbTranslateY.setValue(0);
-        // Expand from point and fade in
-        Animated.parallel([
-          Animated.timing(orbScale, {
-            toValue: 1,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.ease),
-          }),
-          Animated.timing(orbOpacity, {
-            toValue: 1,
-            duration: 80,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.ease),
-          }),
-        ]).start();
-      });
+    if (!showMenu) {
+      // Fade out top orb, fade in center orb simultaneously
+      Animated.parallel([
+        Animated.timing(orbTopOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.timing(orbCenterOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+      ]).start();
     }
   }, [showMenu]);
 
-  // Make background color and orb position respond to drag in real-time
+  // Make background color and orb visibility respond to drag in real-time
   useEffect(() => {
     if (!showMenu) return;
     
-    const centerY = canvasHeight / 2;
-    const topY = screenHeight * 0.13;
-    const translateYValue = topY - centerY;
     const threshold = screenHeight * 0.2; // Same threshold as dismiss
     
     const listenerId = menuPanY.addListener(({ value }) => {
-      // Interpolate background color: 0 drag = full light (#0f0f0f), threshold drag = black (#000)
+      // Interpolate background color: 0 drag = full light (#111111), threshold drag = black (#000)
       const bgProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
       bgColorAnim.setValue(bgProgress);
       
-      // Interpolate orb position: 0 drag = top position, threshold drag = center (0)
+      // Interpolate orb visibility: 0 drag = top visible (1), center invisible (0)
+      // threshold drag = top invisible (0), center visible (1)
       const orbProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
-      orbTranslateY.setValue(translateYValue * orbProgress);
+      orbTopOpacity.setValue(orbProgress);
+      orbCenterOpacity.setValue(1 - orbProgress);
     });
     
     return () => {
       menuPanY.removeListener(listenerId);
     };
-  }, [showMenu, canvasHeight, screenHeight]);
+  }, [showMenu, screenHeight]);
   
   // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
   const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
@@ -595,9 +536,6 @@ export default function ModeZero() {
           // Snap back up and animate background/orb back to open state
           menuPanY.flattenOffset();
           menuPanY.setValue(0);
-          const centerY = canvasHeight / 2;
-          const topY = screenHeight * 0.13;
-          const translateYValue = topY - centerY;
           // Animate back to open state
           Animated.parallel([
             Animated.timing(bgColorAnim, {
@@ -606,8 +544,14 @@ export default function ModeZero() {
               useNativeDriver: false,
               easing: Easing.out(Easing.ease),
             }),
-            Animated.timing(orbTranslateY, {
-              toValue: translateYValue,
+            Animated.timing(orbTopOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+              easing: Easing.out(Easing.ease),
+            }),
+            Animated.timing(orbCenterOpacity, {
+              toValue: 0,
               duration: 200,
               useNativeDriver: true,
               easing: Easing.out(Easing.ease),
@@ -662,8 +606,8 @@ export default function ModeZero() {
   // Update background color based on animation value
   useEffect(() => {
     const listenerId = bgColorAnim.addListener(({ value }) => {
-      // Interpolate: 0 = #000, 1 = #0f0f0f
-      const grayValue = Math.round(value * 15);
+      // Interpolate: 0 = #000, 1 = #111111 (warmer, less blue tint)
+      const grayValue = Math.round(value * 17); // 17 = 0x11
       const hex = grayValue.toString(16).padStart(2, '0');
       setBgColor(`#${hex}${hex}${hex}`);
     });
@@ -722,7 +666,7 @@ export default function ModeZero() {
       }}
     >
   {/* No outer-most tick circles, just icons for those positions */}
-      {/* Outer ring (always visible) */}
+      {/* Center orb - at center position */}
       <Animated.View
         style={{
           position: 'absolute',
@@ -734,15 +678,10 @@ export default function ModeZero() {
           borderWidth: ringThickness,
           borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
           backgroundColor: 'transparent',
-          opacity: orbOpacity,
-          transform: [
-            { translateX: orbTranslateX },
-            { translateY: orbTranslateY },
-            { scale: orbScale },
-          ],
+          opacity: orbCenterOpacity,
+          transform: [{ scale: orbCenterScale }],
         }}
       />
-      {/* Center circle (stationary) */}
       <Animated.View
         style={{
           position: 'absolute',
@@ -752,14 +691,46 @@ export default function ModeZero() {
           height: innerRadius * 2,
           borderRadius: innerRadius,
           backgroundColor: currentPixel,
-          opacity: orbOpacity,
-          transform: [
-            { translateX: orbTranslateX },
-            { translateY: orbTranslateY },
-            { scale: orbScale },
-          ],
+          opacity: orbCenterOpacity,
+          transform: [{ scale: orbCenterScale }],
         }}
       />
+      {/* Top orb - at top position (13% from top) */}
+      {(() => {
+        const topY = screenHeight * 0.13;
+        return (
+          <>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                left: centerX - ringRadius,
+                top: topY - ringRadius,
+                width: ringRadius * 2,
+                height: ringRadius * 2,
+                borderRadius: ringRadius,
+                borderWidth: ringThickness,
+                borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
+                backgroundColor: 'transparent',
+                opacity: orbTopOpacity,
+                transform: [{ scale: orbTopScale }],
+              }}
+            />
+            <Animated.View
+              style={{
+                position: 'absolute',
+                left: centerX - innerRadius,
+                top: topY - innerRadius,
+                width: innerRadius * 2,
+                height: innerRadius * 2,
+                borderRadius: innerRadius,
+                backgroundColor: currentPixel,
+                opacity: orbTopOpacity,
+                transform: [{ scale: orbTopScale }],
+              }}
+            />
+          </>
+        );
+      })()}
       {/* Control point circle - hidden */}
       {/* Simple circle that extends from center in joystick direction */}
       {showLines && (blobOffset.x !== 0 || blobOffset.y !== 0) && (() => {
