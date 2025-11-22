@@ -548,7 +548,7 @@ export default function TypeRacerScreen({ isVisible = true }: TypeRacerScreenPro
               </View>
             </View>
           )}
-          {Platform.OS === 'ios' && inputFocused && isVisible && (
+          {Platform.OS === 'ios' && isVisible && (
             <InputAccessoryView nativeID={inputAccessoryViewID}>
               <View style={{width: '100%', alignItems: 'center', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: insets.bottom / 2, paddingTop: 0}}>
                 {/* Target flash display: shows next obj.string to type */}
