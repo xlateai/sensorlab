@@ -1,27 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import RangedSlider from '../../components/ui/ranged-slider';
+import { useRGBRange } from '../RGBRangeContext';
 
 const screenHeight = Dimensions.get('window').height;
 
 export default function Settings() {
-  const [rMin, setRMin] = useState(0);
-  const [rMax, setRMax] = useState(1);
-  const [gMin, setGMin] = useState(0);
-  const [gMax, setGMax] = useState(1);
-  const [bMin, setBMin] = useState(0);
-  const [bMax, setBMax] = useState(1);
+  const { range, setRange } = useRGBRange();
 
   return (
     <View style={styles.container}>
       <View style={styles.sliderRow}>
         <View style={styles.sliderContainer}>
           <RangedSlider
-            minValue={rMin}
-            maxValue={rMax}
+            minValue={range.rMin}
+            maxValue={range.rMax}
             onRangeChange={(min, max) => {
-              setRMin(min);
-              setRMax(max);
+              setRange({ ...range, rMin: min, rMax: max });
             }}
             trackColor="#ff0000"
             orientation="vertical"
@@ -29,11 +24,10 @@ export default function Settings() {
         </View>
         <View style={styles.sliderContainer}>
           <RangedSlider
-            minValue={gMin}
-            maxValue={gMax}
+            minValue={range.gMin}
+            maxValue={range.gMax}
             onRangeChange={(min, max) => {
-              setGMin(min);
-              setGMax(max);
+              setRange({ ...range, gMin: min, gMax: max });
             }}
             trackColor="#00ff00"
             orientation="vertical"
@@ -41,11 +35,10 @@ export default function Settings() {
         </View>
         <View style={styles.sliderContainer}>
           <RangedSlider
-            minValue={bMin}
-            maxValue={bMax}
+            minValue={range.bMin}
+            maxValue={range.bMax}
             onRangeChange={(min, max) => {
-              setBMin(min);
-              setBMax(max);
+              setRange({ ...range, bMin: min, bMax: max });
             }}
             trackColor="#0000ff"
             orientation="vertical"
