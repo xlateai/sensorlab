@@ -37,15 +37,14 @@ import { Animated } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { MediaControlCenter } from '../components/mediaControlCenter';
-import { ExampleInfoBar } from '../../components/ExampleInfoBar';
-import { RainbowProgressBar } from '../../components/ui/rainbow-progress-bar';
-import { playIncorrectHaptic, playCorrectHaptic } from '../../components/haptics-helper';
+import { TypeStatsBar } from './type-stats-bar';
 import { Transliterator } from './romaji-transliterator';
 import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import { FuriganaViewer } from './furigana-viewer';
 import textExamplesJSONData from './assets/data/japanese_text_examples.json';
 import { InputAccessoryView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { playSimpleHaptic } from '@/app/haptics';
 
 // Load the first example from japanese_text_examples.json
 const FIRST_EXAMPLE = Array.isArray(textExamplesJSONData) ? textExamplesJSONData[0] : null;
@@ -201,7 +200,7 @@ export default function TypeRacerScreen() {
       } else {
         currentIncorrect += text[i];
         if (!foundIncorrect && i === text.length - 1) {
-          playIncorrectHaptic();
+          playSimpleHaptic(0.6, 0.3, 0.1);
           setIncorrectCount(prev => prev + 1);
           incorrectPlayed = true;
           foundIncorrect = true;
@@ -210,7 +209,7 @@ export default function TypeRacerScreen() {
     }
     setLastIncorrect(currentIncorrect); // Show only the most recent incorrect sequence
     if (chunkCompletedOnLastChar) {
-      playCorrectHaptic();
+      playSimpleHaptic(0.6, 0.8, 0.1);
       setShowCompletedChunk(completedChunk);
     } else {
       setShowCompletedChunk('');
@@ -338,7 +337,7 @@ export default function TypeRacerScreen() {
         )}
   <ScrollView contentContainerStyle={[styles.scrollContainer, {paddingBottom: 192}] /* align scroll bottom with media area top */}>
           {/* Info bar at top of main area */}
-          <ExampleInfoBar
+          <TypeStatsBar
             level={example?.level}
             casual={example?.casual}
             index={currentIndex + 1}
