@@ -388,9 +388,11 @@ export default function ModeZero() {
         const distToCenter = Math.sqrt(
           Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
         );
-        let tickLength = distToCenter * 0.2;
-        const tipX = edge.x - edge.dx * tickLength;
-        const tipY = edge.y - edge.dy * tickLength;
+        // Move icons closer to center: 55% of the way from center to edge
+        let tickLength = distToCenter * 0.55;
+        const tipX = centerX + Math.cos(rad) * tickLength;
+        const tipY = centerY + Math.sin(rad) * tickLength;
+        // Icon size: normal 32, enlarged 32*1.36=43.52
         const iconSize = 32;
         return (
           <Animated.View
@@ -403,7 +405,7 @@ export default function ModeZero() {
               height: iconSize,
               alignItems: 'center',
               justifyContent: 'center',
-              transform: [{ scale: iconScaleAnim[i] }],
+              transform: [{ scale: iconScaleAnim[i].interpolate({ inputRange: [1, 1.7], outputRange: [1, 1.36] }) }],
               opacity: iconOpacityAnim[i],
             }}
           >
