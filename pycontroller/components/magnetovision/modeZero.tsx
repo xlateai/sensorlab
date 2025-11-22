@@ -262,7 +262,7 @@ export default function ModeZero() {
     let newScale = 1;
     let newBrightness = 0.45;
     if (joystickAtMax) {
-      joystickAngle = angleRad * 180 / Math.PI;
+      joystickAngle = angleRad * 180 / Math.PI + 90;
       if (joystickAngle < 0) joystickAngle += 360;
       // Find nearest tick
       if (joystickAngle !== null) {
@@ -328,7 +328,7 @@ export default function ModeZero() {
     return () => { running = false; };
   }, [targetOffset.x, targetOffset.y, targetNeedle.idx, targetNeedle.scale, targetNeedle.brightness]);
 
-  // Triangle ticks replaced with styled Views
+  // Triangle ticks replaced with styled Views, fixed orientation and position
   const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
@@ -343,21 +343,20 @@ export default function ModeZero() {
       baseWidth *= animatedNeedle.scale;
       fillColor = `rgba(255,255,255,${animatedNeedle.brightness})`;
     }
-    const tipX = edge.x - edge.dx * tickLength;
-    const tipY = edge.y - edge.dy * tickLength;
-    // Render as a thin rotated rectangle (tick)
+    // Position tick at center, rotate, and extend outward
     return (
       <View
         key={angle}
         style={{
           position: 'absolute',
-          left: edge.x - baseWidth / 2,
-          top: edge.y - tickLength,
+          left: centerX - baseWidth / 2,
+          top: centerY - tickLength,
           width: baseWidth,
           height: tickLength,
           backgroundColor: fillColor,
           borderRadius: baseWidth / 2,
           transform: [
+            { translateY: tickLength / 2 },
             { rotate: `${angle}deg` },
             { translateY: -tickLength / 2 },
           ],
@@ -365,6 +364,19 @@ export default function ModeZero() {
       />
     );
   });
+
+  // Animated value for tap circle position
+  const tapCircleAnim = useRef(new Animated.ValueXY()).current;
+  useEffect(() => {
+    if (joystickOrigin) {
+      Animated.spring(tapCircleAnim, {
+        toValue: { x: joystickOrigin.x - 12, y: joystickOrigin.y - 12 },
+        useNativeDriver: false,
+        speed: 12,
+        bounciness: 8,
+      }).start();
+    }
+  }, [joystickOrigin]);
 
   return (
     <View
@@ -381,19 +393,21 @@ export default function ModeZero() {
     >
       {/* Dial ticks (conditionally rendered) */}
       {showLines && ticks}
-      {/* Silver circle at second tap location */}
+      {/* Silver circle at second tap location, animated */}
       {showLines && joystickOrigin && (
-        <View
+        <Animated.View
           style={{
             position: 'absolute',
-            left: joystickOrigin.x - 12,
-            top: joystickOrigin.y - 12,
             width: 24,
             height: 24,
             borderRadius: 12,
             borderWidth: 1.2,
             borderColor: '#C0C0C0',
             backgroundColor: 'transparent',
+            transform: [
+              { translateX: tapCircleAnim.x },
+              { translateY: tapCircleAnim.y },
+            ],
           }}
         />
       )}
