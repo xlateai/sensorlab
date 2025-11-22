@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
 import PopView from './popview';
+import { playSimpleHaptic } from './haptics';
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
@@ -54,6 +55,8 @@ export default function Main() {
   const activeTouchIdRef = useRef<number | null>(null);
   // Animated state for circle and needle
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
+  // Track previous highlighted icon for haptic feedback
+  const prevTargetNeedleIdxRef = useRef<number | null>(null);
   const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
   const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
@@ -443,6 +446,19 @@ export default function Main() {
       }).start();
     });
     setSelectedNeedle(targetNeedleIdx);
+  }, [targetNeedleIdx, showLines]);
+
+  // Play haptic feedback when selector orb highlights an icon
+  useEffect(() => {
+    if (!showLines) {
+      prevTargetNeedleIdxRef.current = null;
+      return;
+    }
+    // Only play haptic when highlighting a new icon (not when unhighlighting)
+    if (targetNeedleIdx !== null && targetNeedleIdx !== prevTargetNeedleIdxRef.current) {
+      playSimpleHaptic(0.6, 0.3, 0.1);
+    }
+    prevTargetNeedleIdxRef.current = targetNeedleIdx;
   }, [targetNeedleIdx, showLines]);
 
   // Handle menu close when needed (e.g., if user taps outside)

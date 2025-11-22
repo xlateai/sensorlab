@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
 import Settings from './widgets/settings';
 import Docs from './widgets/docs';
+import { playChimeHaptic } from './haptics';
 
 interface PopViewProps {
   isVisible: boolean;
@@ -87,6 +88,9 @@ export default function PopView({
   // Handle menu open animation
   useEffect(() => {
     if (isVisible && selectedNeedle !== null) {
+      // Play chime haptic when opening popview
+      playChimeHaptic();
+      
       // Start from -10% y offset and 0 opacity, then animate in
       const startY = menuHeight * 0.1;
       menuSlideAnim.setValue(startY);
