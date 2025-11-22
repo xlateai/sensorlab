@@ -4,7 +4,7 @@ import { Text, Animated } from 'react-native';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
-import { Svg, Circle, Line, Defs, LinearGradient, Stop, Path } from 'react-native-svg';
+// Removed all SVG imports; will use only View and styles
 
 
 const PIXEL_WIDTH = 256;
@@ -170,10 +170,6 @@ export default function ModeZero() {
   const ringRadius = minRadius + ((maxRadius - minRadius) * (avgRGB / 255));
   const ringThickness = 1.5;
 
-  // Use react-native-svg for rendering
-  const Svg = require('react-native-svg').Svg;
-  const Circle = require('react-native-svg').Circle;
-
   const centerX = screenWidth / 2;
   const centerY = canvasHeight / 2;
 
@@ -332,14 +328,13 @@ export default function ModeZero() {
     return () => { running = false; };
   }, [targetOffset.x, targetOffset.y, targetNeedle.idx, targetNeedle.scale, targetNeedle.brightness]);
 
-  // Triangle ticks with tip at inner end and thin base at outer edge
+  // Triangle ticks replaced with styled Views
   const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
     const distToCenter = Math.sqrt(
       Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
     );
-    // Animated highlight
     let tickLength = distToCenter * 0.2;
     let baseWidth = 4;
     let fillColor = tickColor;
@@ -350,21 +345,23 @@ export default function ModeZero() {
     }
     const tipX = edge.x - edge.dx * tickLength;
     const tipY = edge.y - edge.dy * tickLength;
-    // Perpendicular direction
-    const perpDx = -edge.dy;
-    const perpDy = edge.dx;
-    // Base points
-    const baseX1 = edge.x + perpDx * (baseWidth / 2);
-    const baseY1 = edge.y + perpDy * (baseWidth / 2);
-    const baseX2 = edge.x - perpDx * (baseWidth / 2);
-    const baseY2 = edge.y - perpDy * (baseWidth / 2);
-    // Triangle path
-    const trianglePath = `M${baseX1},${baseY1} L${baseX2},${baseY2} L${tipX},${tipY} Z`;
+    // Render as a thin rotated rectangle (tick)
     return (
-      <Path
+      <View
         key={angle}
-        d={trianglePath}
-        fill={fillColor}
+        style={{
+          position: 'absolute',
+          left: edge.x - baseWidth / 2,
+          top: edge.y - tickLength,
+          width: baseWidth,
+          height: tickLength,
+          backgroundColor: fillColor,
+          borderRadius: baseWidth / 2,
+          transform: [
+            { rotate: `${angle}deg` },
+            { translateY: -tickLength / 2 },
+          ],
+        }}
       />
     );
   });
@@ -382,38 +379,50 @@ export default function ModeZero() {
         }
       }}
     >
-      <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {/* Dial ticks (conditionally rendered) */}
-        {showLines && ticks}
-        {/* Silver circle at second tap location */}
-        {showLines && joystickOrigin && (
-          <Circle
-            cx={joystickOrigin.x}
-            cy={joystickOrigin.y}
-            r={11.9}
-            fill="none"
-            stroke="#C0C0C0"
-            strokeWidth={1.2}
-          />
-        )}
-        {/* Outer ring (always visible) */}
-        <Circle
-          cx={centerX}
-          cy={centerY}
-          r={ringRadius}
-          fill="none"
-          stroke={`rgba(${smoothR},${smoothG},${smoothB},0.25)`}
-          strokeWidth={ringThickness}
+      {/* Dial ticks (conditionally rendered) */}
+      {showLines && ticks}
+      {/* Silver circle at second tap location */}
+      {showLines && joystickOrigin && (
+        <View
+          style={{
+            position: 'absolute',
+            left: joystickOrigin.x - 12,
+            top: joystickOrigin.y - 12,
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            borderWidth: 1.2,
+            borderColor: '#C0C0C0',
+            backgroundColor: 'transparent',
+          }}
         />
-        {/* Inner circle, joystick offset */}
-        {/* Animated inner circle, joystick offset */}
-        <Circle
-          cx={centerX + animatedOffset.x}
-          cy={centerY + animatedOffset.y}
-          r={innerRadius}
-          fill={currentPixel}
-        />
-      </Svg>
+      )}
+      {/* Outer ring (always visible) */}
+      <View
+        style={{
+          position: 'absolute',
+          left: centerX - ringRadius,
+          top: centerY - ringRadius,
+          width: ringRadius * 2,
+          height: ringRadius * 2,
+          borderRadius: ringRadius,
+          borderWidth: ringThickness,
+          borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
+          backgroundColor: 'transparent',
+        }}
+      />
+      {/* Inner circle, joystick offset */}
+      <View
+        style={{
+          position: 'absolute',
+          left: centerX + animatedOffset.x - innerRadius,
+          top: centerY + animatedOffset.y - innerRadius,
+          width: innerRadius * 2,
+          height: innerRadius * 2,
+          borderRadius: innerRadius,
+          backgroundColor: currentPixel,
+        }}
+      />
       {/* Render needle titles at the tip of each needle, only when needles are shown */}
       {showLines && needles.map((needle, i) => {
         const angle = tickAngles[needle.idx];
@@ -448,6 +457,6 @@ export default function ModeZero() {
           </Animated.View>
         );
       })}
-  </View>
+    </View>
   );
 }
