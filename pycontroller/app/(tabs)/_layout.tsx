@@ -31,13 +31,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="renshu"
-        options={{
-          title: '練習',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="character.book.closed" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="directional"
         options={{
           title: 'Heading',
