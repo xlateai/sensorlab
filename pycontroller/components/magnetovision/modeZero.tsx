@@ -262,7 +262,7 @@ export default function ModeZero() {
     let newScale = 1;
     let newBrightness = 0.45;
     if (joystickAtMax) {
-      joystickAngle = angleRad * 180 / Math.PI + 90;
+      joystickAngle = (angleRad * 180 / Math.PI) + 90;
       if (joystickAngle < 0) joystickAngle += 360;
       // Find nearest tick
       if (joystickAngle !== null) {
@@ -332,14 +332,12 @@ export default function ModeZero() {
   const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
-    const distToCenter = Math.sqrt(
-      Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
-    );
-    let tickLength = distToCenter * 0.2;
+    // Use a fixed tick length for all ticks
+    const uniformTickLength = Math.min(screenWidth, canvasHeight) / 7;
+    let tickLength = uniformTickLength;
     let baseWidth = 4;
     let fillColor = tickColor;
     if (animatedNeedle.idx === idx) {
-      tickLength *= animatedNeedle.scale;
       baseWidth *= animatedNeedle.scale;
       fillColor = `rgba(255,255,255,${animatedNeedle.brightness})`;
     }
