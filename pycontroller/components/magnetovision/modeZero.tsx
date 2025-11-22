@@ -65,9 +65,12 @@ export default function ModeZero() {
   const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
   const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
-  // Background color animation: 0 = black (#000), 1 = barely off-black (#050505)
+  // Background colors - explicitly set
+  const bgColor = '#000000'; // Pitch black
+  const bgColorLightened = '#050505'; // ~5% lighter than black
+  // Background color animation: 0 = bgColor, 1 = bgColorLightened
   const bgColorAnim = useRef(new Animated.Value(0)).current;
-  const [bgColor, setBgColor] = useState('#000000');
+  const [currentBgColor, setCurrentBgColor] = useState(bgColor);
   // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
   const orbCenterOpacity = useRef(new Animated.Value(1)).current;
   const orbCenterScale = useRef(new Animated.Value(1)).current;
@@ -700,13 +703,34 @@ export default function ModeZero() {
     );
   });
 
+  // Helper function to interpolate between two hex colors
+  const interpolateHexColor = (color1: string, color2: string, t: number): string => {
+    // Remove # and convert to RGB
+    const hex1 = color1.replace('#', '');
+    const hex2 = color2.replace('#', '');
+    const r1 = parseInt(hex1.substring(0, 2), 16);
+    const g1 = parseInt(hex1.substring(2, 4), 16);
+    const b1 = parseInt(hex1.substring(4, 6), 16);
+    const r2 = parseInt(hex2.substring(0, 2), 16);
+    const g2 = parseInt(hex2.substring(2, 4), 16);
+    const b2 = parseInt(hex2.substring(4, 6), 16);
+    
+    // Interpolate
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+    
+    // Convert back to hex
+    const toHex = (n: number) => n.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  };
+
   // Update background color from animated value
   useEffect(() => {
     const listenerId = bgColorAnim.addListener(({ value }) => {
-      // Interpolate from #000000 (value 0) to #050505 (value 1) - barely off-black
-      const grayValue = Math.round(value * 5); // 5 = 0x05 for barely perceptible lighter black
-      const hex = grayValue.toString(16).padStart(2, '0');
-      setBgColor(`#${hex}${hex}${hex}`);
+      // Interpolate between bgColor and bgColorLightened
+      const interpolatedColor = interpolateHexColor(bgColor, bgColorLightened, value);
+      setCurrentBgColor(interpolatedColor);
     });
     return () => {
       bgColorAnim.removeListener(listenerId);
@@ -719,7 +743,7 @@ export default function ModeZero() {
     <View
       style={{ 
         flex: 1, 
-        backgroundColor: bgColor,
+        backgroundColor: currentBgColor,
       }}
       onStartShouldSetResponder={(evt) => {
         // If menu is open, allow responder to handle taps outside menu
