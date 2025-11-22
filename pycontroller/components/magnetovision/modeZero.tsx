@@ -107,22 +107,64 @@ export default function ModeZero() {
   const centerY = canvasHeight / 2;
 
   // Dial tick rendering
-  const tickLength = 18; // length of each tick
-  const tickThickness = 2.5;
+  const tickThickness = 1.2; // thinner
   const tickColor = '#C0C0C0'; // silver
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
   // Calculate tick positions
+  // Helper to find intersection with viewport edge
+  function getEdgeIntersection(angleRad: number) {
+    // Calculate intersection with screen bounds
+    const dx = Math.cos(angleRad);
+    const dy = Math.sin(angleRad);
+    let tArray = [];
+    // Left edge (x=0)
+    if (dx !== 0) {
+      const t = (0 - centerX) / dx;
+      const y = centerY + t * dy;
+      if (y >= 0 && y <= canvasHeight) tArray.push(t);
+    }
+    // Right edge (x=screenWidth)
+    if (dx !== 0) {
+      const t = (screenWidth - centerX) / dx;
+      const y = centerY + t * dy;
+      if (y >= 0 && y <= canvasHeight) tArray.push(t);
+    }
+    // Top edge (y=0)
+    if (dy !== 0) {
+      const t = (0 - centerY) / dy;
+      const x = centerX + t * dx;
+      if (x >= 0 && x <= screenWidth) tArray.push(t);
+    }
+    // Bottom edge (y=canvasHeight)
+    if (dy !== 0) {
+      const t = (canvasHeight - centerY) / dy;
+      const x = centerX + t * dx;
+      if (x >= 0 && x <= screenWidth) tArray.push(t);
+    }
+    // Find the closest positive t (outward from center)
+    const tEdge = Math.max(...tArray.filter(t => t > 0));
+    return {
+      x: centerX + tEdge * dx,
+      y: centerY + tEdge * dy,
+      t: tEdge,
+      dx,
+      dy,
+    };
+  }
+
+  const protrude = 50; // pixels to draw inward from edge
   const ticks = tickAngles.map(angle => {
     const rad = degToRad(angle);
-    // Start at edge, end just inside edge
-    const edgeRadius = Math.min(screenWidth, canvasHeight) / 2;
-    const startX = centerX + edgeRadius * Math.cos(rad);
-    const startY = centerY + edgeRadius * Math.sin(rad);
-    const endX = centerX + (edgeRadius - tickLength) * Math.cos(rad);
-    const endY = centerY + (edgeRadius - tickLength) * Math.sin(rad);
+    const edge = getEdgeIntersection(rad);
+    // Start at edge intersection
+    const startX = edge.x;
+    const startY = edge.y;
+    // End point is inward toward center by 'protrude' pixels
+    const endX = edge.x - edge.dx * protrude;
+    const endY = edge.y - edge.dy * protrude;
     return (
       <Line
         key={angle}
