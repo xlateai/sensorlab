@@ -66,12 +66,8 @@ export default function Main() {
   // Slide-up menu state
   const [showMenu, setShowMenu] = useState(false);
   const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
-  // Background colors - explicitly set
-  const bgColor = '#000000'; // Pitch black
-  const bgColorLightened = '#080808'; // ~5% lighter than black
-  // Background color animation: 0 = bgColor, 1 = bgColorLightened
-  const bgColorAnim = useRef(new Animated.Value(0)).current;
-  const [currentBgColor, setCurrentBgColor] = useState(bgColor);
+  // Background color - solid pitch black
+  const bgColor = '#000000';
   // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
   // Center orb starts at 0 and animates in on mount; top orb stays at 0 until popview opens
   const orbCenterOpacity = useRef(new Animated.Value(0)).current;
@@ -135,12 +131,6 @@ export default function Main() {
     if (hadSelection) {
       setMenuSelectedNeedle(selectedNeedle);
       setShowMenu(true);
-      Animated.timing(bgColorAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: false,
-        easing: Easing.out(Easing.ease),
-      }).start();
     }
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -476,14 +466,6 @@ export default function Main() {
 
   // Handle menu close when needed (e.g., if user taps outside)
   const closeMenu = () => {
-    // Animate background color back to black smoothly
-    Animated.timing(bgColorAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: false,
-      easing: Easing.out(Easing.ease),
-    }).start();
-    
     // Close menu (orb animations are handled by PopView)
     // Keep menuSelectedNeedle so component state persists when reopening
     setShowMenu(false);
@@ -532,39 +514,6 @@ export default function Main() {
     );
   });
 
-  // Helper function to interpolate between two hex colors
-  const interpolateHexColor = (color1: string, color2: string, t: number): string => {
-    // Remove # and convert to RGB
-    const hex1 = color1.replace('#', '');
-    const hex2 = color2.replace('#', '');
-    const r1 = parseInt(hex1.substring(0, 2), 16);
-    const g1 = parseInt(hex1.substring(2, 4), 16);
-    const b1 = parseInt(hex1.substring(4, 6), 16);
-    const r2 = parseInt(hex2.substring(0, 2), 16);
-    const g2 = parseInt(hex2.substring(2, 4), 16);
-    const b2 = parseInt(hex2.substring(4, 6), 16);
-    
-    // Interpolate
-    const r = Math.round(r1 + (r2 - r1) * t);
-    const g = Math.round(g1 + (g2 - g1) * t);
-    const b = Math.round(b1 + (b2 - b1) * t);
-    
-    // Convert back to hex
-    const toHex = (n: number) => n.toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  };
-
-  // Update background color from animated value
-  useEffect(() => {
-    const listenerId = bgColorAnim.addListener(({ value }) => {
-      // Interpolate between bgColor and bgColorLightened
-      const interpolatedColor = interpolateHexColor(bgColor, bgColorLightened, value);
-      setCurrentBgColor(interpolatedColor);
-    });
-    return () => {
-      bgColorAnim.removeListener(listenerId);
-    };
-  }, []);
 
   // No animation for tap circle; render at joystickOrigin directly
 
@@ -614,7 +563,7 @@ export default function Main() {
     <View
       style={{ 
         flex: 1, 
-        backgroundColor: currentBgColor,
+        backgroundColor: bgColor,
       }}
       pointerEvents={showMenu ? "box-none" : "auto"}
       onStartShouldSetResponder={shouldStartResponder}
@@ -761,7 +710,6 @@ export default function Main() {
         selectedNeedle={menuSelectedNeedle}
         currentPixel={currentPixel}
         onClose={closeMenu}
-        onBackgroundColorChange={setCurrentBgColor}
         orbCenterOpacity={orbCenterOpacity}
         orbCenterScale={orbCenterScale}
         orbTopOpacity={orbTopOpacity}

@@ -10,7 +10,6 @@ interface PopViewProps {
   selectedNeedle: number | null;
   currentPixel: string;
   onClose: () => void;
-  onBackgroundColorChange?: (color: string) => void;
   onOrbStateChange?: (centerVisible: boolean, topVisible: boolean) => void;
   orbCenterOpacity?: Animated.Value;
   orbCenterScale?: Animated.Value;
@@ -31,7 +30,6 @@ export default function PopView({
   selectedNeedle,
   currentPixel,
   onClose,
-  onBackgroundColorChange,
   onOrbStateChange,
   orbCenterOpacity: orbCenterOpacityProp,
   orbCenterScale: orbCenterScaleProp,
@@ -54,11 +52,6 @@ export default function PopView({
   const menuSlideAnim = useRef(new Animated.Value(menuHeight * 0.1)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
   
-  // Background color animation
-  const bgColor = '#000000';
-  const bgColorLightened = '#080808';
-  const bgColorAnim = useRef(new Animated.Value(0)).current;
-  
   // Fallback refs (only used if props not provided)
   const fallbackOrbCenterOpacity = useRef(new Animated.Value(1)).current;
   const fallbackOrbCenterScale = useRef(new Animated.Value(1)).current;
@@ -74,36 +67,6 @@ export default function PopView({
   const isAnimatingRef = useRef(false);
   const hasMountedRef = useRef(false);
 
-  // Helper function to interpolate between two hex colors
-  const interpolateHexColor = (color1: string, color2: string, t: number): string => {
-    const hex1 = color1.replace('#', '');
-    const hex2 = color2.replace('#', '');
-    const r1 = parseInt(hex1.substring(0, 2), 16);
-    const g1 = parseInt(hex1.substring(2, 4), 16);
-    const b1 = parseInt(hex1.substring(4, 6), 16);
-    const r2 = parseInt(hex2.substring(0, 2), 16);
-    const g2 = parseInt(hex2.substring(2, 4), 16);
-    const b2 = parseInt(hex2.substring(4, 6), 16);
-    
-    const r = Math.round(r1 + (r2 - r1) * t);
-    const g = Math.round(g1 + (g2 - g1) * t);
-    const b = Math.round(b1 + (b2 - b1) * t);
-    
-    const toHex = (n: number) => n.toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  };
-
-  // Update background color from animated value
-  useEffect(() => {
-    if (!onBackgroundColorChange) return;
-    const listenerId = bgColorAnim.addListener(({ value }) => {
-      const interpolatedColor = interpolateHexColor(bgColor, bgColorLightened, value);
-      onBackgroundColorChange(interpolatedColor);
-    });
-    return () => {
-      bgColorAnim.removeListener(listenerId);
-    };
-  }, [onBackgroundColorChange]);
 
 
   // Handle menu open animation
@@ -131,14 +94,6 @@ export default function PopView({
       const startY = menuHeight * 0.1;
       menuSlideAnim.setValue(startY);
       menuOpacity.setValue(0);
-      
-      // Animate background color to lighter black when menu opens
-      Animated.timing(bgColorAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: false,
-        easing: Easing.out(Easing.ease),
-      }).start();
       
       // Animate menu slide and opacity
       Animated.parallel([
@@ -370,14 +325,6 @@ export default function PopView({
       menuOpacity.setValue(0);
       onClose();
     });
-    
-    // Animate background color back to black smoothly
-    Animated.timing(bgColorAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: false,
-      easing: Easing.out(Easing.ease),
-    }).start();
   };
 
   if (selectedNeedle === null) {
