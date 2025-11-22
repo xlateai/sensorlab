@@ -71,8 +71,9 @@ export default function Main() {
   const bgColorAnim = useRef(new Animated.Value(0)).current;
   const [currentBgColor, setCurrentBgColor] = useState(bgColor);
   // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
-  const orbCenterOpacity = useRef(new Animated.Value(1)).current;
-  const orbCenterScale = useRef(new Animated.Value(1)).current;
+  // Center orb starts at 0 and animates in on mount; top orb stays at 0 until popview opens
+  const orbCenterOpacity = useRef(new Animated.Value(0)).current;
+  const orbCenterScale = useRef(new Animated.Value(0)).current;
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
 
@@ -178,6 +179,26 @@ export default function Main() {
 
   const [isFocused, setIsFocused] = useState(true);
   const isMountedRef = useRef(true);
+  
+  // Animate center orb in on initial mount
+  useEffect(() => {
+    // Fade in and grow the center orb on initial load
+    Animated.parallel([
+      Animated.timing(orbCenterOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      }),
+      Animated.spring(orbCenterScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 6,
+        tension: 100,
+      }),
+    ]).start();
+  }, []); // Run only once on mount
+  
   useFocusEffect(
     React.useCallback(() => {
       isMountedRef.current = true;

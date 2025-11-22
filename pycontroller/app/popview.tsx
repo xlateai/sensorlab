@@ -53,6 +53,8 @@ export default function PopView({
   const orbTopOpacity = orbTopOpacityProp || fallbackOrbTopOpacity;
   const orbTopScale = orbTopScaleProp || fallbackOrbTopScale;
   const isManuallyClosingRef = useRef(false);
+  const isAnimatingRef = useRef(false);
+  const hasMountedRef = useRef(false);
 
   // Helper function to interpolate between two hex colors
   const interpolateHexColor = (color1: string, color2: string, t: number): string => {
@@ -87,7 +89,22 @@ export default function PopView({
 
   // Handle menu open animation
   useEffect(() => {
-    if (isVisible && selectedNeedle !== null) {
+    if (isVisible && selectedNeedle !== null && !isAnimatingRef.current) {
+      hasMountedRef.current = true;
+      isAnimatingRef.current = true;
+      
+      // Stop all ongoing animations first
+      orbTopOpacity.stopAnimation();
+      orbTopScale.stopAnimation();
+      orbCenterOpacity.stopAnimation();
+      orbCenterScale.stopAnimation();
+      
+      // Ensure only center orb is visible before starting (safety check)
+      orbCenterOpacity.setValue(1);
+      orbCenterScale.setValue(1);
+      orbTopOpacity.setValue(0);
+      orbTopScale.setValue(0);
+      
       // Play chime haptic when opening popview
       playChimeHaptic();
       
@@ -151,16 +168,37 @@ export default function PopView({
           }),
         ]),
       ]).start(() => {
+        // Ensure final state: top visible, center hidden
+        orbTopOpacity.setValue(1);
+        orbTopScale.setValue(1);
+        orbCenterOpacity.setValue(0);
+        orbCenterScale.setValue(0);
         if (onOrbStateChange) {
           onOrbStateChange(false, true);
         }
+        isAnimatingRef.current = false;
       });
     }
   }, [isVisible, selectedNeedle]);
 
   // Handle menu close animation
   useEffect(() => {
-    if (!isVisible && !isManuallyClosingRef.current) {
+    // Only run if we've mounted and the menu was previously visible (not on initial load)
+    if (!isVisible && hasMountedRef.current && !isManuallyClosingRef.current && !isAnimatingRef.current) {
+      isAnimatingRef.current = true;
+      
+      // Stop all ongoing animations first
+      orbTopOpacity.stopAnimation();
+      orbTopScale.stopAnimation();
+      orbCenterOpacity.stopAnimation();
+      orbCenterScale.stopAnimation();
+      
+      // Ensure only top orb is visible before starting (safety check)
+      orbTopOpacity.setValue(1);
+      orbTopScale.setValue(1);
+      orbCenterOpacity.setValue(0);
+      orbCenterScale.setValue(0);
+      
       // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
       Animated.sequence([
         Animated.parallel([
@@ -192,21 +230,30 @@ export default function PopView({
           }),
         ]),
       ]).start(() => {
-        if (onOrbStateChange) {
-          onOrbStateChange(true, false);
-        }
-        // After animation completes, ensure top orb stays at 0 and center at 1
+        // Ensure final state: center visible, top hidden
         orbTopOpacity.setValue(0);
         orbCenterOpacity.setValue(1);
         orbTopScale.setValue(0);
         orbCenterScale.setValue(1);
+        if (onOrbStateChange) {
+          onOrbStateChange(true, false);
+        }
+        isAnimatingRef.current = false;
       });
     }
   }, [isVisible]);
 
-  // Lock orb states when menu closes
+  // Lock orb states when menu closes (safety fallback)
   useEffect(() => {
-    if (!isVisible && !isManuallyClosingRef.current) {
+    // Only run if we've mounted and the menu was previously visible (not on initial load)
+    if (!isVisible && hasMountedRef.current && !isManuallyClosingRef.current && !isAnimatingRef.current) {
+      // Stop any animations
+      orbTopOpacity.stopAnimation();
+      orbTopScale.stopAnimation();
+      orbCenterOpacity.stopAnimation();
+      orbCenterScale.stopAnimation();
+      
+      // Force final state: center visible, top hidden
       orbTopOpacity.setValue(0);
       orbCenterOpacity.setValue(1);
       orbTopScale.setValue(0);
@@ -219,7 +266,10 @@ export default function PopView({
 
   // Close menu handler
   const handleClose = () => {
+    if (isAnimatingRef.current) return; // Prevent rapid clicks
+    
     isManuallyClosingRef.current = true;
+    isAnimatingRef.current = true;
     
     // Play reverse chime haptic when closing popview
     playReverseChime();
@@ -270,6 +320,7 @@ export default function PopView({
         }),
       ]),
     ]).start(() => {
+      // Ensure final state: center visible, top hidden
       orbTopOpacity.setValue(0);
       orbCenterOpacity.setValue(1);
       orbTopScale.setValue(0);
@@ -278,6 +329,7 @@ export default function PopView({
         onOrbStateChange(true, false);
       }
       isManuallyClosingRef.current = false;
+      isAnimatingRef.current = false;
     });
     
     // Animate menu slide down and fade out
