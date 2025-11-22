@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, PanResponder } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
 import { Dimensions, View } from 'react-native';
@@ -57,6 +57,11 @@ export default function ModeZero() {
   const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
+  // Slide-up menu state
+  const [showMenu, setShowMenu] = useState(false);
+  const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const menuPanY = useRef(new Animated.Value(0)).current;
+  const menuOpacity = useRef(new Animated.Value(0)).current;
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -93,6 +98,9 @@ export default function ModeZero() {
       }
     }
     
+    // Check if we have a selected needle before clearing state
+    const hadSelection = selectedNeedle !== null;
+    
     setShowLines(false);
     setTapPosition(null);
     setFingerPosition(null);
@@ -109,6 +117,14 @@ export default function ModeZero() {
     });
     // Reset blob
     setBlobOffset({ x: 0, y: 0 });
+    
+    // Open menu only if we released while a needle was selected
+    if (hadSelection) {
+      menuPanY.setValue(0);
+      menuSlideAnim.setValue(0);
+      menuOpacity.setValue(1);
+      setShowMenu(true);
+    }
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
@@ -391,6 +407,53 @@ export default function ModeZero() {
     setSelectedNeedle(targetNeedleIdx);
   }, [targetNeedleIdx, showLines]);
 
+  // Handle menu close when needed (e.g., if user taps outside)
+  const closeMenu = (currentDragY: number = 0) => {
+    // Stop any ongoing animations
+    menuPanY.stopAnimation();
+    menuSlideAnim.stopAnimation();
+    menuOpacity.stopAnimation();
+    
+    // Just hide it instantly
+    setShowMenu(false);
+    menuPanY.setValue(0);
+    menuSlideAnim.setValue(0);
+    menuOpacity.setValue(0);
+  };
+
+  // Pan responder for swipe-down to dismiss
+  const menuPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to downward swipes
+        return gestureState.dy > 5;
+      },
+      onPanResponderGrant: () => {
+        menuPanY.setOffset((menuPanY as any)._value || 0);
+        menuPanY.setValue(0);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Only allow downward movement
+        if (gestureState.dy > 0) {
+          menuPanY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const currentDragY = gestureState.dy;
+        const threshold = screenHeight * 0.2; // Dismiss if dragged down 20% of screen
+        if (currentDragY > threshold || gestureState.vy > 0.5) {
+          // Dismiss menu immediately from current position (before flattening)
+          closeMenu(currentDragY);
+        } else {
+          // Snap back up instantly
+          menuPanY.flattenOffset();
+          menuPanY.setValue(0);
+        }
+      },
+    })
+  ).current;
+
   // Animation loop for glass blob - smooth melting effect
   useEffect(() => {
     let running = true;
@@ -574,6 +637,26 @@ export default function ModeZero() {
           </Animated.View>
         );
       })}
+      {/* Slide-up menu */}
+      {showMenu && (
+        <Animated.View
+          {...menuPanResponder.panHandlers}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            top: screenHeight * 0.20, // Leave 20% space at the top
+            backgroundColor: '#fff',
+            borderTopLeftRadius: 35,
+            borderTopRightRadius: 35,
+            opacity: menuOpacity,
+            transform: [
+              { translateY: Animated.add(menuSlideAnim, menuPanY) },
+            ],
+          }}
+        />
+      )}
     </View>
   );
 }
