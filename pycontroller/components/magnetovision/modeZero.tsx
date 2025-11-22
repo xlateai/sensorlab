@@ -65,10 +65,9 @@ export default function ModeZero() {
   const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
   const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
-  // Background color animation: 0 = black (#000), 1 = dark gray (#0a0a0a)
+  // Background color animation: 0 = black (#000), 1 = barely off-black (#050505)
   const bgColorAnim = useRef(new Animated.Value(0)).current;
-  const [bgColor, setBgColor] = useState('#000');
-  const bgColorTargetRef = useRef(0); // Target value for smooth interpolation
+  const [bgColor, setBgColor] = useState('#000000');
   // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
   const orbCenterOpacity = useRef(new Animated.Value(1)).current;
   const orbCenterScale = useRef(new Animated.Value(1)).current;
@@ -157,9 +156,13 @@ export default function ModeZero() {
       menuOpacity.setValue(0);
       setMenuSelectedNeedle(selectedNeedle);
       setShowMenu(true);
-      // Set initial values for drag-responsive animations
-      bgColorTargetRef.current = 1;
-      // The animation loop will smoothly lerp to this target
+      // Animate background color to lighter black when menu opens
+      Animated.timing(bgColorAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+        easing: Easing.out(Easing.ease),
+      }).start();
       // Animate menu slide and opacity
       Animated.parallel([
         Animated.timing(menuSlideAnim, {
@@ -697,49 +700,18 @@ export default function ModeZero() {
     );
   });
 
-  // Smooth background color animation loop - only active when menu is open
+  // Update background color from animated value
   useEffect(() => {
-    if (!showMenu) return;
-    
-    let running = true;
-    function animate() {
-      if (!running || !showMenu || !isMountedRef.current) return;
-      
-      const currentValue = (bgColorAnim as any)._value || 0;
-      const targetValue = bgColorTargetRef.current;
-      
-      // Smooth lerp towards target (0.15 = smooth but responsive)
-      const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-      const newValue = lerp(currentValue, targetValue, 0.15);
-      
-      if (Math.abs(newValue - currentValue) > 0.001) {
-        bgColorAnim.setValue(newValue);
-      }
-      
-      // Update color from animated value
-      const grayValue = Math.round(newValue * 10); // 10 = 0x0a
-      const hex = grayValue.toString(16).padStart(2, '0');
-      setBgColor(`#${hex}${hex}${hex}`);
-      
-      if (running && isMountedRef.current) requestAnimationFrame(animate);
-    }
-    animate();
-    return () => { running = false; };
-  }, [showMenu]);
-  
-  // Update background color from animated value when menu is closed
-  useEffect(() => {
-    if (showMenu) return;
-    
     const listenerId = bgColorAnim.addListener(({ value }) => {
-      const grayValue = Math.round(value * 10); // 10 = 0x0a
+      // Interpolate from #000000 (value 0) to #050505 (value 1) - barely off-black
+      const grayValue = Math.round(value * 5); // 5 = 0x05 for barely perceptible lighter black
       const hex = grayValue.toString(16).padStart(2, '0');
       setBgColor(`#${hex}${hex}${hex}`);
     });
     return () => {
       bgColorAnim.removeListener(listenerId);
     };
-  }, [showMenu]);
+  }, []);
 
   // No animation for tap circle; render at joystickOrigin directly
 
@@ -747,7 +719,7 @@ export default function ModeZero() {
     <View
       style={{ 
         flex: 1, 
-        backgroundColor: '#000000',
+        backgroundColor: bgColor,
       }}
       onStartShouldSetResponder={(evt) => {
         // If menu is open, allow responder to handle taps outside menu
