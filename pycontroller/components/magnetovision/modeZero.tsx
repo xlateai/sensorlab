@@ -958,6 +958,31 @@ export default function ModeZero() {
       {/* Slide-up menu */}
       {showMenu && (
         <>
+          {/* Glow effect behind popover */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              top: screenHeight * 0.30,
+              borderTopLeftRadius: 35,
+              borderTopRightRadius: 35,
+              borderWidth: 2,
+              borderColor: currentPixel,
+              opacity: menuOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.3],
+              }),
+              shadowColor: currentPixel,
+              shadowOffset: { width: 0, height: -8 },
+              shadowOpacity: 0.6,
+              shadowRadius: 12,
+              transform: [
+                { translateY: menuSlideAnim },
+              ],
+            }}
+          />
           <Animated.View
             style={{
               position: 'absolute',
@@ -971,6 +996,10 @@ export default function ModeZero() {
               borderWidth: 1,
               borderColor: currentPixel,
               opacity: menuOpacity,
+              shadowColor: currentPixel,
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.4,
+              shadowRadius: 8,
               transform: [
                 { translateY: menuSlideAnim },
               ],
