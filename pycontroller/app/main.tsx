@@ -663,7 +663,7 @@ export default function Main() {
         // 0% = viewport center (50%), 100% = full screen (0%)
         // Orb center is positioned 1.2x radius higher than the menu top edge
         const menuTop = screenHeight * (1 - heightPercentage);
-        const topY = menuTop - (ringRadius * 1.2);
+        const topY = menuTop - (ringRadius * 1.3);
         return (
           <>
             <Animated.View

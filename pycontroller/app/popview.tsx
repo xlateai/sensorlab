@@ -460,6 +460,7 @@ export default function PopView({
         <View
           style={{
             flex: 1,
+            paddingTop: 20, // Top margin to prevent overlap with border
             paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
           }}
           pointerEvents={isVisible ? "auto" : "none"}
