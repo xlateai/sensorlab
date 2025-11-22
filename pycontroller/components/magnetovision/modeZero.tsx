@@ -337,26 +337,30 @@ export default function ModeZero() {
     let tickLength = uniformTickLength;
     let baseWidth = 4;
     let fillColor = tickColor;
+    let outwardGrowth = 1;
     if (animatedNeedle.idx === idx) {
       baseWidth *= animatedNeedle.scale;
       fillColor = `rgba(255,255,255,${animatedNeedle.brightness})`;
+      outwardGrowth = 1.2; // Grow by 20% when selected
     }
-    // Position tick at center, rotate, and extend outward
+    // To grow outward, keep the base at center and extend length outward
+    // So, move the tick up by the extra length
+    const extraLength = tickLength * (outwardGrowth - 1);
     return (
       <View
         key={angle}
         style={{
           position: 'absolute',
           left: centerX - baseWidth / 2,
-          top: centerY - tickLength,
+          top: centerY - tickLength - extraLength,
           width: baseWidth,
-          height: tickLength,
+          height: tickLength * outwardGrowth,
           backgroundColor: fillColor,
           borderRadius: baseWidth / 2,
           transform: [
-            { translateY: tickLength / 2 },
+            { translateY: (tickLength * outwardGrowth) / 2 },
             { rotate: `${angle}deg` },
-            { translateY: -tickLength / 2 },
+            { translateY: -(tickLength * outwardGrowth) / 2 },
           ],
         }}
       />
