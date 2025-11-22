@@ -9,10 +9,10 @@ import { Magnetometer, DeviceMotion } from 'expo-sensors';
 import PopView from './popview';
 import { playSimpleHaptic } from './haptics';
 import { useRGBRange } from './RGBRangeContext';
-import { calculateColorFromMagnetometer, blendRGB } from './color-decoding';
+import { calculateColorFromMagnetometer } from './color-decoding';
 
 const PIXEL_WIDTH = 256;
-const BUFFER_SIZE = 64;
+const BUFFER_SIZE = 16;
 
 export default function Main() {
   const { range } = useRGBRange();
@@ -185,43 +185,12 @@ export default function Main() {
     }, [])
   );
 
-  const [minMax, setMinMax] = useState({
-    minX: 0, maxX: 1,
-    minY: 0, maxY: 1,
-    minZ: 0, maxZ: 1,
-  });
-
-  useEffect(() => {
-    if (buffer.length === 0) return;
-    let minX = buffer[0].x, maxX = buffer[0].x;
-    let minY = buffer[0].y, maxY = buffer[0].y;
-    let minZ = buffer[0].z, maxZ = buffer[0].z;
-    for (const v of buffer) {
-      if (v.x < minX) minX = v.x;
-      if (v.x > maxX) maxX = v.x;
-      if (v.y < minY) minY = v.y;
-      if (v.y > maxY) maxY = v.y;
-      if (v.z < minZ) minZ = v.z;
-      if (v.z > maxZ) maxZ = v.z;
-    }
-    setMinMax({ minX, maxX, minY, maxY, minZ, maxZ });
-  }, [buffer]);
-
-  // Interpolate between colors for smooth transitions
-  const prevRGBRef = useRef<[number, number, number]>([0, 0, 0]);
-  
-  // Calculate color from magnetometer data
-  const currentRGB = calculateColorFromMagnetometer(magnetometer, minMax, range);
-  
-  // Blend previous and current RGB
-  const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
-  const blended = blendRGB(currentRGB, prevRGBRef.current, blend);
-  prevRGBRef.current = [blended.r, blended.g, blended.b];
-  const currentPixel = blended.rgbString;
-  
-  const smoothR = blended.r;
-  const smoothG = blended.g;
-  const smoothB = blended.b;
+  // Calculate color from magnetometer data (buffer is used to determine min/max range)
+  const currentRGB = calculateColorFromMagnetometer(buffer, magnetometer, range);
+  const currentPixel = `rgb(${currentRGB.r},${currentRGB.g},${currentRGB.b})`;
+  const smoothR = currentRGB.r;
+  const smoothG = currentRGB.g;
+  const smoothB = currentRGB.b;
 
 
   if (!isFocused) {
