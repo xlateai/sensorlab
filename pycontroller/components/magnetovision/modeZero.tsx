@@ -70,7 +70,7 @@ export default function ModeZero() {
   const orbCenterOpacity = useRef(new Animated.Value(1)).current;
   const orbCenterScale = useRef(new Animated.Value(1)).current;
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
-  const orbTopScale = useRef(new Animated.Value(1)).current;
+  const orbTopScale = useRef(new Animated.Value(0)).current;
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -155,20 +155,36 @@ export default function ModeZero() {
           easing: Easing.out(Easing.ease),
         }),
       ]).start();
-      // Sequential orb fade: first fade out center completely, then fade in top
+      // Sequential orb fade: first fade out center completely (with shrink), then fade in top (with grow)
       Animated.sequence([
-        Animated.timing(orbCenterOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbTopOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
+        Animated.parallel([
+          Animated.timing(orbCenterOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+          Animated.timing(orbCenterScale, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(orbTopOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+          Animated.timing(orbTopScale, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+        ]),
       ]).start();
     }
   };
@@ -185,25 +201,43 @@ export default function ModeZero() {
       const currentCenterOpacity = (orbCenterOpacity as any)._value || 0;
       
       // Always animate smoothly from current state to final state
-      // Sequential: first fade out top completely, then fade in center
+      // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
       Animated.sequence([
-        Animated.timing(orbTopOpacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbCenterOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
+        Animated.parallel([
+          Animated.timing(orbTopOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+          Animated.timing(orbTopScale, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(orbCenterOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+          Animated.timing(orbCenterScale, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+        ]),
       ]).start(() => {
         // After animation completes, ensure top orb stays at 0 and center at 1
         // This prevents any flash-back
         orbTopOpacity.setValue(0);
         orbCenterOpacity.setValue(1);
+        orbTopScale.setValue(0);
+        orbCenterScale.setValue(1);
       });
     }
   }, [showMenu]);
@@ -214,6 +248,8 @@ export default function ModeZero() {
       // When menu closes, immediately lock orb states and cleanup
       orbTopOpacity.setValue(0);
       orbCenterOpacity.setValue(1);
+      orbTopScale.setValue(0);
+      orbCenterScale.setValue(1);
       return;
     }
     
@@ -229,11 +265,13 @@ export default function ModeZero() {
       // Update target for smooth interpolation
       bgColorTargetRef.current = bgProgress;
       
-      // Interpolate orb visibility: 0 drag = top visible (1), center invisible (0)
+      // Interpolate orb visibility and scale: 0 drag = top visible (1), center invisible (0)
       // threshold drag = top invisible (0), center visible (1)
       const orbProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
       orbTopOpacity.setValue(orbProgress);
       orbCenterOpacity.setValue(1 - orbProgress);
+      orbTopScale.setValue(orbProgress);
+      orbCenterScale.setValue(1 - orbProgress);
     });
     
     return () => {
@@ -242,6 +280,8 @@ export default function ModeZero() {
       // Always lock orb states when listener is removed (menu closing)
       orbTopOpacity.setValue(0);
       orbCenterOpacity.setValue(1);
+      orbTopScale.setValue(0);
+      orbCenterScale.setValue(1);
     };
   }, [showMenu, screenHeight]);
   
@@ -550,6 +590,8 @@ export default function ModeZero() {
       menuOpacity.setValue(0);
       // Ensure top orb stays invisible - lock it in place
       orbTopOpacity.setValue(0);
+      orbTopScale.setValue(0);
+      orbCenterScale.setValue(1);
     }, 300); // Wait for orb animation to complete
   };
 
@@ -585,20 +627,36 @@ export default function ModeZero() {
           bgColorTargetRef.current = 1;
           // The animation loop will smoothly lerp to this target
           Animated.parallel([
-            // Sequential orb fade: first fade out center, then fade in top
+            // Sequential orb fade: first fade out center (with shrink), then fade in top (with grow)
             Animated.sequence([
-              Animated.timing(orbCenterOpacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.ease),
-              }),
-              Animated.timing(orbTopOpacity, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.ease),
-              }),
+              Animated.parallel([
+                Animated.timing(orbCenterOpacity, {
+                  toValue: 0,
+                  duration: 200,
+                  useNativeDriver: true,
+                  easing: Easing.out(Easing.ease),
+                }),
+                Animated.timing(orbCenterScale, {
+                  toValue: 0,
+                  duration: 200,
+                  useNativeDriver: true,
+                  easing: Easing.out(Easing.ease),
+                }),
+              ]),
+              Animated.parallel([
+                Animated.timing(orbTopOpacity, {
+                  toValue: 1,
+                  duration: 200,
+                  useNativeDriver: true,
+                  easing: Easing.out(Easing.ease),
+                }),
+                Animated.timing(orbTopScale, {
+                  toValue: 1,
+                  duration: 200,
+                  useNativeDriver: true,
+                  easing: Easing.out(Easing.ease),
+                }),
+              ]),
             ]),
           ]).start();
         }
