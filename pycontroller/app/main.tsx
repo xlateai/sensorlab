@@ -756,15 +756,16 @@ export default function Main() {
         const tipY = centerY + Math.sin(rad) * tickLength;
         // Icon size: normal 32, enlarged 32*1.36=43.52
         const iconSize = 32;
+        const containerSize = needle.Title ? iconSize * 1.5 : iconSize; // Larger container for text
         return (
           <Animated.View
             key={needle.Title || `needle-${i}`}
             style={{
               position: 'absolute',
-              left: tipX - iconSize / 2,
-              top: tipY - iconSize / 2,
-              width: iconSize,
-              height: iconSize,
+              left: tipX - containerSize / 2,
+              top: tipY - containerSize / 2,
+              width: containerSize,
+              height: containerSize,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ scale: iconScaleAnim[i].interpolate({ inputRange: [1, 1.7], outputRange: [1, 1.36] }) }],
@@ -774,7 +775,7 @@ export default function Main() {
             {needle.icon ? (
               <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
             ) : needle.Title ? (
-              <Text style={{ color: '#fff', fontSize: iconSize * 0.6, fontWeight: '500' }}>{needle.Title}</Text>
+              <Text style={{ color: '#fff', fontSize: iconSize, fontWeight: '500' }}>{needle.Title}</Text>
             ) : null}
           </Animated.View>
         );
