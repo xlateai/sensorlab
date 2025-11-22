@@ -5,6 +5,7 @@ import Notes from './widgets/notes';
 import TypeRacerScreen from './subapps/renshu/typeracer';
 import Browser from './widgets/browser';
 import { playChimeHaptic, playReverseChime } from './haptics';
+import { useDeviceOrientation } from './orientation';
 
 interface PopViewProps {
   isVisible: boolean;
@@ -30,7 +31,17 @@ export default function PopView({
   onClose,
   orbPositionY,
 }: PopViewProps) {
-  const { height: screenHeight } = Dimensions.get('window');
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+  
+  const screenHeight = dimensions.height;
   
   // Get height percentage for current component, default to 0.7 (70%)
   const heightPercentage = selectedNeedle !== null 
@@ -50,7 +61,15 @@ export default function PopView({
   const isAnimatingRef = useRef(false);
   const hasMountedRef = useRef(false);
 
+  // Use custom orientation detection hook
+  const isBrowser = selectedNeedle === 3;
+  const { orientation, rotationDeg, isLandscape } = useDeviceOrientation(isVisible && isBrowser);
+  const rotationAnim = useRef(new Animated.Value(0)).current;
 
+  // Update rotation animation when orientation changes
+  useEffect(() => {
+    rotationAnim.setValue(rotationDeg);
+  }, [rotationDeg]);
 
   // Handle menu open animation
   useEffect(() => {
@@ -246,7 +265,41 @@ export default function PopView({
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Notes />}
           {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
-          {selectedNeedle === 3 && <Browser isVisible={isVisible} />}
+          {selectedNeedle === 3 && (() => {
+            // Calculate available container dimensions
+            const containerWidth = dimensions.width;
+            const containerHeight = menuHeight - (screenHeight * 0.066);
+            
+            // When rotated, swap dimensions to fit
+            const browserWidth = isLandscape ? containerHeight : containerWidth;
+            const browserHeight = isLandscape ? containerWidth : containerHeight;
+            
+            return (
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                <Animated.View
+                  style={{
+                    width: browserWidth,
+                    height: browserHeight,
+                    transform: [
+                      { rotate: rotationAnim.interpolate({
+                        inputRange: [-90, 0, 90],
+                        outputRange: ['-90deg', '0deg', '90deg'],
+                      })},
+                    ],
+                  }}
+                >
+                  <Browser isVisible={isVisible} />
+                </Animated.View>
+              </View>
+            );
+          })()}
         </View>
         {/* Border overlay that always sits on top */}
         <Animated.View
