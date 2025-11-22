@@ -80,6 +80,21 @@ export default function ModeZero() {
     const now = Date.now();
     const { locationX, locationY } = event.nativeEvent;
     const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
+    const { height: screenH } = Dimensions.get('window');
+    
+    // If menu is open, handle single tap to close
+    if (showMenu) {
+      // Check if tap is outside menu (in top 20% area)
+      const tapY = locationY;
+      const menuTopY = screenH * 0.20;
+      if (tapY < menuTopY) {
+        // Tap is outside menu - close it
+        closeMenu();
+        return;
+      }
+      // If tap is inside menu, let menu handle it (don't interfere)
+      return;
+    }
     
     if (now - lastTapRef.current < 350) {
       // Double-tap detected
@@ -567,17 +582,79 @@ export default function ModeZero() {
 
   // Handle menu close when needed (e.g., if user taps outside)
   const closeMenu = (currentDragY: number = 0) => {
-    // Stop any ongoing animations (but let orb animations run smoothly)
+    // Stop any ongoing pan animations
     menuPanY.stopAnimation();
-    menuSlideAnim.stopAnimation();
-    menuOpacity.stopAnimation();
     
-    // Don't stop orb animations - let them animate smoothly
-    // Don't set orb values immediately - let the useEffect handle the smooth transition
+    // Flatten any offset from dragging
+    menuPanY.flattenOffset();
+    menuPanY.setValue(0);
     
-    // Hide menu - this will trigger the smooth closing animation in useEffect
-    setShowMenu(false);
-    setMenuSelectedNeedle(null);
+    // Animate menu closing: slide down and fade out
+    const screenH = Dimensions.get('window').height;
+    const menuHeight = screenH * 0.8; // Menu takes 80% of screen
+    const endY = menuHeight * 0.1; // Slide down to -10% offset
+    
+    // Start orb animations immediately (fade out top, fade in center)
+    // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(orbTopOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.timing(orbTopScale, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(orbCenterOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.timing(orbCenterScale, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+      ]),
+    ]).start(() => {
+      // After orb animation completes, ensure states are locked
+      orbTopOpacity.setValue(0);
+      orbCenterOpacity.setValue(1);
+      orbTopScale.setValue(0);
+      orbCenterScale.setValue(1);
+    });
+    
+    // Animate menu slide down and fade out
+    Animated.parallel([
+      Animated.timing(menuSlideAnim, {
+        toValue: endY,
+        duration: 200,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.ease),
+      }),
+      Animated.timing(menuOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.ease),
+      }),
+    ]).start(() => {
+      // After animation completes, hide menu and reset values
+      setShowMenu(false);
+      setMenuSelectedNeedle(null);
+      menuPanY.setValue(0);
+      menuSlideAnim.setValue(0);
+      menuOpacity.setValue(0);
+    });
     
     // Animate background color back to black smoothly
     Animated.timing(bgColorAnim, {
@@ -586,18 +663,6 @@ export default function ModeZero() {
       useNativeDriver: false,
       easing: Easing.out(Easing.ease),
     }).start();
-    
-    // Reset menu values after animation completes to prevent any interference
-    // Wait longer to ensure orb animation has started
-    setTimeout(() => {
-      menuPanY.setValue(0);
-      menuSlideAnim.setValue(0);
-      menuOpacity.setValue(0);
-      // Ensure top orb stays invisible - lock it in place
-      orbTopOpacity.setValue(0);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
-    }, 300); // Wait for orb animation to complete
   };
 
   // Pan responder for swipe-down to dismiss
@@ -763,17 +828,29 @@ export default function ModeZero() {
         backgroundColor: bgColor,
       }}
       onStartShouldSetResponder={(evt) => {
+        // If menu is open, allow responder to handle taps outside menu
+        if (showMenu) {
+          const { height: screenH } = Dimensions.get('window');
+          const tapY = evt.nativeEvent.locationY;
+          const menuTopY = screenH * 0.20;
+          // Only capture taps in the top 20% area (outside menu)
+          return tapY < menuTopY;
+        }
         // If already in selection mode, detect if another touch is starting
         if (showLines) {
           // Cancel selection if another touch occurs
           handlePressOut();
           return false;
         }
-        // Don't capture touches that start in the left edge area (let parent handle swipe gesture)
+        // Allow gestures anywhere except left edge (let parent handle swipe gesture)
         const touchX = evt.nativeEvent.locationX;
         return touchX >= LEFT_EDGE_THRESHOLD;
       }}
       onMoveShouldSetResponder={(evt) => {
+        // If menu is open, don't move responder (let menu handle its own gestures)
+        if (showMenu) {
+          return false;
+        }
         // Check for multiple touches during selection
         if (showLines) {
           const touches = evt.nativeEvent.touches || [];
@@ -790,6 +867,10 @@ export default function ModeZero() {
       onResponderRelease={handlePressOut}
       onResponderTerminate={handlePressOut}
       onResponderMove={event => {
+        // Don't handle move if menu is open
+        if (showMenu) {
+          return;
+        }
         if (showLines && tapPosition) {
           // Check for multiple touches
           const touches = event.nativeEvent.touches || [];
@@ -938,6 +1019,24 @@ export default function ModeZero() {
           </Animated.View>
         );
       })}
+      {/* Transparent overlay to detect taps outside menu */}
+      {showMenu && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: screenHeight * 0.20, // Top 20% area
+            backgroundColor: 'transparent',
+          }}
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={() => {
+            // Close menu when tapping outside
+            closeMenu();
+          }}
+        />
+      )}
       {/* Slide-up menu */}
       {showMenu && (
         <Animated.View
