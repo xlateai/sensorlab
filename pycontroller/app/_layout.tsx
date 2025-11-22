@@ -7,6 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { StorageProvider } from './StorageContext';
 import { FullscreenProvider } from './FullscreenContext';
 import { RGBRangeProvider } from './RGBRangeContext';
+import { BufferSizeProvider } from './BufferSizeContext';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -19,13 +20,15 @@ export default function RootLayout() {
       <StorageProvider>
         <FullscreenProvider>
           <RGBRangeProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
+            <BufferSizeProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <Stack>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+                </Stack>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </BufferSizeProvider>
           </RGBRangeProvider>
         </FullscreenProvider>
       </StorageProvider>

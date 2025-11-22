@@ -9,13 +9,14 @@ import { Magnetometer, DeviceMotion } from 'expo-sensors';
 import PopView from './popview';
 import { playSimpleHaptic } from './haptics';
 import { useRGBRange } from './RGBRangeContext';
+import { useBufferSize } from './BufferSizeContext';
 import { calculateColorFromMagnetometer } from './color-decoding';
 
 const PIXEL_WIDTH = 256;
-const BUFFER_SIZE = 16;
 
 export default function Main() {
   const { range } = useRGBRange();
+  const { bufferSize } = useBufferSize();
   // Animated rotation value for smooth transitions
   const rotationAnim = useRef(new Animated.Value(0)).current;
   const [rawRotation, setRawRotation] = useState(0);
@@ -164,10 +165,16 @@ export default function Main() {
     React.useCallback(() => {
       isMountedRef.current = true;
       setIsFocused(true);
+      
+      // Trim buffer if current size exceeds new bufferSize
+      if (bufferRef.current.length > bufferSize) {
+        bufferRef.current = bufferRef.current.slice(-bufferSize);
+      }
+      
       const sub = Magnetometer.addListener(data => {
         if (!isMountedRef.current) return;
         bufferRef.current.push(data);
-        if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
+        if (bufferRef.current.length > bufferSize) bufferRef.current.shift();
         magnetometerRef.current = data;
       });
       Magnetometer.setUpdateInterval(24);
@@ -182,7 +189,7 @@ export default function Main() {
         clearInterval(interval);
         // Don't update state during unmount to avoid hooks mismatch
       };
-    }, [])
+    }, [bufferSize])
   );
 
   // Calculate color from magnetometer data (buffer is used to determine min/max range)
