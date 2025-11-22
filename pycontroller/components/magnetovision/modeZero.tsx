@@ -6,6 +6,8 @@ import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
+import Settings from '../../app/components/widgets/settings';
+import Docs from '../../app/components/widgets/docs';
 
 
 const PIXEL_WIDTH = 256;
@@ -59,6 +61,7 @@ export default function ModeZero() {
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
   // Slide-up menu state
   const [showMenu, setShowMenu] = useState(false);
+  const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
   const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const menuPanY = useRef(new Animated.Value(0)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
@@ -136,6 +139,7 @@ export default function ModeZero() {
       const startY = menuHeight * 0.1; // -10% offset
       menuSlideAnim.setValue(startY);
       menuOpacity.setValue(0);
+      setMenuSelectedNeedle(selectedNeedle);
       setShowMenu(true);
       // Set initial values for drag-responsive animations
       bgColorTargetRef.current = 1;
@@ -573,6 +577,7 @@ export default function ModeZero() {
     
     // Hide menu - this will trigger the smooth closing animation in useEffect
     setShowMenu(false);
+    setMenuSelectedNeedle(null);
     
     // Animate background color back to black smoothly
     Animated.timing(bgColorAnim, {
@@ -958,7 +963,10 @@ export default function ModeZero() {
               { translateY: Animated.add(menuSlideAnim, menuPanY) },
             ],
           }}
-        />
+        >
+          {menuSelectedNeedle === 0 && <Docs />}
+          {menuSelectedNeedle === 1 && <Settings />}
+        </Animated.View>
       )}
     </View>
   );
