@@ -121,9 +121,28 @@ export default function ModeZero() {
     // Open menu only if we released while a needle was selected
     if (hadSelection) {
       menuPanY.setValue(0);
-      menuSlideAnim.setValue(0);
-      menuOpacity.setValue(1);
+      // Start from -10% y offset and 0 opacity, then animate in
+      const screenH = Dimensions.get('window').height;
+      const menuHeight = screenH * 0.8; // Menu takes 80% of screen (20% at top)
+      const startY = menuHeight * 0.1; // -10% offset
+      menuSlideAnim.setValue(startY);
+      menuOpacity.setValue(0);
       setShowMenu(true);
+      // Animate both position and opacity simultaneously
+      Animated.parallel([
+        Animated.timing(menuSlideAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.timing(menuOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+      ]).start();
     }
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
