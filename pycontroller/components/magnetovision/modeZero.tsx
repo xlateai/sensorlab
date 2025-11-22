@@ -74,6 +74,8 @@ export default function ModeZero() {
   const orbCenterScale = useRef(new Animated.Value(1)).current;
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
+  // Flag to track if we're manually closing the menu (to prevent useEffect from interfering)
+  const isManuallyClosingRef = useRef(false);
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -214,7 +216,7 @@ export default function ModeZero() {
   
   // Animate orb visibility when menu closes (fade out top, then fade in center)
   useEffect(() => {
-    if (!showMenu) {
+    if (!showMenu && !isManuallyClosingRef.current) {
       // Get current values from the drag state
       const currentTopOpacity = (orbTopOpacity as any)._value || 0;
       const currentCenterOpacity = (orbCenterOpacity as any)._value || 0;
@@ -264,11 +266,13 @@ export default function ModeZero() {
   // Make background color and orb visibility respond to drag in real-time
   useEffect(() => {
     if (!showMenu) {
-      // When menu closes, immediately lock orb states and cleanup
-      orbTopOpacity.setValue(0);
-      orbCenterOpacity.setValue(1);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
+      // When menu closes, only lock orb states if we're not manually closing (to allow animation to complete)
+      if (!isManuallyClosingRef.current) {
+        orbTopOpacity.setValue(0);
+        orbCenterOpacity.setValue(1);
+        orbTopScale.setValue(0);
+        orbCenterScale.setValue(1);
+      }
       return;
     }
     
@@ -276,8 +280,8 @@ export default function ModeZero() {
     let isActive = true; // Flag to prevent listener from running after cleanup
     
     const listenerId = menuPanY.addListener(({ value }) => {
-      // Don't update if menu has closed
-      if (!isActive) return;
+      // Don't update if menu has closed or if we're manually closing
+      if (!isActive || isManuallyClosingRef.current) return;
       
       // Interpolate background color: 0 drag = full light (#0a0a0a), threshold drag = black (#000)
       const bgProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
@@ -296,11 +300,13 @@ export default function ModeZero() {
     return () => {
       isActive = false; // Disable listener before removing
       menuPanY.removeListener(listenerId);
-      // Always lock orb states when listener is removed (menu closing)
-      orbTopOpacity.setValue(0);
-      orbCenterOpacity.setValue(1);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
+      // Only lock orb states when listener is removed if we're not manually closing
+      if (!isManuallyClosingRef.current) {
+        orbTopOpacity.setValue(0);
+        orbCenterOpacity.setValue(1);
+        orbTopScale.setValue(0);
+        orbCenterScale.setValue(1);
+      }
     };
   }, [showMenu, screenHeight]);
   
@@ -582,12 +588,28 @@ export default function ModeZero() {
 
   // Handle menu close when needed (e.g., if user taps outside)
   const closeMenu = (currentDragY: number = 0) => {
+    // Set flag to prevent useEffect from interfering
+    isManuallyClosingRef.current = true;
+    
     // Stop any ongoing pan animations
     menuPanY.stopAnimation();
+    
+    // Stop any ongoing orb animations to prevent conflicts
+    orbTopOpacity.stopAnimation();
+    orbTopScale.stopAnimation();
+    orbCenterOpacity.stopAnimation();
+    orbCenterScale.stopAnimation();
     
     // Flatten any offset from dragging
     menuPanY.flattenOffset();
     menuPanY.setValue(0);
+    
+    // Force orbs to the "menu open" state first (top visible, center hidden)
+    // This ensures we always animate from the correct starting point
+    orbTopOpacity.setValue(1);
+    orbTopScale.setValue(1);
+    orbCenterOpacity.setValue(0);
+    orbCenterScale.setValue(0);
     
     // Animate menu closing: slide down and fade out
     const screenH = Dimensions.get('window').height;
@@ -631,6 +653,8 @@ export default function ModeZero() {
       orbCenterOpacity.setValue(1);
       orbTopScale.setValue(0);
       orbCenterScale.setValue(1);
+      // Reset flag after animation completes
+      isManuallyClosingRef.current = false;
     });
     
     // Animate menu slide down and fade out
