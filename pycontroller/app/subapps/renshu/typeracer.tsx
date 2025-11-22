@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
 import { Animated } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RainbowProgressBar } from './rainbow-progress-bar';
 import { TypeRacerControlMenu } from './typeracer-control-menu';
 import { TypeStatsBar } from './type-stats-bar';
