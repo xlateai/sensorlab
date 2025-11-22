@@ -550,42 +550,46 @@ export default function TypeRacerScreen({ isVisible = true }: TypeRacerScreenPro
           )}
           {Platform.OS === 'ios' && isVisible && (
             <InputAccessoryView nativeID={inputAccessoryViewID}>
-              <View style={{width: '100%', alignItems: 'center', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: insets.bottom / 2, paddingTop: 0}}>
-                {/* Target flash display: shows next obj.string to type */}
-                {status !== 'success' && (
+              {inputFocused ? (
+                <View style={{width: '100%', alignItems: 'center', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: insets.bottom / 2, paddingTop: 0}}>
+                  {/* Target flash display: shows next obj.string to type */}
+                  {status !== 'success' && (
+                    <TouchableOpacity
+                      style={styles.flashBoxReference}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        if (nextObj && nextObj.string) Clipboard.setStringAsync(nextObj.string);
+                      }}
+                    >
+                      {nextObj ? (
+                        <>
+                          {/* Furigana display if enabled and available */}
+                          {showFurigana && nextObj && nextObj.reading && nextObj.reading !== nextObj.string ? (
+                            <Text style={styles.flashTextReferenceFurigana}>{nextObj.reading}</Text>
+                          ) : null}
+                          <Text style={styles.flashTextReference}>{nextObj.string}</Text>
+                        </>
+                      ) : null}
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
-                    style={styles.flashBoxReference}
+                    style={styles.flashBox}
                     activeOpacity={0.7}
                     onPress={() => {
-                      if (nextObj && nextObj.string) Clipboard.setStringAsync(nextObj.string);
+                      const word = transliterator['buffer'] || '';
+                      if (word) Clipboard.setStringAsync(word);
                     }}
                   >
-                    {nextObj ? (
-                      <>
-                        {/* Furigana display if enabled and available */}
-                        {showFurigana && nextObj && nextObj.reading && nextObj.reading !== nextObj.string ? (
-                          <Text style={styles.flashTextReferenceFurigana}>{nextObj.reading}</Text>
-                        ) : null}
-                        <Text style={styles.flashTextReference}>{nextObj.string}</Text>
-                      </>
-                    ) : null}
+                    <BlinkingCursor style={styles.flashText} buffer={transliterator['buffer']} />
                   </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.flashBox}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    const word = transliterator['buffer'] || '';
-                    if (word) Clipboard.setStringAsync(word);
-                  }}
-                >
-                  <BlinkingCursor style={styles.flashText} buffer={transliterator['buffer']} />
-                </TouchableOpacity>
-                {/* Progress bar hugs bottom of accessory view */}
-                <View style={[styles.progressBarContainer, {marginBottom: 0, marginTop: 0, alignSelf: 'center', width: '80%'}]}>
-                  <RainbowProgressBar progress={progress} />
+                  {/* Progress bar hugs bottom of accessory view */}
+                  <View style={[styles.progressBarContainer, {marginBottom: 0, marginTop: 0, alignSelf: 'center', width: '80%'}]}>
+                    <RainbowProgressBar progress={progress} />
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View style={{width: '100%', height: 1}} />
+              )}
             </InputAccessoryView>
           )}
           {/*
