@@ -247,7 +247,7 @@ export default function PopView({
 
   return (
     <>
-      {/* Transparent overlay to detect taps outside menu - only in top area above menu */}
+      {/* Transparent overlay to detect taps outside menu - DISABLED: only dismiss button closes popview */}
       <Pressable
         style={{
           position: 'absolute',
@@ -257,11 +257,8 @@ export default function PopView({
           height: menuTop, // Top area above menu
           backgroundColor: 'transparent',
           opacity: isVisible ? 1 : 0,
-          pointerEvents: isVisible ? 'auto' : 'none',
+          pointerEvents: 'none', // Disabled - tap-to-dismiss no longer works
         }}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onTouchMove={handleTouchMove}
       />
       {/* Slide-up menu */}
       {/* Glow effect behind popover */}
