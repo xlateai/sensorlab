@@ -31,7 +31,10 @@ export default function HomeScreen() {
         toggledRef.current = false;
         gestureReadyRef.current = false;
         swipeActiveRef.current = false;
-  // ...existing code...
+        return evt.nativeEvent.locationX < screenWidth * 0.1;
+      },
+      onStartShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Only capture touches in the left edge area, let others pass through to child
         return evt.nativeEvent.locationX < screenWidth * 0.1;
       },
       onPanResponderGrant: (evt, gestureState) => {

@@ -87,6 +87,9 @@ export default function ModeZero() {
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
+  
+  // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
+  const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
 
   const bufferRef = useRef<{x: number, y: number, z: number}[]>([]);
   const magnetometerRef = useRef<{x: number, y: number, z: number} | null>(null);
@@ -344,7 +347,11 @@ export default function ModeZero() {
   return (
     <View
       style={{ flex: 1, backgroundColor: '#000' }}
-      onStartShouldSetResponder={() => true}
+      onStartShouldSetResponder={(evt) => {
+        // Don't capture touches that start in the left edge area (let parent handle swipe gesture)
+        const touchX = evt.nativeEvent.locationX;
+        return touchX >= LEFT_EDGE_THRESHOLD;
+      }}
       onResponderGrant={handlePressIn}
       onResponderRelease={handlePressOut}
       onResponderMove={event => {
