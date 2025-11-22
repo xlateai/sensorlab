@@ -54,6 +54,9 @@ export default function ModeZero() {
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
   const iconScaleAnim = useRef([new Animated.Value(1), new Animated.Value(1)]).current;
   const iconOpacityAnim = useRef([new Animated.Value(0.45), new Animated.Value(0.45)]).current;
+  // Motion blur trail - track recent positions
+  const trailRef = useRef<{x: number, y: number}[]>([]);
+  const [trail, setTrail] = useState<{x: number, y: number}[]>([]);
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -335,22 +338,38 @@ export default function ModeZero() {
     setSelectedNeedle(targetNeedleIdx);
   }, [targetNeedleIdx]);
 
-  // Animation loop for joystick offset only
+  // Animation loop for joystick offset with motion blur trail
   useEffect(() => {
     let running = true;
     function animate() {
       setAnimatedOffset(prev => {
         const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-        return {
-          x: lerp(prev.x, targetOffset.x, 0.18),
-          y: lerp(prev.y, targetOffset.y, 0.18)
+        const newOffset = {
+          x: lerp(prev.x, targetOffset.x, 0.85),
+          y: lerp(prev.y, targetOffset.y, 0.85)
         };
+        
+        // Update motion blur trail
+        if (showLines) {
+          trailRef.current.push({ ...newOffset });
+          // Keep last 8 positions for trail
+          if (trailRef.current.length > 8) {
+            trailRef.current.shift();
+          }
+          setTrail([...trailRef.current]);
+        } else {
+          // Clear trail when joystick is released
+          trailRef.current = [];
+          setTrail([]);
+        }
+        
+        return newOffset;
       });
       if (running) requestAnimationFrame(animate);
     }
     animate();
     return () => { running = false; };
-  }, [targetOffset.x, targetOffset.y]);
+  }, [targetOffset.x, targetOffset.y, showLines]);
 
   // Render ticks as dots at the tips
   const ticks = tickAngles.map((angle, idx) => {
@@ -411,6 +430,25 @@ export default function ModeZero() {
           backgroundColor: 'transparent',
         }}
       />
+      {/* Motion blur trail - render previous positions with decreasing opacity */}
+      {trail.map((trailPos, idx) => {
+        const opacity = (idx + 1) / (trail.length + 1) * 0.4; // Fade from 0.4 to 0
+        return (
+          <View
+            key={`trail-${idx}`}
+            style={{
+              position: 'absolute',
+              left: centerX + trailPos.x - innerRadius,
+              top: centerY + trailPos.y - innerRadius,
+              width: innerRadius * 2,
+              height: innerRadius * 2,
+              borderRadius: innerRadius,
+              backgroundColor: currentPixel,
+              opacity: opacity,
+            }}
+          />
+        );
+      })}
       {/* Center joystick (inner circle, joystick offset) */}
       <View
         style={{
