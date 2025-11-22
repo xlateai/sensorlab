@@ -6,7 +6,6 @@ export default function Docs() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Quick Note</Text>
       <TextInput
         style={styles.textInput}
         value={text}

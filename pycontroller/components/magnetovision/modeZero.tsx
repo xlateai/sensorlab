@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
-import { Dimensions, View } from 'react-native';
+import { Dimensions, View, Pressable, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
@@ -971,28 +971,48 @@ export default function ModeZero() {
             <View
               style={{
                 flex: 1,
-                paddingBottom: screenHeight * 0.10, // Reserve bottom 10% for white region
+                paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
               }}
             >
               {menuSelectedNeedle === 0 && <Docs />}
               {menuSelectedNeedle === 1 && <Settings />}
             </View>
           </Animated.View>
-          {/* White region at bottom 10% */}
+          {/* Black region at bottom 12% */}
           <Animated.View
             style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              height: screenHeight * 0.10,
-              backgroundColor: '#fff',
+              height: screenHeight * 0.12,
+              backgroundColor: '#000',
               opacity: menuOpacity,
               transform: [
                 { translateY: menuSlideAnim },
               ],
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              paddingTop: 16,
+              zIndex: 1000,
             }}
-          />
+          >
+            <Pressable
+              onPress={() => closeMenu()}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 24,
+                paddingVertical: 12,
+                minWidth: 120,
+                minHeight: 44,
+                zIndex: 1001,
+              }}
+            >
+              <Text style={{ color: '#888', fontWeight: '500', fontSize: 15, textAlign: 'center' }}>Dismiss</Text>
+            </Pressable>
+          </Animated.View>
         </>
       )}
     </View>

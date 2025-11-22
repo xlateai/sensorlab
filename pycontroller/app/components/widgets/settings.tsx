@@ -9,7 +9,6 @@ export default function Settings() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Settings</Text>
       <View style={styles.sliderContainer}>
         <Slider
           value={r}
