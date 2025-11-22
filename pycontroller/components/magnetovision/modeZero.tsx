@@ -16,6 +16,9 @@ export default function ModeZero() {
   const tapTimeoutRef = useRef<any>(null);
   const [tapPosition, setTapPosition] = useState<{x: number, y: number} | null>(null);
   const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
+  // Animated state for circle and needle
+  const [animatedOffset, setAnimatedOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
+  const [animatedNeedle, setAnimatedNeedle] = useState<{idx: number | null, scale: number, brightness: number}>({ idx: null, scale: 1, brightness: 0.45 });
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -189,20 +192,29 @@ export default function ModeZero() {
     };
   }
 
-  // Highlight logic for nearest needle
+  // Highlight logic for nearest needle (with animation)
   let highlightIdx: number | null = null;
   let highlightProps = { fill: tickColor, scale: 1 };
   // Joystick state for highlight
   let joystickAngle: number | null = null;
   let joystickAtMax = false;
+  let targetOffset = { x: 0, y: 0 };
+  let targetNeedle = { idx: animatedNeedle.idx, scale: 1, brightness: 0.45 };
   if (showLines && tapPosition && fingerPosition) {
     const dx = fingerPosition.x - tapPosition.x;
     const dy = fingerPosition.y - tapPosition.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = 36; // 10% shorter than 40
-    joystickAtMax = dist >= maxDist - 0.5; // allow for rounding
+    const maxDist = 18; // 50% of previous reach
+    const moveDist = Math.min(dist, maxDist);
+    const angleRad = Math.atan2(dy, dx);
+    targetOffset.x = Math.cos(angleRad) * moveDist;
+    targetOffset.y = Math.sin(angleRad) * moveDist;
+    joystickAtMax = dist >= maxDist - 0.5;
+    let newIdx: number | null = null;
+    let newScale = 1;
+    let newBrightness = 0.45;
     if (joystickAtMax) {
-      joystickAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+      joystickAngle = angleRad * 180 / Math.PI;
       if (joystickAngle < 0) joystickAngle += 360;
       // Find nearest tick
       if (joystickAngle !== null) {
@@ -213,17 +225,48 @@ export default function ModeZero() {
             if (diff > 180) diff = 360 - diff;
             if (diff < minDiff) {
               minDiff = diff;
-              highlightIdx = idx;
+              newIdx = idx;
             }
           }
         });
-        highlightProps = {
-          fill: 'rgba(255,255,255,0.85)', // brighter
-          scale: 1.7 // bigger
-        };
+        newScale = 1.7;
+        newBrightness = 0.85;
       }
     }
+    targetNeedle = {
+      idx: newIdx,
+      scale: newScale,
+      brightness: newBrightness
+    };
+  } else {
+    targetOffset = { x: 0, y: 0 };
+    targetNeedle = { idx: null, scale: 1, brightness: 0.45 };
   }
+
+  // Animation loop for interpolation
+  useEffect(() => {
+    let running = true;
+    function animate() {
+      setAnimatedOffset(prev => {
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+        return {
+          x: lerp(prev.x, targetOffset.x, 0.18),
+          y: lerp(prev.y, targetOffset.y, 0.18)
+        };
+      });
+      setAnimatedNeedle(prev => {
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+        return {
+          idx: targetNeedle.idx,
+          scale: lerp(prev.scale, targetNeedle.scale, 0.18),
+          brightness: lerp(prev.brightness, targetNeedle.brightness, 0.18)
+        };
+      });
+      if (running) requestAnimationFrame(animate);
+    }
+    animate();
+    return () => { running = false; };
+  }, [targetOffset.x, targetOffset.y, targetNeedle.idx, targetNeedle.scale, targetNeedle.brightness]);
 
   // Triangle ticks with tip at inner end and thin base at outer edge
   const ticks = tickAngles.map((angle, idx) => {
@@ -232,14 +275,14 @@ export default function ModeZero() {
     const distToCenter = Math.sqrt(
       Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
     );
-    // Highlight if needed
+    // Animated highlight
     let tickLength = distToCenter * 0.2;
     let baseWidth = 4;
     let fillColor = tickColor;
-    if (highlightIdx === idx && joystickAtMax) {
-      tickLength *= highlightProps.scale;
-      baseWidth *= highlightProps.scale;
-      fillColor = highlightProps.fill;
+    if (animatedNeedle.idx === idx) {
+      tickLength *= animatedNeedle.scale;
+      baseWidth *= animatedNeedle.scale;
+      fillColor = `rgba(255,255,255,${animatedNeedle.brightness})`;
     }
     const tipX = edge.x - edge.dx * tickLength;
     const tipY = edge.y - edge.dy * tickLength;
@@ -299,23 +342,13 @@ export default function ModeZero() {
           strokeWidth={ringThickness}
         />
         {/* Inner circle, joystick offset */}
-        {(() => {
-          let offsetX = centerX;
-          let offsetY = centerY;
-          if (showLines && tapPosition && fingerPosition) {
-            // Calculate angle and distance from tapPosition to fingerPosition
-            const dx = fingerPosition.x - tapPosition.x;
-            const dy = fingerPosition.y - tapPosition.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            // Limit max joystick movement (now 36px)
-            const maxDist = 36;
-            const moveDist = Math.min(dist, maxDist);
-            const angle = Math.atan2(dy, dx);
-            offsetX = centerX + Math.cos(angle) * moveDist;
-            offsetY = centerY + Math.sin(angle) * moveDist;
-          }
-          return <Circle cx={offsetX} cy={offsetY} r={innerRadius} fill={currentPixel} />;
-        })()}
+        {/* Animated inner circle, joystick offset */}
+        <Circle
+          cx={centerX + animatedOffset.x}
+          cy={centerY + animatedOffset.y}
+          r={innerRadius}
+          fill={currentPixel}
+        />
       </Svg>
   </View>
   );
