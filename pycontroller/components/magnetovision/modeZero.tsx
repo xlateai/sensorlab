@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { Pressable } from 'react-native';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
@@ -9,6 +10,30 @@ const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
 export default function ModeZero() {
+  // Gesture state for double-tap-and-hold
+  const [showLines, setShowLines] = useState(false);
+  const lastTapRef = useRef<number>(0);
+  const tapTimeoutRef = useRef<any>(null);
+
+  // Handler for double-tap-and-hold
+  const handlePressIn = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) {
+      // Double-tap detected
+      setShowLines(true);
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    } else {
+      // First tap
+      lastTapRef.current = now;
+      // Reset if no second tap within 350ms
+      tapTimeoutRef.current = setTimeout(() => {
+        lastTapRef.current = 0;
+      }, 350);
+    }
+  };
+  const handlePressOut = () => {
+    setShowLines(false);
+  };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
@@ -87,7 +112,7 @@ export default function ModeZero() {
 
 
   if (!isFocused) {
-    return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+  return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
   // Render a single centered circle with the latest value color
   // Outer ring logic
@@ -185,11 +210,15 @@ export default function ModeZero() {
   });
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
+    <Pressable
+      style={{ flex: 1, backgroundColor: '#000' }}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
       <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {/* Dial ticks */}
-        {ticks}
-        {/* Outer ring */}
+        {/* Dial ticks (conditionally rendered) */}
+        {showLines && ticks}
+        {/* Outer ring (always visible) */}
         <Circle
           cx={centerX}
           cy={centerY}
@@ -201,6 +230,6 @@ export default function ModeZero() {
         {/* Inner circle */}
         <Circle cx={centerX} cy={centerY} r={innerRadius} fill={currentPixel} />
       </Svg>
-    </View>
+    </Pressable>
   );
 }
