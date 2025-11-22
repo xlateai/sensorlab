@@ -21,6 +21,8 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const [url, setUrl] = useState<string>('');
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [addressBarText, setAddressBarText] = useState<string>('');
+  const [searchText, setSearchText] = useState<string>('');
+  const [clipboardContent, setClipboardContent] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
@@ -29,12 +31,13 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const [addressBarFocused, setAddressBarFocused] = useState<boolean>(false);
   const webViewRef = useRef<any>(null);
   const addressBarRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const inputAccessoryViewID = useRef(`addressBarAccessoryView-${Date.now()}-${Math.random()}`).current;
 
+  // Check clipboard when component becomes visible
   useEffect(() => {
-    // Try to get URL from clipboard when component mounts or becomes visible
     if (isVisible) {
-      loadFromClipboard();
+      checkClipboard();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
@@ -46,18 +49,29 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     }
   }, [currentUrl]);
 
-  const loadFromClipboard = async () => {
+  const checkClipboard = async () => {
     try {
       const clipboardText = await Clipboard.getStringAsync();
-      if (clipboardText) {
-        const trimmed = clipboardText.trim();
-        const normalized = normalizeUrl(trimmed);
-        if (isValidUrl(normalized)) {
-          setUrl(normalized);
-        }
+      if (clipboardText && clipboardText.trim()) {
+        setClipboardContent(clipboardText.trim());
+      } else {
+        setClipboardContent('');
       }
     } catch (error) {
       console.error('Error reading clipboard:', error);
+      setClipboardContent('');
+    }
+  };
+
+  const handleOpenFromClipboard = () => {
+    if (clipboardContent) {
+      handleNavigate(clipboardContent);
+    }
+  };
+
+  const handleSearch = () => {
+    if (searchText.trim()) {
+      handleNavigate(searchText.trim());
     }
   };
 
@@ -94,7 +108,16 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         addressBarRef.current.blur();
       }
     } else {
-      setIsInvalidUrl(true);
+      // If not a valid URL, search it on Google
+      const searchQuery = encodeURIComponent(inputUrl.trim());
+      const googleSearchUrl = `https://www.google.com/search?q=${searchQuery}`;
+      setUrl(googleSearchUrl);
+      setCurrentUrl(googleSearchUrl);
+      setAddressBarText(googleSearchUrl);
+      setIsInvalidUrl(false);
+      if (addressBarRef.current) {
+        addressBarRef.current.blur();
+      }
     }
   };
 
@@ -127,19 +150,34 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     );
   }
 
-  if (!url && !isInvalidUrl) {
+  // Show initial screen with search bar and clipboard button when no URL is loaded
+  if (!url) {
     return (
       <View style={styles.container}>
-        <Text style={styles.hint}>No URL found in clipboard. Copy a URL and reopen this view.</Text>
-      </View>
-    );
-  }
-
-  if (isInvalidUrl && !url) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.invalidAddressContainer}>
-          <Text style={styles.invalidAddressText}>Invalid address</Text>
+        <View style={styles.initialScreen}>
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchBar}
+            value={searchText}
+            onChangeText={setSearchText}
+            onSubmitEditing={handleSearch}
+            placeholder="Search on Google"
+            placeholderTextColor="#666"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {clipboardContent && (
+            <TouchableOpacity
+              style={styles.clipboardButton}
+              onPress={handleOpenFromClipboard}
+            >
+              <View style={{ marginRight: 8 }}>
+                <MaterialIcons name="content-paste" size={18} color="#fff" />
+              </View>
+              <Text style={styles.clipboardButtonText}>Open link from clipboard</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -524,6 +562,41 @@ const styles = StyleSheet.create({
   loadingScreenBackground: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  initialScreen: {
+    flex: 1,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  searchBar: {
+    width: '100%',
+    height: 48,
+    backgroundColor: '#222',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  clipboardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#222',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  clipboardButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
   hint: {
     color: '#888',
