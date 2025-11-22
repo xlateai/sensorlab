@@ -35,7 +35,8 @@ export default function ModeZero() {
 
   // Animate rotation value smoothly
   useEffect(() => {
-  const rotationDeg = (rawRotation * 180) / Math.PI + 30;
+    if (!isMountedRef.current) return;
+    const rotationDeg = (rawRotation * 180) / Math.PI + 30;
     Animated.timing(rotationAnim, {
       toValue: rotationDeg,
       duration: 120,
@@ -214,6 +215,7 @@ export default function ModeZero() {
   
   // Animate orb visibility when menu closes (fade out top, then fade in center)
   useEffect(() => {
+    if (!isMountedRef.current) return;
     if (!showMenu && !isManuallyClosingRef.current) {
       // Get current values from the drag state
       const currentTopOpacity = (orbTopOpacity as any)._value || 0;
@@ -251,6 +253,7 @@ export default function ModeZero() {
           }),
         ]),
       ]).start(() => {
+        if (!isMountedRef.current) return;
         // After animation completes, ensure top orb stays at 0 and center at 1
         // This prevents any flash-back
         orbTopOpacity.setValue(0);
@@ -263,6 +266,7 @@ export default function ModeZero() {
 
   // Lock orb states when menu closes
   useEffect(() => {
+    if (!isMountedRef.current) return;
     if (!showMenu) {
       // When menu closes, only lock orb states if we're not manually closing (to allow animation to complete)
       if (!isManuallyClosingRef.current) {
@@ -284,23 +288,28 @@ export default function ModeZero() {
 
 
   const [isFocused, setIsFocused] = useState(true);
+  const isMountedRef = useRef(true);
   useFocusEffect(
     React.useCallback(() => {
+      isMountedRef.current = true;
       setIsFocused(true);
       const sub = Magnetometer.addListener(data => {
+        if (!isMountedRef.current) return;
         bufferRef.current.push(data);
         if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
         magnetometerRef.current = data;
       });
       Magnetometer.setUpdateInterval(24);
       const interval = setInterval(() => {
+        if (!isMountedRef.current) return;
         setBuffer([...bufferRef.current]);
         setMagnetometer(magnetometerRef.current);
       }, 33);
       return () => {
-        setIsFocused(false);
+        isMountedRef.current = false;
         sub && sub.remove();
         clearInterval(interval);
+        // Don't update state during unmount to avoid hooks mismatch
       };
     }, [])
   );
@@ -650,6 +659,7 @@ export default function ModeZero() {
   useEffect(() => {
     let running = true;
     function animate() {
+      if (!running || !isMountedRef.current) return;
       setBlobOffset(prev => {
         const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
         return {
@@ -657,7 +667,7 @@ export default function ModeZero() {
           y: lerp(prev.y, targetOffset.y, 0.25)
         };
       });
-      if (running) requestAnimationFrame(animate);
+      if (running && isMountedRef.current) requestAnimationFrame(animate);
     }
     animate();
     return () => { running = false; };
@@ -693,7 +703,7 @@ export default function ModeZero() {
     
     let running = true;
     function animate() {
-      if (!running || !showMenu) return;
+      if (!running || !showMenu || !isMountedRef.current) return;
       
       const currentValue = (bgColorAnim as any)._value || 0;
       const targetValue = bgColorTargetRef.current;
@@ -711,7 +721,7 @@ export default function ModeZero() {
       const hex = grayValue.toString(16).padStart(2, '0');
       setBgColor(`#${hex}${hex}${hex}`);
       
-      requestAnimationFrame(animate);
+      if (running && isMountedRef.current) requestAnimationFrame(animate);
     }
     animate();
     return () => { running = false; };
