@@ -31,7 +31,7 @@ function normalizeValue(val: number, min: number, max: number): number {
 }
 
 /**
- * Calculates RGB values from magnetometer data using variations within the selected range
+ * Calculates RGB values from magnetometer data by mapping to the selected range
  */
 export function calculateColorFromMagnetometer(
   magnetometer: MagnetometerData | null,
@@ -41,40 +41,20 @@ export function calculateColorFromMagnetometer(
   let r = 0, g = 0, b = 0;
   
   if (magnetometer !== null) {
-    // Calculate center points of magnetometer ranges
-    const centerX = (minMax.minX + minMax.maxX) / 2;
-    const centerY = (minMax.minY + minMax.maxY) / 2;
-    const centerZ = (minMax.minZ + minMax.maxZ) / 2;
+    // Normalize magnetometer values to [0, 1]
+    const rNorm = normalizeValue(magnetometer.x, minMax.minX, minMax.maxX);
+    const gNorm = normalizeValue(magnetometer.y, minMax.minY, minMax.maxY);
+    const bNorm = normalizeValue(magnetometer.z, minMax.minZ, minMax.maxZ);
     
-    // Calculate range sizes for normalization
-    const rangeX = minMax.maxX - minMax.minX;
-    const rangeY = minMax.maxY - minMax.minY;
-    const rangeZ = minMax.maxZ - minMax.minZ;
-    
-    // Calculate deviation from center, normalized to [-1, 1]
-    const deviationX = rangeX !== 0 ? (magnetometer.x - centerX) / rangeX : 0;
-    const deviationY = rangeY !== 0 ? (magnetometer.y - centerY) / rangeY : 0;
-    const deviationZ = rangeZ !== 0 ? (magnetometer.z - centerZ) / rangeZ : 0;
-    
-    // Calculate center points of selected ranges
-    const rangeCenterR = (range.rMin + range.rMax) / 2;
-    const rangeCenterG = (range.gMin + range.gMax) / 2;
-    const rangeCenterB = (range.bMin + range.bMax) / 2;
-    
-    // Calculate range sizes for variation
-    const rangeSizeR = range.rMax - range.rMin;
-    const rangeSizeG = range.gMax - range.gMin;
-    const rangeSizeB = range.bMax - range.bMin;
-    
-    // Apply variations around center, constrained to selected range
-    const rVaried = Math.max(range.rMin, Math.min(range.rMax, rangeCenterR + deviationX * rangeSizeR * 0.5));
-    const gVaried = Math.max(range.gMin, Math.min(range.gMax, rangeCenterG + deviationY * rangeSizeG * 0.5));
-    const bVaried = Math.max(range.bMin, Math.min(range.bMax, rangeCenterB + deviationZ * rangeSizeB * 0.5));
+    // Map normalized values to selected range [rangeMin, rangeMax]
+    const rMapped = rNorm * (range.rMax - range.rMin) + range.rMin;
+    const gMapped = gNorm * (range.gMax - range.gMin) + range.gMin;
+    const bMapped = bNorm * (range.bMax - range.bMin) + range.bMin;
     
     // Convert to [0, 255] range
-    r = Math.round(rVaried * 255);
-    g = Math.round(gVaried * 255);
-    b = Math.round(bVaried * 255);
+    r = Math.round(rMapped * 255);
+    g = Math.round(gMapped * 255);
+    b = Math.round(bMapped * 255);
   }
   
   return { r, g, b };
