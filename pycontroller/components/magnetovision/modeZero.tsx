@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View } from 'react-native';
+// ...existing code...
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
@@ -189,6 +189,42 @@ export default function ModeZero() {
     };
   }
 
+  // Highlight logic for nearest needle
+  let highlightIdx: number | null = null;
+  let highlightProps = { fill: tickColor, scale: 1 };
+  // Joystick state for highlight
+  let joystickAngle: number | null = null;
+  let joystickAtMax = false;
+  if (showLines && tapPosition && fingerPosition) {
+    const dx = fingerPosition.x - tapPosition.x;
+    const dy = fingerPosition.y - tapPosition.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const maxDist = 36; // 10% shorter than 40
+    joystickAtMax = dist >= maxDist - 0.5; // allow for rounding
+    if (joystickAtMax) {
+      joystickAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (joystickAngle < 0) joystickAngle += 360;
+      // Find nearest tick
+      if (joystickAngle !== null) {
+        let minDiff = 999;
+        tickAngles.forEach((angle, idx) => {
+          if (joystickAngle !== null) {
+            let diff = Math.abs(angle - joystickAngle);
+            if (diff > 180) diff = 360 - diff;
+            if (diff < minDiff) {
+              minDiff = diff;
+              highlightIdx = idx;
+            }
+          }
+        });
+        highlightProps = {
+          fill: 'rgba(255,255,255,0.85)', // brighter
+          scale: 1.7 // bigger
+        };
+      }
+    }
+  }
+
   // Triangle ticks with tip at inner end and thin base at outer edge
   const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
@@ -196,11 +232,17 @@ export default function ModeZero() {
     const distToCenter = Math.sqrt(
       Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
     );
-    const tickLength = distToCenter * 0.2;
+    // Highlight if needed
+    let tickLength = distToCenter * 0.2;
+    let baseWidth = 4;
+    let fillColor = tickColor;
+    if (highlightIdx === idx && joystickAtMax) {
+      tickLength *= highlightProps.scale;
+      baseWidth *= highlightProps.scale;
+      fillColor = highlightProps.fill;
+    }
     const tipX = edge.x - edge.dx * tickLength;
     const tipY = edge.y - edge.dy * tickLength;
-    // Base width (super thin)
-    const baseWidth = 4; // px, adjust for thinness
     // Perpendicular direction
     const perpDx = -edge.dy;
     const perpDy = edge.dx;
@@ -215,7 +257,7 @@ export default function ModeZero() {
       <Path
         key={angle}
         d={trianglePath}
-        fill={tickColor}
+        fill={fillColor}
       />
     );
   });
@@ -265,8 +307,8 @@ export default function ModeZero() {
             const dx = fingerPosition.x - tapPosition.x;
             const dy = fingerPosition.y - tapPosition.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            // Limit max joystick movement (e.g. 40px)
-            const maxDist = 40;
+            // Limit max joystick movement (now 36px)
+            const maxDist = 36;
             const moveDist = Math.min(dist, maxDist);
             const angle = Math.atan2(dy, dx);
             offsetX = centerX + Math.cos(angle) * moveDist;
@@ -275,6 +317,6 @@ export default function ModeZero() {
           return <Circle cx={offsetX} cy={offsetY} r={innerRadius} fill={currentPixel} />;
         })()}
       </Svg>
-    </Pressable>
+  </View>
   );
 }
