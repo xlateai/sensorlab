@@ -138,7 +138,7 @@ export default function ModeZero() {
       setShowMenu(true);
       // Set initial values for drag-responsive animations
       bgColorAnim.setValue(1);
-      // Fade out center orb, fade in top orb simultaneously
+      // Animate menu slide and opacity
       Animated.parallel([
         Animated.timing(menuSlideAnim, {
           toValue: 0,
@@ -152,6 +152,9 @@ export default function ModeZero() {
           useNativeDriver: true,
           easing: Easing.out(Easing.ease),
         }),
+      ]).start();
+      // Sequential orb fade: first fade out center completely, then fade in top
+      Animated.sequence([
         Animated.timing(orbCenterOpacity, {
           toValue: 0,
           duration: 200,
@@ -172,35 +175,53 @@ export default function ModeZero() {
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
   
-  // Animate orb visibility when menu closes (fade out top, fade in center)
+  // Animate orb visibility when menu closes (fade out top, then fade in center)
   useEffect(() => {
     if (!showMenu) {
-      // Fade out top orb, fade in center orb simultaneously
-      Animated.parallel([
-        Animated.timing(orbTopOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbCenterOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]).start();
+      // Stop any ongoing orb animations first
+      orbTopOpacity.stopAnimation();
+      orbCenterOpacity.stopAnimation();
+      
+      // Get current values to see if we need to animate
+      const currentTopOpacity = (orbTopOpacity as any)._value || 0;
+      const currentCenterOpacity = (orbCenterOpacity as any)._value || 0;
+      
+      // Only animate if top is visible or center is not fully visible
+      if (currentTopOpacity > 0 || currentCenterOpacity < 1) {
+        // Sequential: first fade out top completely, then fade in center
+        Animated.sequence([
+          Animated.timing(orbTopOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+          Animated.timing(orbCenterOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+        ]).start();
+      } else {
+        // Already in correct state, just ensure values are set
+        orbTopOpacity.setValue(0);
+        orbCenterOpacity.setValue(1);
+      }
     }
   }, [showMenu]);
 
   // Make background color and orb visibility respond to drag in real-time
   useEffect(() => {
-    if (!showMenu) return;
+    if (!showMenu) {
+      // When menu closes, immediately remove listener and ensure final orb state
+      return;
+    }
     
     const threshold = screenHeight * 0.2; // Same threshold as dismiss
     
     const listenerId = menuPanY.addListener(({ value }) => {
-      // Interpolate background color: 0 drag = full light (#111111), threshold drag = black (#000)
+      // Interpolate background color: 0 drag = full light (#0a0a0a), threshold drag = black (#000)
       const bgProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
       bgColorAnim.setValue(bgProgress);
       
@@ -498,9 +519,15 @@ export default function ModeZero() {
     menuPanY.stopAnimation();
     menuSlideAnim.stopAnimation();
     menuOpacity.stopAnimation();
+    orbTopOpacity.stopAnimation();
+    orbCenterOpacity.stopAnimation();
     
-    // Background and orb position are already at correct values from drag listener
-    // Just hide the menu
+    // Immediately set orb states to final values (top invisible, center visible)
+    // This prevents any flash from the drag listener when menuPanY is reset
+    orbTopOpacity.setValue(0);
+    orbCenterOpacity.setValue(1);
+    
+    // Hide menu first, then reset values
     setShowMenu(false);
     menuPanY.setValue(0);
     menuSlideAnim.setValue(0);
@@ -544,18 +571,21 @@ export default function ModeZero() {
               useNativeDriver: false,
               easing: Easing.out(Easing.ease),
             }),
-            Animated.timing(orbTopOpacity, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease),
-            }),
-            Animated.timing(orbCenterOpacity, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease),
-            }),
+            // Sequential orb fade: first fade out center, then fade in top
+            Animated.sequence([
+              Animated.timing(orbCenterOpacity, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+              }),
+              Animated.timing(orbTopOpacity, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+              }),
+            ]),
           ]).start();
         }
       },
@@ -606,8 +636,8 @@ export default function ModeZero() {
   // Update background color based on animation value
   useEffect(() => {
     const listenerId = bgColorAnim.addListener(({ value }) => {
-      // Interpolate: 0 = #000, 1 = #111111 (warmer, less blue tint)
-      const grayValue = Math.round(value * 17); // 17 = 0x11
+      // Interpolate: 0 = #000 (pure black), 1 = #0a0a0a (very dark, slightly off-black)
+      const grayValue = Math.round(value * 10); // 10 = 0x0a
       const hex = grayValue.toString(16).padStart(2, '0');
       setBgColor(`#${hex}${hex}${hex}`);
     });
