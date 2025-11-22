@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { Text, Animated } from 'react-native';
 // ...existing code...
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Magnetometer } from 'expo-sensors';
+import { Magnetometer, DeviceMotion } from 'expo-sensors';
 import { Svg, Circle, Line, Defs, LinearGradient, Stop, Path } from 'react-native-svg';
 
 
@@ -10,6 +11,23 @@ const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
 export default function ModeZero() {
+  // Device orientation state
+  const [deviceRotation, setDeviceRotation] = useState(0); // in radians
+  useEffect(() => {
+    let sub = DeviceMotion.addListener(motion => {
+      // Use yaw (rotation around Z axis) for screen rotation
+      // DeviceMotion returns rotation in radians
+      if (motion?.rotation?.gamma !== undefined) {
+        // gamma is rotation around Z axis (portrait)
+        setDeviceRotation(motion.rotation.gamma);
+      } else if (motion?.rotation?.alpha !== undefined) {
+        // fallback to alpha if gamma is not available
+        setDeviceRotation(motion.rotation.alpha);
+      }
+    });
+    DeviceMotion.setUpdateInterval(33);
+    return () => { sub && sub.remove(); };
+  }, []);
   // Gesture state for double-tap-and-hold
   const [showLines, setShowLines] = useState(false);
   const lastTapRef = useRef<number>(0);
@@ -148,6 +166,11 @@ export default function ModeZero() {
   const tickColor = 'rgba(216,216,216,0.45)'; // silvery and faded
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+  // Needles array with Title property
+  const needles = [
+    { idx: 0, Title: 'Hi' },      // Left needle (0 degrees)
+    { idx: 4, Title: 'There' },   // Right needle (180 degrees)
+  ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
   // Calculate tick positions
@@ -363,6 +386,37 @@ export default function ModeZero() {
           fill={currentPixel}
         />
       </Svg>
+      {/* Render needle titles at the tip of each needle, only when needles are shown */}
+      {showLines && needles.map((needle, i) => {
+        const angle = tickAngles[needle.idx];
+        const rad = degToRad(angle);
+        const edge = getEdgeIntersection(rad);
+        const distToCenter = Math.sqrt(
+          Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
+        );
+        let tickLength = distToCenter * 0.2;
+        if (animatedNeedle.idx === needle.idx) {
+          tickLength *= animatedNeedle.scale;
+        }
+        const tipX = edge.x - edge.dx * tickLength;
+        const tipY = edge.y - edge.dy * tickLength;
+    // Rotation in degrees, wrapped to [0, 360)
+  let rotationDeg = (-deviceRotation * 180) / Math.PI - 45;
+  rotationDeg = ((rotationDeg % 360) + 360) % 360;
+        return (
+          <Animated.View
+            key={needle.Title}
+            style={{
+              position: 'absolute',
+              left: tipX - 20,
+              top: tipY - 12,
+              transform: [{ rotate: `${rotationDeg}deg` }],
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 18 }}>{needle.Title}</Text>
+          </Animated.View>
+        );
+      })}
   </View>
   );
 }
