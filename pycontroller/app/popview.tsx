@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
 import Settings from './widgets/settings';
 import Docs from './widgets/docs';
-import { playChimeHaptic } from './haptics';
+import { playChimeHaptic, playReverseChime } from './haptics';
 
 interface PopViewProps {
   isVisible: boolean;
@@ -220,6 +220,9 @@ export default function PopView({
   // Close menu handler
   const handleClose = () => {
     isManuallyClosingRef.current = true;
+    
+    // Play reverse chime haptic when closing popview
+    playReverseChime();
     
     // Stop any ongoing orb animations to prevent conflicts
     orbTopOpacity.stopAnimation();

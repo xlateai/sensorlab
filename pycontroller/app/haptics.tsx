@@ -86,3 +86,20 @@ export async function playChimeHaptic() {
   };
   await Sensorlib.playHaptic(pattern);
 }
+
+export async function playReverseChime() {
+  if (!Sensorlib || typeof Sensorlib.playHaptic !== 'function') {
+    // ExpoHaptics.impactAsync(ExpoHaptics.ImpactFeedbackStyle.Medium);
+    return;
+  }
+  // Reverse of playChimeHaptic: fade out instead of fade in
+  const pattern: HapticPatternRequest = {
+    type: 'continuous',
+    duration: 0.35,
+    curve: [
+      { time: 0.0, intensity: 1.0, sharpness: 0.3 },
+      { time: 0.35, intensity: 0.0, sharpness: 0.0 },
+    ]
+  };
+  await Sensorlib.playHaptic(pattern);
+}
