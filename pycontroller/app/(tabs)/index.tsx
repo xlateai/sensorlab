@@ -6,17 +6,12 @@ import { StatusBar, View, PanResponder, Dimensions, Platform } from 'react-nativ
 import * as ExpoStatusBar from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
 import ModeZero from '../../components/magnetovision/modeZero';
-import ModeOne from '../../components/magnetovision/modeOne';
-import ModeTwo from '../../components/magnetovision/modeTwo';
-import ModeThree from '../../components/magnetovision/modeThree';
-import ModeFour from '../../components/magnetovision/modeFour';
 import { useStorage } from '../StorageContext';
 
 export default function HomeScreen() {
   // Fullscreen state, default enabled
   const [fullscreen, setFullscreen] = useState(true);
-  const { get, set } = useStorage();
-  const [mode, setMode] = useState(() => Number(get('selectedMode') ?? 0));
+  // Removed mode selector logic; always show ModeZero
   const navigation = useNavigation();
   const screenWidth = Dimensions.get('window').width;
   const toggledRef = useRef(false);
@@ -26,18 +21,7 @@ export default function HomeScreen() {
   // No need for tapTimesRef, just track if tap happened
   const tapDetectedRef = useRef(false);
 
-  // Sync mode from context when it changes in storage
-  const selectedMode = get('selectedMode');
-  useEffect(() => {
-    if (selectedMode !== undefined && Number(selectedMode) !== mode) {
-      setMode(Number(selectedMode));
-    }
-  }, [selectedMode]);
-
-  // Persist mode changes to context/storage
-  useEffect(() => {
-    set('selectedMode', String(mode));
-  }, [mode, set]);
+  // Removed mode selector logic
 
   // PanResponder for left-to-right swipe to toggle fullscreen (only once per gesture)
   const panResponder = useRef(
@@ -47,7 +31,10 @@ export default function HomeScreen() {
         toggledRef.current = false;
         gestureReadyRef.current = false;
         swipeActiveRef.current = false;
-  // ...existing code...
+        return evt.nativeEvent.locationX < screenWidth * 0.1;
+      },
+      onStartShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Only capture touches in the left edge area, let others pass through to child
         return evt.nativeEvent.locationX < screenWidth * 0.1;
       },
       onPanResponderGrant: (evt, gestureState) => {
@@ -125,23 +112,7 @@ export default function HomeScreen() {
   }, [fullscreen, navigation]);
 
 
-  // Render the correct mode component based on mode index
-  const renderMode = useMemo(() => {
-    switch (mode) {
-      case 0:
-        return <ModeZero key="mode-zero" />;
-      case 1:
-        return <ModeOne key="mode-one" />;
-      case 2:
-        return <ModeTwo key="mode-two" />;
-      case 3:
-        return <ModeThree key="mode-three" />;
-      case 4:
-        return <ModeFour key="mode-four" />;
-      default:
-        return <ModeZero key="mode-zero" />;
-    }
-  }, [mode]);
+  // Always render ModeZero
 
   return (
     <View
@@ -150,7 +121,7 @@ export default function HomeScreen() {
     >
       <StatusBar hidden={fullscreen} animated />
       <View style={{ flex: 1 }}>
-        {renderMode}
+        <ModeZero key="mode-zero" />
       </View>
     </View>
   );

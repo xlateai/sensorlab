@@ -1,11 +1,12 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useStorage } from '../StorageContext';
-import { StatusBar } from 'react-native';
+import { StatusBar, Text } from 'react-native';
 import ModeZero from '../../components/magnetovision/modeZero';
 import ModeOne from '../../components/magnetovision/modeOne';
 import ModeTwo from '../../components/magnetovision/modeTwo';
 import ModeThree from '../../components/magnetovision/modeThree';
 import ModeFour from '../../components/magnetovision/modeFour';
+import ModeFive from '../../components/magnetovision/modeFive';
 import { Dimensions, View, Animated, PanResponder, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
@@ -53,8 +54,14 @@ export default function VideoScreen() {
         return <ModeThree key="mode-three" />;
       case 4:
         return <ModeFour key="mode-four" />;
+      case 5:
+        return <ModeFive key="mode-five" />;
       default:
-        return <ModeZero key="mode-zero" />;
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+            <Text style={{ color: '#fff', fontSize: 20, textAlign: 'center' }}>Mode Not Yet Implemented</Text>
+          </View>
+        );
     }
   }, [mode]);
 
