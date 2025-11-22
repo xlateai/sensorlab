@@ -968,15 +968,12 @@ export default function ModeZero() {
               top: screenHeight * 0.30 - 8,
               borderTopLeftRadius: 35,
               borderTopRightRadius: 35,
-              backgroundColor: currentPixel,
-              opacity: menuOpacity.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 0.15],
-              }),
+              backgroundColor: 'transparent',
+              opacity: menuOpacity,
               shadowColor: currentPixel,
               shadowOffset: { width: 0, height: -12 },
               shadowOpacity: 0.8,
-              shadowRadius: 16,
+              shadowRadius: 35,
               transform: [
                 { translateY: menuSlideAnim },
               ],
