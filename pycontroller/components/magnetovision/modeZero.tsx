@@ -107,8 +107,8 @@ export default function ModeZero() {
   const centerY = canvasHeight / 2;
 
   // Dial tick rendering
-  const tickThickness = 1.2; // thinner
-  const tickColor = '#C0C0C0'; // silver
+  const tickThickness = 1.1; // slightly thinner
+  const tickColor = 'rgba(216,216,216,0.45)'; // silvery and faded
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Convert degrees to radians
