@@ -12,7 +12,6 @@ import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollVi
 import { FuriganaViewer } from './furigana-viewer';
 import textExamplesJSONData from './assets/data/japanese_text_examples.json';
 import { InputAccessoryView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { playSimpleHaptic } from '@/app/haptics';
 
 
@@ -33,7 +32,7 @@ function BlinkingCursor({ style, buffer }: { style?: any, buffer: string }) {
         opacity: visible ? 1 : 0,
         marginLeft: 2,
         width: 2,
-        height: style?.fontSize || 26,
+        height: style?.fontSize || 23.4,
         backgroundColor: '#e0e0e0',
         borderRadius: 1,
         transitionProperty: 'margin-left',
@@ -251,7 +250,7 @@ export default function TypeRacerScreen() {
     // ...existing code...
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <View style={{flex: 1}}>
         {/* Overlay to close keyboard when clicking outside flash displays */}
         {inputFocused && (
@@ -266,13 +265,13 @@ export default function TypeRacerScreen() {
         {/* Modal for selecting example */}
         {showListModal && (
           <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, justifyContent: 'center', alignItems: 'center'}}>
-            <View style={{maxHeight: '80%', width: 340, backgroundColor: '#181818', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#333'}}>
-              <Text style={{color: '#39FF14', fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center'}}>Select Example</Text>
-              <ScrollView style={{maxHeight: 400}}>
+            <View style={{maxHeight: '80%', width: 306, backgroundColor: '#181818', borderRadius: 16.2, padding: 16.2, borderWidth: 1, borderColor: '#333'}}>
+              <Text style={{color: '#39FF14', fontSize: 18, fontWeight: 'bold', marginBottom: 10.8, textAlign: 'center'}}>Select Example</Text>
+              <ScrollView style={{maxHeight: 360}}>
                 {Array.isArray(textExamplesJSONData) && textExamplesJSONData.map((ex, idx) => (
                   <TouchableOpacity
                     key={idx}
-                    style={{paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#222', backgroundColor: idx === currentIndex ? '#222' : 'transparent', borderRadius: 8}}
+                    style={{paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#222', backgroundColor: idx === currentIndex ? '#222' : 'transparent', borderRadius: 7.2}}
                     onPress={() => {
                       setCurrentIndex(idx);
                       setHistory([idx]);
@@ -280,20 +279,20 @@ export default function TypeRacerScreen() {
                       setShowListModal(false);
                     }}
                   >
-                    <Text style={{color: idx === currentIndex ? '#39FF14' : '#fff', fontSize: 17}}>
+                    <Text style={{color: idx === currentIndex ? '#39FF14' : '#fff', fontSize: 15.3}}>
                       {[ex.level ? `Level: ${ex.level}` : null, ex.casual ? `| ${ex.casual}` : null].filter(Boolean).join(' ')}
                     </Text>
-                    <Text style={{color: '#b0b0b0', fontSize: 15}} numberOfLines={1}>
+                    <Text style={{color: '#b0b0b0', fontSize: 13.5}} numberOfLines={1}>
                       {Array.isArray(ex.tokens) ? ex.tokens.map(t => t.string).join('') : ''}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
               <TouchableOpacity
-                style={{marginTop: 18, backgroundColor: '#222', borderRadius: 12, padding: 10, alignItems: 'center'}}
+                style={{marginTop: 16.2, backgroundColor: '#222', borderRadius: 10.8, padding: 9, alignItems: 'center'}}
                 onPress={() => setShowListModal(false)}
               >
-                <Text style={{color: '#fff', fontSize: 16}}>Cancel</Text>
+                <Text style={{color: '#fff', fontSize: 14.4}}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -301,38 +300,38 @@ export default function TypeRacerScreen() {
 
         {showHistoryModal && (
           <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, justifyContent: 'center', alignItems: 'center'}}>
-            <View style={{maxHeight: '80%', width: 340, backgroundColor: '#181818', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#333'}}>
-              <Text style={{color: '#39FF14', fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center'}}>History</Text>
-              <ScrollView style={{maxHeight: 400}}>
+            <View style={{maxHeight: '80%', width: 306, backgroundColor: '#181818', borderRadius: 16.2, padding: 16.2, borderWidth: 1, borderColor: '#333'}}>
+              <Text style={{color: '#39FF14', fontSize: 18, fontWeight: 'bold', marginBottom: 10.8, textAlign: 'center'}}>History</Text>
+              <ScrollView style={{maxHeight: 360}}>
                   {history.map((idx, i) => (
                     <TouchableOpacity
                       key={i}
-                      style={{paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#222', backgroundColor: i === historyPos ? '#222' : 'transparent', borderRadius: 8}}
+                      style={{paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#222', backgroundColor: i === historyPos ? '#222' : 'transparent', borderRadius: 7.2}}
                       onPress={() => {
                         setCurrentIndex(idx);
                         setHistoryPos(i);
                         setShowHistoryModal(false);
                       }}
                     >
-                      <Text style={{color: i === historyPos ? '#39FF14' : '#fff', fontSize: 17}}>
+                      <Text style={{color: i === historyPos ? '#39FF14' : '#fff', fontSize: 15.3}}>
                         {[textExamplesJSONData[idx]?.level ? `Level: ${textExamplesJSONData[idx].level}` : null, textExamplesJSONData[idx]?.casual ? `| ${textExamplesJSONData[idx].casual}` : null].filter(Boolean).join(' ')}
                       </Text>
-                      <Text style={{color: '#b0b0b0', fontSize: 15}} numberOfLines={1}>
+                      <Text style={{color: '#b0b0b0', fontSize: 13.5}} numberOfLines={1}>
                         {Array.isArray(textExamplesJSONData[idx]?.tokens) ? textExamplesJSONData[idx].tokens.map(t => t.string).join('') : ''}
                       </Text>
                     </TouchableOpacity>
                   ))}
               </ScrollView>
               <TouchableOpacity
-                style={{marginTop: 18, backgroundColor: '#222', borderRadius: 12, padding: 10, alignItems: 'center'}}
+                style={{marginTop: 16.2, backgroundColor: '#222', borderRadius: 10.8, padding: 9, alignItems: 'center'}}
                 onPress={() => setShowHistoryModal(false)}
               >
-                <Text style={{color: '#fff', fontSize: 16}}>Close</Text>
+                <Text style={{color: '#fff', fontSize: 14.4}}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
-        <ScrollView contentContainerStyle={[styles.scrollContainer, {paddingBottom: 192}] /* align scroll bottom with media area top */}>
+        <ScrollView contentContainerStyle={[styles.scrollContainer, {paddingBottom: 172.8}] /* align scroll bottom with media area top */}>
           {/* Info bar at top of main area */}
           <TypeStatsBar
             level={example?.level}
@@ -344,7 +343,7 @@ export default function TypeRacerScreen() {
             cps={cps}
           />
           {/* Show buttons */}
-          <View style={{flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'flex-start', marginBottom: 8, marginTop: 0}}>
+          <View style={{flexDirection: 'row', width: '100%', alignItems: 'center', justifyContent: 'flex-start', marginBottom: 7.2, marginTop: 0}}>
             <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between'}}>
               <View style={{flexDirection: 'row'}}>
                 <TouchableOpacity
@@ -357,7 +356,7 @@ export default function TypeRacerScreen() {
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
-                style={{marginRight: 0, marginLeft: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center', height: 32}}
+                style={{marginRight: 0, marginLeft: 7.2, paddingVertical: 5.4, paddingHorizontal: 9, borderRadius: 14.4, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center', height: 28.8}}
                 onPress={async () => {
                   // Copy the current example's tokens, not the initial ones
                   if (example && Array.isArray(example.tokens)) {
@@ -383,10 +382,10 @@ export default function TypeRacerScreen() {
               >
                 {copied ? (
                   <Animated.View style={{opacity: fadeAnim}}>
-                    <MaterialIcons name="check" size={18} color="#fff" />
+                    <MaterialIcons name="check" size={16.2} color="#fff" />
                   </Animated.View>
                 ) : (
-                  <MaterialIcons name="content-copy" size={18} color="#fff" />
+                  <MaterialIcons name="content-copy" size={16.2} color="#fff" />
                 )}
               </TouchableOpacity>
             </View>
@@ -405,25 +404,25 @@ export default function TypeRacerScreen() {
           />
           {/* Completion section below info table, inside scroll area */}
           {showCompletionSection && (
-            <View style={{marginTop: 24, width: '100%', alignItems: 'center'}}>
-              <Text style={{fontSize: 32, fontWeight: '800', color: '#fff', marginBottom: 18}}>100% Complete!</Text>
-              <View style={{marginBottom: 24, alignItems: 'center', width: 320, backgroundColor: '#181818', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#333'}}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 8}}>
-                  <Text style={{fontSize: 16, color: '#b0b0b0'}}>Incorrect Keystrokes</Text>
-                  <Text style={{fontSize: 16, color: '#fff', fontWeight: 'bold'}}>{incorrectCount}</Text>
+            <View style={{marginTop: 21.6, width: '100%', alignItems: 'center'}}>
+              <Text style={{fontSize: 28.8, fontWeight: '800', color: '#fff', marginBottom: 16.2}}>100% Complete!</Text>
+              <View style={{marginBottom: 21.6, alignItems: 'center', width: 288, backgroundColor: '#181818', borderRadius: 14.4, padding: 14.4, borderWidth: 1, borderColor: '#333'}}>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 7.2}}>
+                  <Text style={{fontSize: 14.4, color: '#b0b0b0'}}>Incorrect Keystrokes</Text>
+                  <Text style={{fontSize: 14.4, color: '#fff', fontWeight: 'bold'}}>{incorrectCount}</Text>
                 </View>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 8}}>
-                  <Text style={{fontSize: 16, color: '#b0b0b0'}}>Time Spent</Text>
-                  <Text style={{fontSize: 16, color: '#fff', fontWeight: 'bold'}}>{endTime && startTime ? ((endTime - startTime) / 1000).toFixed(2) : '0.00'}s</Text>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 7.2}}>
+                  <Text style={{fontSize: 14.4, color: '#b0b0b0'}}>Time Spent</Text>
+                  <Text style={{fontSize: 14.4, color: '#fff', fontWeight: 'bold'}}>{endTime && startTime ? ((endTime - startTime) / 1000).toFixed(2) : '0.00'}s</Text>
                 </View>
                 <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%'}}>
-                  <Text style={{fontSize: 16, color: '#b0b0b0'}}>Characters/sec</Text>
-                  <Text style={{fontSize: 16, color: '#fff', fontWeight: 'bold'}}>{cps.toFixed(2)}</Text>
+                  <Text style={{fontSize: 14.4, color: '#b0b0b0'}}>Characters/sec</Text>
+                  <Text style={{fontSize: 14.4, color: '#fff', fontWeight: 'bold'}}>{cps.toFixed(2)}</Text>
                 </View>
               </View>
               <View style={{flexDirection: 'row', justifyContent: 'center'}}>
                 <TouchableOpacity
-                  style={{backgroundColor: '#222', borderRadius: 24, padding: 14, marginRight: 12, alignItems: 'center', justifyContent: 'center'}}
+                  style={{backgroundColor: '#222', borderRadius: 21.6, padding: 12.6, marginRight: 10.8, alignItems: 'center', justifyContent: 'center'}}
                   onPress={() => {
                     // Reset everything for replay
                     setInput('');
@@ -446,10 +445,10 @@ export default function TypeRacerScreen() {
                   }}
                 >
                   {/* Replay icon using MaterialIcons */}
-                  <MaterialIcons name="replay" size={32} color="#fff" />
+                  <MaterialIcons name="replay" size={28.8} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={{backgroundColor: '#222', borderRadius: 24, padding: 14, alignItems: 'center', justifyContent: 'center'}}
+                  style={{backgroundColor: '#222', borderRadius: 21.6, padding: 12.6, alignItems: 'center', justifyContent: 'center'}}
                   onPress={() => {
                     // Advance to next example index
                     if (historyPos < history.length - 1) {
@@ -471,7 +470,7 @@ export default function TypeRacerScreen() {
                   }}
                 >
                   {/* Next icon using MaterialIcons */}
-                  <MaterialIcons name="double-arrow" size={32} color="#fff" />
+                  <MaterialIcons name="double-arrow" size={28.8} color="#fff" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -670,7 +669,7 @@ export default function TypeRacerScreen() {
         currentIndex={currentIndex}
         textExamplesJSONData={Array.isArray(textExamplesJSONData) ? textExamplesJSONData : []}
       />
-      </SafeAreaView>
+      </View>
     );
 }
 
@@ -684,152 +683,152 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   flashBox: {
-  minWidth: 120,
-  minHeight: 48,
-  paddingVertical: 16,
-  paddingHorizontal: 32,
-    borderRadius: 28,
+  minWidth: 108,
+  minHeight: 43.2,
+  paddingVertical: 14.4,
+  paddingHorizontal: 28.8,
+    borderRadius: 25.2,
     backgroundColor: 'rgba(40,40,40,1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#fff',
     shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 10.8,
+    shadowOffset: {width: 0, height: 1.8},
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 3.6,
     flexDirection: 'row',
   },
   flashText: {
-    fontSize: 25.8, // 15% smaller than 30.4
+    fontSize: 23.22,
     color: '#e0e0e0',
     fontWeight: '600',
-    letterSpacing: 2,
+    letterSpacing: 1.8,
   },
   flashTextIncorrect: {
-    fontSize: 30.4,
+    fontSize: 27.36,
     color: 'rgba(255,0,0,0.8)',
     fontWeight: '600',
     textDecorationLine: 'line-through',
-    marginLeft: 8,
+    marginLeft: 7.2,
   },
   flashBoxReference: {
-    minWidth: 100,
-    minHeight: 40,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 28,
+    minWidth: 90,
+    minHeight: 36,
+    paddingVertical: 5.4,
+    paddingHorizontal: 14.4,
+    borderRadius: 25.2,
     backgroundColor: '#282828',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#fff',
     shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 10.8,
+    shadowOffset: {width: 0, height: 1.8},
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     marginTop: 0,
-    marginBottom: 6,
+    marginBottom: 5.4,
     flexDirection: 'column',
   },
   flashTextReference: {
-    fontSize: 30.4,
+    fontSize: 27.36,
     color: '#e0e0e0',
     fontWeight: '600',
-    letterSpacing: 2,
+    letterSpacing: 1.8,
     textAlign: 'center',
   },
   flashTextReferenceFurigana: {
-    fontSize: 17.1, // 5% smaller than 18
+    fontSize: 15.39,
     color: '#e0e0e0',
     marginBottom: 0,
     textAlign: 'center',
   },
   flashBoxSmall: {
-    minWidth: 100,
-    minHeight: 40,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 28,
+    minWidth: 90,
+    minHeight: 36,
+    paddingVertical: 5.4,
+    paddingHorizontal: 14.4,
+    borderRadius: 25.2,
     backgroundColor: 'rgba(40,40,40,1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#fff',
     shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 10.8,
+    shadowOffset: {width: 0, height: 1.8},
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     marginTop: 0,
-    marginBottom: 8,
+    marginBottom: 7.2,
     flexDirection: 'column',
   },
   flashTextSmall: {
-    fontSize: 26.6, // 5% smaller than 28
+    fontSize: 23.94,
     color: '#fff',
     fontWeight: '700',
     textAlign: 'center',
   },
   progressBarContainer: {
-    width: 320,
+    width: 288,
     maxWidth: '100%',
     alignSelf: 'center',
-    marginBottom: 8,
+    marginBottom: 7.2,
     marginTop: 0,
     backgroundColor: 'transparent',
     zIndex: 10,
   },
   startTypingBox: {
-    width: 320,
+    width: 288,
     maxWidth: '100%',
     alignSelf: 'center',
-    marginTop: 24,
-    marginBottom: 24,
+    marginTop: 21.6,
+    marginBottom: 21.6,
     borderWidth: 2,
     borderColor: '#39ff1466', // softer neon green
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: 'rgba(24,24,24,0.7)', // more transparent
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 12,
+    paddingVertical: 16.2,
+    paddingHorizontal: 10.8,
     shadowColor: '#39FF14',
     shadowOpacity: 0.07,
-    shadowRadius: 8,
-    shadowOffset: {width: 0, height: 1},
+    shadowRadius: 7.2,
+    shadowOffset: {width: 0, height: 0.9},
   },
   startTypingText: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#39ff1499', // softer neon green
     fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: 0.5,
+    letterSpacing: 0.45,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 24,
-    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingHorizontal: 14.4,
   },
   topContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28.8,
   },
   sentenceContainer: {
     width: '100%',
-    paddingLeft: 4,
-    paddingRight: 4,
-    marginBottom: 8,
+    paddingLeft: 3.6,
+    paddingRight: 3.6,
+    marginBottom: 7.2,
   },
   sentenceRow: {
     flexDirection: 'row',
@@ -840,58 +839,58 @@ const styles = StyleSheet.create({
   wordBlock: {
     flexDirection: 'column',
     alignItems: 'center',
-    marginHorizontal: 1,
+    marginHorizontal: 0.9,
     marginBottom: 0,
     paddingHorizontal: 0,
     paddingVertical: 0,
-    minWidth: 18,
+    minWidth: 16.2,
     flexShrink: 0,
   },
   furigana: {
-     fontSize: 14,
+     fontSize: 12.6,
      color: '#e0e0e0',
      marginBottom: 0,
      textAlign: 'left',
      userSelect: 'none', // Prevent furigana from being highlighted/selected
   },
   japanese: {
-    fontSize: 39.6, // 10% increase from 36
+    fontSize: 35.64,
     fontWeight: 'bold',
     textAlign: 'left',
     color: '#fff',
   },
   furiganaButton: {
-    marginTop: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    marginTop: 7.2,
+    paddingVertical: 5.4,
+    paddingHorizontal: 14.4,
     backgroundColor: '#222',
-    borderRadius: 16,
+    borderRadius: 14.4,
   },
   furiganaButtonText: {
-    fontSize: 16,
+    fontSize: 14.4,
     color: '#fff',
     fontWeight: '500',
   },
   inputContainer: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 14.4,
   },
   input: {
     width: '100%',
-    fontSize: 24,
+    fontSize: 21.6,
     borderWidth: 1,
     borderColor: '#222',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 24,
+    borderRadius: 7.2,
+    padding: 10.8,
+    marginBottom: 21.6,
     backgroundColor: '#111',
     color: '#fff',
   },
   success: {
-    fontSize: 24,
+    fontSize: 21.6,
     color: '#39FF14',
     fontWeight: 'bold',
-    marginTop: 16,
+    marginTop: 14.4,
   },
 });
