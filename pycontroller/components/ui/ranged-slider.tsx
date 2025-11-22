@@ -118,12 +118,64 @@ export default function RangedSlider({
     
     if (!isWithinBounds) return;
     
-    const dragMode = getDragMode(locationX, locationY);
+    let dragMode = getDragMode(locationX, locationY);
+    
+    // If no drag mode detected, check if clicking outside the range
+    // This allows snapping knobs to the touch position
+    let snappedMin = minValue;
+    let snappedMax = maxValue;
+    
+    if (!dragMode) {
+      const minPos = valueToPosition(minValue);
+      const maxPos = valueToPosition(maxValue);
+      const minDistance = getMinDistance();
+      
+      if (isVertical) {
+        const touchPos = locationY;
+        const minThumbCenter = minPos + thumbHeight / 2;
+        const maxThumbCenter = maxPos + thumbHeight / 2;
+        
+        // Clicking above the max thumb (lower Y) - snap max thumb up
+        if (touchPos < maxThumbCenter) {
+          const newValue = positionToValue(touchPos);
+          snappedMax = Math.max(minValue + minDistance, Math.min(newValue, 1));
+          onRangeChange(minValue, Number(snappedMax.toFixed(2)));
+          dragMode = 'max';
+        }
+        // Clicking below the min thumb (higher Y) - snap min thumb down
+        else if (touchPos > minThumbCenter) {
+          const newValue = positionToValue(touchPos);
+          snappedMin = Math.max(0, Math.min(newValue, maxValue - minDistance));
+          onRangeChange(Number(snappedMin.toFixed(2)), maxValue);
+          dragMode = 'min';
+        }
+      } else {
+        const touchPos = locationX;
+        const minThumbCenter = minPos + thumbWidth / 2;
+        const maxThumbCenter = maxPos + thumbWidth / 2;
+        
+        // Clicking before the min thumb (lower X) - snap min thumb left
+        if (touchPos < minThumbCenter) {
+          const newValue = positionToValue(touchPos);
+          snappedMin = Math.max(0, Math.min(newValue, maxValue - minDistance));
+          onRangeChange(Number(snappedMin.toFixed(2)), maxValue);
+          dragMode = 'min';
+        }
+        // Clicking after the max thumb (higher X) - snap max thumb right
+        else if (touchPos > maxThumbCenter) {
+          const newValue = positionToValue(touchPos);
+          snappedMax = Math.max(minValue + minDistance, Math.min(newValue, 1));
+          onRangeChange(minValue, Number(snappedMax.toFixed(2)));
+          dragMode = 'max';
+        }
+      }
+    }
+    
     if (dragMode) {
       activeTouchesRef.current.set(identifier, dragMode);
       dragStartRef.current = {
-        min: minValue,
-        max: maxValue,
+        min: snappedMin,
+        max: snappedMax,
         touchX: locationX,
         touchY: locationY,
       };
