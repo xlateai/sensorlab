@@ -1,8 +1,20 @@
-// ...existing code...
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
+import type { DeviceMotionMeasurement } from 'expo-sensors';
+import AccelerationScreen from '@/components/sensorvisuals/acceleration';
+import MagneticScreen from '@/components/sensorvisuals/magnetic';
+import AccelerationWithGravityScreen from '@/components/sensorvisuals/accelerationWithGravity';
+import RotationScreen from '@/components/sensorvisuals/rotation';
+import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
+import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
+import Slider from '@/components/ui/slider';
+import RangedSlider from '@/components/ui/ranged-slider';
+
+const screenHeight = Dimensions.get('window').height;
 
 // Blank popup component
 function BlankPopup({ visible, onClose, children }: {
@@ -57,15 +69,6 @@ function BlankPopup({ visible, onClose, children }: {
     </Modal>
   );
 }
-import { StyleSheet, View, Text, SafeAreaView, ScrollView } from 'react-native';
-import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
-import type { DeviceMotionMeasurement } from 'expo-sensors';
-import AccelerationScreen from '@/components/sensorvisuals/acceleration';
-import MagneticScreen from '@/components/sensorvisuals/magnetic';
-import AccelerationWithGravityScreen from '@/components/sensorvisuals/accelerationWithGravity';
-import RotationScreen from '@/components/sensorvisuals/rotation';
-import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
-import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 
 // Map measurement to component
 const measurementComponentMap: Record<string, React.ComponentType | null> = {
@@ -77,6 +80,40 @@ const measurementComponentMap: Record<string, React.ComponentType | null> = {
   'gyroscope': GyroscopeScreen,
   'barometer': null,
 };
+
+// Collapsible section component
+function CollapsibleSection({ 
+  title, 
+  children, 
+  defaultExpanded = false 
+}: { 
+  title: string; 
+  children: React.ReactNode; 
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  
+  return (
+    <View style={collapsibleStyles.section}>
+      <Pressable 
+        onPress={() => setExpanded(!expanded)}
+        style={collapsibleStyles.header}
+      >
+        <Text style={collapsibleStyles.headerText}>{title}</Text>
+        <MaterialIcons 
+          name={expanded ? 'expand-less' : 'expand-more'} 
+          size={24} 
+          color="#fff" 
+        />
+      </Pressable>
+      {expanded && (
+        <View style={collapsibleStyles.content}>
+          {children}
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function DevScreen() {
   // Popup state
@@ -94,6 +131,15 @@ export default function DevScreen() {
   const [gyroscopeData, setGyroscopeData] = useState<{x: number, y: number, z: number} | null>(null);
   const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
   const [paused, setPaused] = useState(true); // default to paused
+  
+  // UI/UX slider states
+  const [r, setR] = useState(0.5);
+  const [g, setG] = useState(0.5);
+  const [b, setB] = useState(0.5);
+  const [rangeMin, setRangeMin] = useState(0.2);
+  const [rangeMax, setRangeMax] = useState(0.8);
+  const [verticalRangeMin, setVerticalRangeMin] = useState(0.3);
+  const [verticalRangeMax, setVerticalRangeMax] = useState(0.7);
 
   // Store subscriptions in refs so we can kill them on pause and recreate on play
   const motionSubRef = useRef<any>(null);
@@ -157,31 +203,32 @@ export default function DevScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
-          {/* Modern Play/Pause Toggle Button */}
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <Text
-              onPress={() => setPaused(p => !p)}
-              style={{
-                backgroundColor: paused ? '#222' : '#e53935',
-                color: '#fff',
-                paddingHorizontal: 36,
-                paddingVertical: 14,
-                borderRadius: 32,
-                fontWeight: '600',
-                fontSize: 20,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 2,
-                letterSpacing: 1,
-                marginBottom: 0,
-              }}
-            >
-              {paused ? '▶ Play' : '⏸ Pause'}
-            </Text>
-          </View>
-          <Text style={styles.header}>Device Motion Sensor Table</Text>
+          <CollapsibleSection title="Sensors">
+            {/* Modern Play/Pause Toggle Button */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Text
+                onPress={() => setPaused(p => !p)}
+                style={{
+                  backgroundColor: paused ? '#222' : '#e53935',
+                  color: '#fff',
+                  paddingHorizontal: 36,
+                  paddingVertical: 14,
+                  borderRadius: 32,
+                  fontWeight: '600',
+                  fontSize: 20,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: 2,
+                  letterSpacing: 1,
+                  marginBottom: 0,
+                }}
+              >
+                {paused ? '▶ Play' : '⏸ Pause'}
+              </Text>
+            </View>
+            <Text style={styles.header}>Device Motion Sensor Table</Text>
           {/* Motion Data Table */}
           <View style={[styles.tableContainer, styles.motionTable]}>
             <View style={styles.tableRow}>
@@ -297,18 +344,75 @@ export default function DevScreen() {
               {/* No Plot button for barometer */}
             </View>
           </View>
-          <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
-          {/* Blank popup modal */}
-          <BlankPopup visible={popupVisible} onClose={closePopup}>
-            {measurementComponentMap[popupComponent]
-              ? React.createElement(measurementComponentMap[popupComponent])
-              : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 32 }}>{popupMeasurement}</Text>
-                  <Text style={{ color: '#fff', fontSize: 18, marginTop: 16 }}>TODO</Text>
+            <Text style={styles.instructions}>All available sensor measurements are shown above. Values update live.</Text>
+            {/* Blank popup modal */}
+            <BlankPopup visible={popupVisible} onClose={closePopup}>
+              {measurementComponentMap[popupComponent]
+                ? React.createElement(measurementComponentMap[popupComponent])
+                : (
+                  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 32 }}>{popupMeasurement}</Text>
+                    <Text style={{ color: '#fff', fontSize: 18, marginTop: 16 }}>TODO</Text>
+                  </View>
+                )}
+            </BlankPopup>
+          </CollapsibleSection>
+          
+          <CollapsibleSection title="UI/UX">
+            <View style={uiStyles.container}>
+              <View style={uiStyles.sliderRow}>
+                <View style={uiStyles.sliderContainer}>
+                  <Slider
+                    value={r}
+                    onValueChange={setR}
+                    trackColor="#ff0000"
+                    orientation="vertical"
+                  />
                 </View>
-              )}
-          </BlankPopup>
+                <View style={uiStyles.sliderContainer}>
+                  <Slider
+                    value={g}
+                    onValueChange={setG}
+                    trackColor="#00ff00"
+                    orientation="vertical"
+                  />
+                </View>
+                <View style={uiStyles.sliderContainer}>
+                  <Slider
+                    value={b}
+                    onValueChange={setB}
+                    trackColor="#0000ff"
+                    orientation="vertical"
+                  />
+                </View>
+                <View style={uiStyles.sliderContainer}>
+                  <RangedSlider
+                    minValue={verticalRangeMin}
+                    maxValue={verticalRangeMax}
+                    onRangeChange={(min, max) => {
+                      setVerticalRangeMin(min);
+                      setVerticalRangeMax(max);
+                    }}
+                    trackColor="#ff00ff"
+                    orientation="vertical"
+                  />
+                </View>
+              </View>
+              <View style={uiStyles.horizontalRangeContainer}>
+                <Text style={uiStyles.label}>Range: {rangeMin.toFixed(2)} - {rangeMax.toFixed(2)}</Text>
+                <RangedSlider
+                  minValue={rangeMin}
+                  maxValue={rangeMax}
+                  onRangeChange={(min, max) => {
+                    setRangeMin(min);
+                    setRangeMax(max);
+                  }}
+                  trackColor="#ffff00"
+                  orientation="horizontal"
+                />
+              </View>
+            </View>
+          </CollapsibleSection>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -400,6 +504,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#aaa',
     marginTop: 24,
+    textAlign: 'center',
+  },
+});
+
+const collapsibleStyles = StyleSheet.create({
+  section: {
+    marginBottom: 16,
+    backgroundColor: '#111',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#222',
+  },
+  headerText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  content: {
+    padding: 16,
+  },
+});
+
+const uiStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 20,
+    height: screenHeight * 0.3,
+  },
+  sliderContainer: {
+    flex: 1,
+    maxWidth: 60,
+    height: '100%',
+    alignItems: 'center',
+  },
+  horizontalRangeContainer: {
+    marginTop: 40,
+    paddingHorizontal: 20,
+  },
+  label: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
 });

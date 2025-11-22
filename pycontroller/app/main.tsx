@@ -2,17 +2,19 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
-import { Dimensions, View } from 'react-native';
+import { Dimensions, View, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
 import PopView from './popview';
 import { playSimpleHaptic } from './haptics';
+import { useRGBRange } from './RGBRangeContext';
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
 
 export default function Main() {
+  const { range } = useRGBRange();
   // Animated rotation value for smooth transitions
   const rotationAnim = useRef(new Animated.Value(0)).current;
   const [rawRotation, setRawRotation] = useState(0);
@@ -57,8 +59,8 @@ export default function Main() {
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
   // Track previous highlighted icon for haptic feedback
   const prevTargetNeedleIdxRef = useRef<number | null>(null);
-  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
-  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
   // Slide-up menu state
@@ -77,29 +79,14 @@ export default function Main() {
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
 
-  // Handler for double-tap-and-hold
+  // Handler for double-tap-and-hold gesture
   const handlePressIn = (event: any) => {
     const now = Date.now();
     const { locationX, locationY } = event.nativeEvent;
     const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
-    const { height: screenH } = Dimensions.get('window');
-    
-    // If menu is open, handle single tap to close
-    if (showMenu) {
-      // Check if tap is outside menu (in top 30% area)
-      const tapY = locationY;
-      const menuTopY = screenH * 0.30;
-      if (tapY < menuTopY) {
-        // Tap is outside menu - close it
-        closeMenu();
-        return;
-      }
-      // If tap is inside menu, let menu handle it (don't interfere)
-      return;
-    }
     
     if (now - lastTapRef.current < 350) {
-      // Double-tap detected
+      // Double-tap detected - enter selection mode
       activeTouchIdRef.current = touchId;
       setShowLines(true);
       setTapPosition({ x: locationX, y: locationY });
@@ -107,9 +94,8 @@ export default function Main() {
       setFingerPosition({ x: locationX, y: locationY });
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     } else {
-      // First tap
+      // First tap - wait for potential second tap
       lastTapRef.current = now;
-      // Reset if no second tap within 350ms
       tapTimeoutRef.current = setTimeout(() => {
         lastTapRef.current = 0;
       }, 350);
@@ -118,47 +104,43 @@ export default function Main() {
       setFingerPosition(null);
     }
   };
+
   const handlePressOut = (event?: any) => {
-    // Only respond if this is the active touch or if no active touch is set
+    // Verify this is the active touch before processing
     if (activeTouchIdRef.current !== null && event) {
       const touchId = event.nativeEvent?.identifier || event.nativeEvent?.changedTouches?.[0]?.identifier;
       if (touchId !== undefined && touchId !== activeTouchIdRef.current) {
-        return; // Ignore other touches
+        return; // Ignore touches from other fingers
       }
     }
     
-    // Check if we have a selected needle before clearing state
     const hadSelection = selectedNeedle !== null;
     
+    // Reset selection state
     setShowLines(false);
     setTapPosition(null);
     setFingerPosition(null);
     setJoystickOrigin(null);
     activeTouchIdRef.current = null;
-    // Explicitly reset selection
     setSelectedNeedle(null);
-    // Reset animations immediately
-    iconScaleAnim.forEach((anim) => {
-      anim.setValue(0);
-    });
-    iconOpacityAnim.forEach((anim) => {
-      anim.setValue(0);
-    });
-    // Reset blob
+    
+    // Reset icon animations
+    iconScaleAnim.forEach((anim) => anim.setValue(0));
+    iconOpacityAnim.forEach((anim) => anim.setValue(0));
+    
+    // Reset blob position
     setBlobOffset({ x: 0, y: 0 });
     
-    // Open menu only if we released while a needle was selected
+    // Open menu if a needle was selected on release
     if (hadSelection) {
       setMenuSelectedNeedle(selectedNeedle);
       setShowMenu(true);
-      // Animate background color to lighter black when menu opens
       Animated.timing(bgColorAnim, {
         toValue: 1,
         duration: 200,
         useNativeDriver: false,
         easing: Easing.out(Easing.ease),
       }).start();
-      // Orb animations are now handled by PopView
     }
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -254,9 +236,18 @@ export default function Main() {
       if (max === min) return 0.5;
       return Math.max(0, Math.min(1, (val - min) / (max - min)));
     };
-    r = Math.round(norm(magnetometer.x, minMax.minX, minMax.maxX) * 255);
-    g = Math.round(norm(magnetometer.y, minMax.minY, minMax.maxY) * 255);
-    b = Math.round(norm(magnetometer.z, minMax.minZ, minMax.maxZ) * 255);
+    // Normalize to [0, 1]
+    const rNorm = norm(magnetometer.x, minMax.minX, minMax.maxX);
+    const gNorm = norm(magnetometer.y, minMax.minY, minMax.maxY);
+    const bNorm = norm(magnetometer.z, minMax.minZ, minMax.maxZ);
+    // Apply range transformation: squash into [rangeMin, rangeMax]
+    const rSquashed = rNorm * (range.rMax - range.rMin) + range.rMin;
+    const gSquashed = gNorm * (range.gMax - range.gMin) + range.gMin;
+    const bSquashed = bNorm * (range.bMax - range.bMin) + range.bMin;
+    // Convert to [0, 255] range
+    r = Math.round(rSquashed * 255);
+    g = Math.round(gSquashed * 255);
+    b = Math.round(bSquashed * 255);
   }
   // Blend previous and current RGB
   const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
@@ -290,9 +281,10 @@ export default function Main() {
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
-  const needles: { angle: number; Title: string; icon: 'description' | 'settings' }[] = [
-    { angle: 0, Title: 'Hi', icon: 'settings' },      // Left needle (0 degrees) - Settings
-    { angle: 180, Title: 'There', icon: 'description' },    // Right needle (180 degrees) - Docs
+  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | 'menu-book' | null }[] = [
+    { angle: 0, Title: null, icon: 'settings' },      // Left needle (0 degrees) - Settings
+    { angle: 180, Title: null, icon: 'description' },    // Right needle (180 degrees) - Docs
+    { angle: 90, Title: null, icon: 'menu-book' },    // Bottom needle (270 degrees) - Practice
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
@@ -493,8 +485,8 @@ export default function Main() {
     }).start();
     
     // Close menu (orb animations are handled by PopView)
+    // Keep menuSelectedNeedle so component state persists when reopening
     setShowMenu(false);
-    setMenuSelectedNeedle(null);
   };
 
 
@@ -576,68 +568,61 @@ export default function Main() {
 
   // No animation for tap circle; render at joystickOrigin directly
 
+  // Determines if the main view should capture touch start events
+  const shouldStartResponder = (evt: any): boolean => {
+    // Cancel selection if another touch starts during selection mode
+    if (showLines) {
+      handlePressOut();
+      return false;
+    }
+    
+    // Allow gestures except on left edge (reserved for parent swipe gesture)
+    const touchX = evt.nativeEvent.locationX;
+    return touchX >= LEFT_EDGE_THRESHOLD;
+  };
+
+  // Determines if the main view should capture touch move events
+  const shouldMoveResponder = (evt: any): boolean => {
+    if (showLines) {
+      const touches = evt.nativeEvent.touches || [];
+      if (touches.length > 1) {
+        // Multiple touches detected - cancel selection
+        handlePressOut();
+        return false;
+      }
+      return true; // Maintain responder during active selection
+    }
+    
+    return false;
+  };
+
+  // Handles touch movement during selection mode
+  const handleResponderMove = (event: any) => {
+    if (showLines && tapPosition) {
+      const touches = event.nativeEvent.touches || [];
+      if (touches.length > 1) {
+        // Multiple touches detected - cancel selection
+        handlePressOut();
+        return;
+      }
+      const { locationX, locationY } = event.nativeEvent;
+      setFingerPosition({ x: locationX, y: locationY });
+    }
+  };
+
   return (
     <View
       style={{ 
         flex: 1, 
         backgroundColor: currentBgColor,
       }}
-      onStartShouldSetResponder={(evt) => {
-        // If menu is open, allow responder to handle taps outside menu
-        if (showMenu) {
-          const { height: screenH } = Dimensions.get('window');
-          const tapY = evt.nativeEvent.locationY;
-          const menuTopY = screenH * 0.30;
-          // Only capture taps in the top 30% area (outside menu)
-          return tapY < menuTopY;
-        }
-        // If already in selection mode, detect if another touch is starting
-        if (showLines) {
-          // Cancel selection if another touch occurs
-          handlePressOut();
-          return false;
-        }
-        // Allow gestures anywhere except left edge (let parent handle swipe gesture)
-        const touchX = evt.nativeEvent.locationX;
-        return touchX >= LEFT_EDGE_THRESHOLD;
-      }}
-      onMoveShouldSetResponder={(evt) => {
-        // If menu is open, don't move responder (let menu handle its own gestures)
-        if (showMenu) {
-          return false;
-        }
-        // Check for multiple touches during selection
-        if (showLines) {
-          const touches = evt.nativeEvent.touches || [];
-          if (touches.length > 1) {
-            // Multiple touches detected - cancel selection
-            handlePressOut();
-            return false;
-          }
-          return true; // Maintain responder during selection
-        }
-        return false;
-      }}
+      pointerEvents={showMenu ? "box-none" : "auto"}
+      onStartShouldSetResponder={shouldStartResponder}
+      onMoveShouldSetResponder={shouldMoveResponder}
       onResponderGrant={handlePressIn}
       onResponderRelease={handlePressOut}
       onResponderTerminate={handlePressOut}
-      onResponderMove={event => {
-        // Don't handle move if menu is open
-        if (showMenu) {
-          return;
-        }
-        if (showLines && tapPosition) {
-          // Check for multiple touches
-          const touches = event.nativeEvent.touches || [];
-          if (touches.length > 1) {
-            // Multiple touches detected - cancel selection
-            handlePressOut();
-            return;
-          }
-          const { locationX, locationY } = event.nativeEvent;
-          setFingerPosition({ x: locationX, y: locationY });
-        }
-      }}
+      onResponderMove={handleResponderMove}
     >
   {/* No outer-most tick circles, just icons for those positions */}
       {/* Center orb - at center position */}
@@ -745,19 +730,16 @@ export default function Main() {
       {/* Render needle titles at the tip of each needle, only when needles are shown */}
       {showLines && needles.map((needle, i) => {
         const rad = degToRad(needle.angle);
-        const edge = getEdgeIntersection(rad);
-        const distToCenter = Math.sqrt(
-          Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
-        );
-        // Move icons closer to center: 55% of the way from center to edge
-        let tickLength = distToCenter * 0.55;
-        const tipX = centerX + Math.cos(rad) * tickLength;
-        const tipY = centerY + Math.sin(rad) * tickLength;
+        // Calculate orbital ring: center at 50% of screen, radius is 25% of smallest dimension
+        const smallestDimension = Math.min(screenWidth, screenHeight);
+        const radius = smallestDimension * 0.25;
+        const tipX = centerX + Math.cos(rad) * radius;
+        const tipY = centerY + Math.sin(rad) * radius;
         // Icon size: normal 32, enlarged 32*1.36=43.52
         const iconSize = 32;
         return (
           <Animated.View
-            key={needle.Title}
+            key={needle.Title || `needle-${i}`}
             style={{
               position: 'absolute',
               left: tipX - iconSize / 2,
@@ -770,7 +752,11 @@ export default function Main() {
               opacity: iconOpacityAnim[i],
             }}
           >
-            <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
+            {needle.icon ? (
+              <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
+            ) : needle.Title ? (
+              <Text style={{ color: '#fff', fontSize: iconSize, fontWeight: '500' }}>{needle.Title}</Text>
+            ) : null}
           </Animated.View>
         );
       })}

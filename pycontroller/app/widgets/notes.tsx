@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 
-export default function Docs() {
+export default function Notes() {
   const [text, setText] = useState('');
 
   return (

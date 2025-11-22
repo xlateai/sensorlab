@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
 import Settings from './widgets/settings';
-import Docs from './widgets/docs';
+import Notes from './widgets/notes';
+import TypeRacerScreen from './subapps/renshu/typeracer';
 import { playChimeHaptic, playReverseChime } from './haptics';
 
 interface PopViewProps {
@@ -361,14 +362,14 @@ export default function PopView({
     }).start();
   };
 
-  if (!isVisible || selectedNeedle === null) {
+  if (selectedNeedle === null) {
     return null;
   }
 
   return (
     <>
-      {/* Transparent overlay to detect taps outside menu */}
-      <View
+      {/* Transparent overlay to detect taps outside menu - only in top 30% area */}
+      <Pressable
         style={{
           position: 'absolute',
           top: 0,
@@ -376,9 +377,13 @@ export default function PopView({
           right: 0,
           height: screenHeight * 0.30, // Top 30% area
           backgroundColor: 'transparent',
+          opacity: isVisible ? 1 : 0,
+          pointerEvents: isVisible ? 'auto' : 'none',
         }}
-        onStartShouldSetResponder={() => true}
-        onResponderRelease={handleClose}
+        onPress={(e) => {
+          e.stopPropagation();
+          handleClose();
+        }}
       />
       {/* Slide-up menu */}
       {/* Glow effect behind popover */}
@@ -401,6 +406,7 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
+        pointerEvents="none"
       />
       <Animated.View
         style={{
@@ -423,15 +429,18 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
+        pointerEvents={isVisible ? "box-none" : "none"}
       >
         <View
           style={{
             flex: 1,
             paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
           }}
+          pointerEvents={isVisible ? "auto" : "none"}
         >
           {selectedNeedle === 0 && <Settings />}
-          {selectedNeedle === 1 && <Docs />}
+          {selectedNeedle === 1 && <Notes />}
+          {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
         </View>
       </Animated.View>
       {/* Black region at bottom 12% */}
@@ -452,6 +461,7 @@ export default function PopView({
           paddingTop: 16,
           zIndex: 1000,
         }}
+        pointerEvents={isVisible ? "box-none" : "none"}
       >
         <Pressable
           onPress={handleClose}

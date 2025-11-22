@@ -5,6 +5,8 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { StorageProvider } from './StorageContext';
+import { FullscreenProvider } from './FullscreenContext';
+import { RGBRangeProvider } from './RGBRangeContext';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -15,13 +17,17 @@ export default function RootLayout() {
 
     return (
       <StorageProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <FullscreenProvider>
+          <RGBRangeProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+              </Stack>
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </RGBRangeProvider>
+        </FullscreenProvider>
       </StorageProvider>
     );
 }

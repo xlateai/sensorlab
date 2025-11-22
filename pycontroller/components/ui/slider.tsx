@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, PanResponder } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View } from 'react-native';
 
 export default function Slider({ 
   value, 
@@ -14,48 +14,82 @@ export default function Slider({
 }) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
+  // Track which touch IDs are active on this slider (supports multiple touches)
+  const activeTouchesRef = useRef<Set<number>>(new Set());
+  const containerRef = useRef<View>(null);
 
   const isVertical = orientation === 'vertical';
 
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (evt) => {
-      if (isVertical) {
-        if (containerHeight === 0) return;
-        // For vertical, value increases from bottom to top (inverted)
-        const y = evt.nativeEvent.locationY;
-        const percent = Math.max(0, Math.min(1, 1 - (y / containerHeight)));
-        onValueChange(Number(percent.toFixed(2)));
-      } else {
-        if (containerWidth === 0) return;
-        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
-        onValueChange(Number(percent.toFixed(2)));
+  const updateValue = (locationX: number, locationY: number) => {
+    if (isVertical) {
+      if (containerHeight === 0) return;
+      // For vertical, value increases from bottom to top (inverted)
+      const percent = Math.max(0, Math.min(1, 1 - (locationY / containerHeight)));
+      onValueChange(Number(percent.toFixed(2)));
+    } else {
+      if (containerWidth === 0) return;
+      const percent = Math.max(0, Math.min(1, locationX / containerWidth));
+      onValueChange(Number(percent.toFixed(2)));
+    }
+  };
+
+  const handleTouchStart = (evt: any) => {
+    const touches = evt.nativeEvent.touches || [];
+    for (const touch of touches) {
+      if (containerRef.current) {
+        containerRef.current.measure((x, y, width, height, pageX, pageY) => {
+          const touchX = touch.pageX - pageX;
+          const touchY = touch.pageY - pageY;
+          
+          // Check if touch is within slider bounds
+          const isWithinBounds = isVertical
+            ? touchY >= 0 && touchY <= height
+            : touchX >= 0 && touchX <= width;
+          
+          if (isWithinBounds) {
+            activeTouchesRef.current.add(touch.identifier);
+            updateValue(touchX, touchY);
+          }
+        });
       }
-    },
-    onPanResponderMove: (evt) => {
-      if (isVertical) {
-        if (containerHeight === 0) return;
-        // For vertical, value increases from bottom to top (inverted)
-        const y = evt.nativeEvent.locationY;
-        const percent = Math.max(0, Math.min(1, 1 - (y / containerHeight)));
-        onValueChange(Number(percent.toFixed(2)));
-      } else {
-        if (containerWidth === 0) return;
-        const percent = Math.max(0, Math.min(1, evt.nativeEvent.locationX / containerWidth));
-        onValueChange(Number(percent.toFixed(2)));
+    }
+  };
+
+  const handleTouchMove = (evt: any) => {
+    const touches = evt.nativeEvent.touches || [];
+    for (const touch of touches) {
+      // Only process touches that started on this slider
+      if (!activeTouchesRef.current.has(touch.identifier)) continue;
+      
+      if (containerRef.current) {
+        containerRef.current.measure((x, y, width, height, pageX, pageY) => {
+          const touchX = touch.pageX - pageX;
+          const touchY = touch.pageY - pageY;
+          updateValue(touchX, touchY);
+        });
       }
-    },
-  });
+    }
+  };
+
+  const handleTouchEnd = (evt: any) => {
+    const touches = evt.nativeEvent.changedTouches || [];
+    for (const touch of touches) {
+      activeTouchesRef.current.delete(touch.identifier);
+    }
+  };
 
   return (
     <View
+      ref={containerRef}
       onLayout={e => {
         const { width, height } = e.nativeEvent.layout;
         if (width > 0) setContainerWidth(width);
         if (height > 0) setContainerHeight(height);
       }}
-      {...panResponder.panHandlers}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       style={{
         width: isVertical ? 50 : '100%',
         height: isVertical ? '100%' : 32,
