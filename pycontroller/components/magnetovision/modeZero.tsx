@@ -155,16 +155,21 @@ export default function ModeZero() {
     };
   }
 
-  const protrude = 50; // pixels to draw inward from edge
   const ticks = tickAngles.map(angle => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
+    // Distance from edge intersection to center
+    const distToCenter = Math.sqrt(
+      Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
+    );
+    // Line length is 15% of that distance
+    const lineLength = distToCenter * 0.25;
     // Start at edge intersection
     const startX = edge.x;
     const startY = edge.y;
-    // End point is inward toward center by 'protrude' pixels
-    const endX = edge.x - edge.dx * protrude;
-    const endY = edge.y - edge.dy * protrude;
+    // End point is inward toward center by 'lineLength' pixels
+    const endX = edge.x - edge.dx * lineLength;
+    const endY = edge.y - edge.dy * lineLength;
     return (
       <Line
         key={angle}
