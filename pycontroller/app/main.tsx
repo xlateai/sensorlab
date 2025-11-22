@@ -564,8 +564,8 @@ export default function Main() {
   {/* No outer-most tick circles, just icons for those positions */}
       {/* Single orb that animates between center and top positions */}
       {(() => {
-        // Calculate Y offset: center position to top position (13% viewport height)
-        const topY = screenHeight * 0.13;
+        // Calculate Y offset: center position to top position (16% viewport height)
+        const topY = screenHeight * 0.15;
         const yOffset = topY - centerY;
         
         // Interpolate translateY: 0 = center, 1 = top
