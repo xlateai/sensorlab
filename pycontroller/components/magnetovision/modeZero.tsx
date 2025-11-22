@@ -181,17 +181,10 @@ export default function ModeZero() {
             easing: Easing.in(Easing.ease),
           }),
         ]),
-        // Instantly move position (no animation)
-        Animated.timing(orbTranslateX, {
-          toValue: 0, // Stay centered horizontally
-          duration: 0,
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbTranslateY, {
-          toValue: translateYValue,
-          duration: 0,
-          useNativeDriver: true,
-        }),
+      ]).start(() => {
+        // Instantly move position (no animation) - happens in callback
+        orbTranslateX.setValue(0);
+        orbTranslateY.setValue(translateYValue);
         // Expand from point and fade in (super fast)
         Animated.parallel([
           Animated.timing(orbScale, {
@@ -206,8 +199,8 @@ export default function ModeZero() {
             useNativeDriver: true,
             easing: Easing.out(Easing.ease),
           }),
-        ]),
-      ]).start();
+        ]).start();
+      });
     } else {
       // Reverse: shrink, move back to center, expand
       Animated.sequence([
@@ -226,17 +219,10 @@ export default function ModeZero() {
             easing: Easing.in(Easing.ease),
           }),
         ]),
-        // Instantly move position back to center
-        Animated.timing(orbTranslateX, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbTranslateY, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
+      ]).start(() => {
+        // Instantly move position back to center - happens in callback
+        orbTranslateX.setValue(0);
+        orbTranslateY.setValue(0);
         // Expand from point and fade in
         Animated.parallel([
           Animated.timing(orbScale, {
@@ -251,8 +237,8 @@ export default function ModeZero() {
             useNativeDriver: true,
             easing: Easing.out(Easing.ease),
           }),
-        ]),
-      ]).start();
+        ]).start();
+      });
     }
   }, [showMenu]);
   
@@ -784,7 +770,7 @@ export default function ModeZero() {
             left: 0,
             right: 0,
             top: screenHeight * 0.20, // Leave 20% space at the top
-            backgroundColor: '#fff',
+            backgroundColor: '#0f0f0f',
             borderTopLeftRadius: 35,
             borderTopRightRadius: 35,
             opacity: Animated.multiply(
