@@ -246,7 +246,7 @@ export default function PopView({
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Notes />}
           {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
-          {selectedNeedle === 3 && <Browser />}
+          {selectedNeedle === 3 && <Browser isVisible={isVisible} />}
         </View>
         {/* Border overlay that always sits on top */}
         <Animated.View
