@@ -66,7 +66,23 @@ export default function Browser({ isVisible = true }: BrowserProps) {
 
   const handleOpenFromClipboard = () => {
     if (clipboardContent) {
-      handleNavigate(clipboardContent);
+      const trimmed = clipboardContent.trim();
+      const normalized = normalizeUrl(trimmed);
+      if (isValidUrl(normalized)) {
+        // If it's a valid URL, navigate to it
+        setUrl(normalized);
+        setCurrentUrl(normalized);
+        setAddressBarText(normalized);
+        setIsInvalidUrl(false);
+      } else {
+        // If not a valid URL, search it on Google
+        const searchQuery = encodeURIComponent(trimmed);
+        const googleSearchUrl = `https://www.google.com/search?q=${searchQuery}`;
+        setUrl(googleSearchUrl);
+        setCurrentUrl(googleSearchUrl);
+        setAddressBarText(googleSearchUrl);
+        setIsInvalidUrl(false);
+      }
     }
   };
 
@@ -88,7 +104,31 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const isValidUrl = (string: string): boolean => {
     try {
       const urlObj = new URL(string);
-      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+      if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+        return false;
+      }
+      
+      // Check if hostname looks like a valid domain
+      const hostname = urlObj.hostname;
+      if (!hostname) {
+        return false;
+      }
+      
+      // Must have at least one dot (like example.com) or be localhost/ip
+      // Also allow single-word domains that are common TLDs (like .ai, .io, etc.)
+      // But reject single words without dots that aren't valid domains
+      if (hostname.includes('.')) {
+        // Has a dot - likely a valid domain
+        return true;
+      }
+      
+      // Check if it's localhost or an IP address
+      if (hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+        return true;
+      }
+      
+      // Single word without dot - likely not a valid domain, treat as search
+      return false;
     } catch (_) {
       return false;
     }
