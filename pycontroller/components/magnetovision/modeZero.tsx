@@ -45,6 +45,8 @@ export default function ModeZero() {
   const lastTapRef = useRef<number>(0);
   const tapTimeoutRef = useRef<any>(null);
   const [tapPosition, setTapPosition] = useState<{x: number, y: number} | null>(null);
+  // Joystick origin that can drift
+  const [joystickOrigin, setJoystickOrigin] = useState<{x: number, y: number} | null>(null);
   const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
   // Animated state for circle and needle
   const [animatedOffset, setAnimatedOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
@@ -57,8 +59,9 @@ export default function ModeZero() {
     if (now - lastTapRef.current < 350) {
       // Double-tap detected
       setShowLines(true);
-      setTapPosition({ x: locationX, y: locationY });
-      setFingerPosition({ x: locationX, y: locationY });
+  setTapPosition({ x: locationX, y: locationY });
+  setJoystickOrigin({ x: locationX, y: locationY });
+  setFingerPosition({ x: locationX, y: locationY });
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     } else {
       // First tap
@@ -67,8 +70,9 @@ export default function ModeZero() {
       tapTimeoutRef.current = setTimeout(() => {
         lastTapRef.current = 0;
       }, 350);
-      setTapPosition(null);
-      setFingerPosition(null);
+  setTapPosition(null);
+  setJoystickOrigin(null);
+  setFingerPosition(null);
     }
   };
   const handlePressOut = () => {
@@ -236,11 +240,23 @@ export default function ModeZero() {
   let targetOffset = { x: 0, y: 0 };
   // Always interpolate to target scale/brightness, even when unselected
   let targetNeedle = { idx: animatedNeedle.idx, scale: animatedNeedle.scale, brightness: animatedNeedle.brightness };
-  if (showLines && tapPosition && fingerPosition) {
-    const dx = fingerPosition.x - tapPosition.x;
-    const dy = fingerPosition.y - tapPosition.y;
+  if (showLines && joystickOrigin && fingerPosition) {
+    let origin = joystickOrigin;
+    const dx = fingerPosition.x - origin.x;
+    const dy = fingerPosition.y - origin.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const maxDist = 18; // 50% of previous reach
+    const driftDist = maxDist * 2;
+    // If finger is further than 2x maxDist, drift the origin towards the finger
+    if (dist > driftDist) {
+      // Move origin a fraction towards the finger
+      const driftFrac = 0.18; // smooth drift
+      origin = {
+        x: origin.x + (fingerPosition.x - origin.x) * driftFrac,
+        y: origin.y + (fingerPosition.y - origin.y) * driftFrac,
+      };
+      setJoystickOrigin(origin);
+    }
     const moveDist = Math.min(dist, maxDist);
     const angleRad = Math.atan2(dy, dx);
     targetOffset.x = Math.cos(angleRad) * moveDist;
@@ -370,10 +386,10 @@ export default function ModeZero() {
         {/* Dial ticks (conditionally rendered) */}
         {showLines && ticks}
         {/* Silver circle at second tap location */}
-        {showLines && tapPosition && (
+        {showLines && joystickOrigin && (
           <Circle
-            cx={tapPosition.x}
-            cy={tapPosition.y}
+            cx={joystickOrigin.x}
+            cy={joystickOrigin.y}
             r={11.9}
             fill="none"
             stroke="#C0C0C0"
