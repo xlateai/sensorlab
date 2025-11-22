@@ -77,29 +77,14 @@ export default function Main() {
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
 
-  // Handler for double-tap-and-hold
+  // Handler for double-tap-and-hold gesture
   const handlePressIn = (event: any) => {
     const now = Date.now();
     const { locationX, locationY } = event.nativeEvent;
     const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
-    const { height: screenH } = Dimensions.get('window');
-    
-    // If menu is open, handle single tap to close
-    if (showMenu) {
-      // Check if tap is outside menu (in top 30% area)
-      const tapY = locationY;
-      const menuTopY = screenH * 0.30;
-      if (tapY < menuTopY) {
-        // Tap is outside menu - close it
-        closeMenu();
-        return;
-      }
-      // If tap is inside menu, let menu handle it (don't interfere)
-      return;
-    }
     
     if (now - lastTapRef.current < 350) {
-      // Double-tap detected
+      // Double-tap detected - enter selection mode
       activeTouchIdRef.current = touchId;
       setShowLines(true);
       setTapPosition({ x: locationX, y: locationY });
@@ -107,9 +92,8 @@ export default function Main() {
       setFingerPosition({ x: locationX, y: locationY });
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     } else {
-      // First tap
+      // First tap - wait for potential second tap
       lastTapRef.current = now;
-      // Reset if no second tap within 350ms
       tapTimeoutRef.current = setTimeout(() => {
         lastTapRef.current = 0;
       }, 350);
@@ -118,47 +102,43 @@ export default function Main() {
       setFingerPosition(null);
     }
   };
+
   const handlePressOut = (event?: any) => {
-    // Only respond if this is the active touch or if no active touch is set
+    // Verify this is the active touch before processing
     if (activeTouchIdRef.current !== null && event) {
       const touchId = event.nativeEvent?.identifier || event.nativeEvent?.changedTouches?.[0]?.identifier;
       if (touchId !== undefined && touchId !== activeTouchIdRef.current) {
-        return; // Ignore other touches
+        return; // Ignore touches from other fingers
       }
     }
     
-    // Check if we have a selected needle before clearing state
     const hadSelection = selectedNeedle !== null;
     
+    // Reset selection state
     setShowLines(false);
     setTapPosition(null);
     setFingerPosition(null);
     setJoystickOrigin(null);
     activeTouchIdRef.current = null;
-    // Explicitly reset selection
     setSelectedNeedle(null);
-    // Reset animations immediately
-    iconScaleAnim.forEach((anim) => {
-      anim.setValue(0);
-    });
-    iconOpacityAnim.forEach((anim) => {
-      anim.setValue(0);
-    });
-    // Reset blob
+    
+    // Reset icon animations
+    iconScaleAnim.forEach((anim) => anim.setValue(0));
+    iconOpacityAnim.forEach((anim) => anim.setValue(0));
+    
+    // Reset blob position
     setBlobOffset({ x: 0, y: 0 });
     
-    // Open menu only if we released while a needle was selected
+    // Open menu if a needle was selected on release
     if (hadSelection) {
       setMenuSelectedNeedle(selectedNeedle);
       setShowMenu(true);
-      // Animate background color to lighter black when menu opens
       Animated.timing(bgColorAnim, {
         toValue: 1,
         duration: 200,
         useNativeDriver: false,
         easing: Easing.out(Easing.ease),
       }).start();
-      // Orb animations are now handled by PopView
     }
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -494,8 +474,8 @@ export default function Main() {
     }).start();
     
     // Close menu (orb animations are handled by PopView)
+    // Keep menuSelectedNeedle so component state persists when reopening
     setShowMenu(false);
-    setMenuSelectedNeedle(null);
   };
 
 
@@ -577,68 +557,61 @@ export default function Main() {
 
   // No animation for tap circle; render at joystickOrigin directly
 
+  // Determines if the main view should capture touch start events
+  const shouldStartResponder = (evt: any): boolean => {
+    // Cancel selection if another touch starts during selection mode
+    if (showLines) {
+      handlePressOut();
+      return false;
+    }
+    
+    // Allow gestures except on left edge (reserved for parent swipe gesture)
+    const touchX = evt.nativeEvent.locationX;
+    return touchX >= LEFT_EDGE_THRESHOLD;
+  };
+
+  // Determines if the main view should capture touch move events
+  const shouldMoveResponder = (evt: any): boolean => {
+    if (showLines) {
+      const touches = evt.nativeEvent.touches || [];
+      if (touches.length > 1) {
+        // Multiple touches detected - cancel selection
+        handlePressOut();
+        return false;
+      }
+      return true; // Maintain responder during active selection
+    }
+    
+    return false;
+  };
+
+  // Handles touch movement during selection mode
+  const handleResponderMove = (event: any) => {
+    if (showLines && tapPosition) {
+      const touches = event.nativeEvent.touches || [];
+      if (touches.length > 1) {
+        // Multiple touches detected - cancel selection
+        handlePressOut();
+        return;
+      }
+      const { locationX, locationY } = event.nativeEvent;
+      setFingerPosition({ x: locationX, y: locationY });
+    }
+  };
+
   return (
     <View
       style={{ 
         flex: 1, 
         backgroundColor: currentBgColor,
       }}
-      onStartShouldSetResponder={(evt) => {
-        // If menu is open, allow responder to handle taps outside menu
-        if (showMenu) {
-          const { height: screenH } = Dimensions.get('window');
-          const tapY = evt.nativeEvent.locationY;
-          const menuTopY = screenH * 0.30;
-          // Only capture taps in the top 30% area (outside menu)
-          return tapY < menuTopY;
-        }
-        // If already in selection mode, detect if another touch is starting
-        if (showLines) {
-          // Cancel selection if another touch occurs
-          handlePressOut();
-          return false;
-        }
-        // Allow gestures anywhere except left edge (let parent handle swipe gesture)
-        const touchX = evt.nativeEvent.locationX;
-        return touchX >= LEFT_EDGE_THRESHOLD;
-      }}
-      onMoveShouldSetResponder={(evt) => {
-        // If menu is open, don't move responder (let menu handle its own gestures)
-        if (showMenu) {
-          return false;
-        }
-        // Check for multiple touches during selection
-        if (showLines) {
-          const touches = evt.nativeEvent.touches || [];
-          if (touches.length > 1) {
-            // Multiple touches detected - cancel selection
-            handlePressOut();
-            return false;
-          }
-          return true; // Maintain responder during selection
-        }
-        return false;
-      }}
+      pointerEvents={showMenu ? "box-none" : "auto"}
+      onStartShouldSetResponder={shouldStartResponder}
+      onMoveShouldSetResponder={shouldMoveResponder}
       onResponderGrant={handlePressIn}
       onResponderRelease={handlePressOut}
       onResponderTerminate={handlePressOut}
-      onResponderMove={event => {
-        // Don't handle move if menu is open
-        if (showMenu) {
-          return;
-        }
-        if (showLines && tapPosition) {
-          // Check for multiple touches
-          const touches = event.nativeEvent.touches || [];
-          if (touches.length > 1) {
-            // Multiple touches detected - cancel selection
-            handlePressOut();
-            return;
-          }
-          const { locationX, locationY } = event.nativeEvent;
-          setFingerPosition({ x: locationX, y: locationY });
-        }
-      }}
+      onResponderMove={handleResponderMove}
     >
   {/* No outer-most tick circles, just icons for those positions */}
       {/* Center orb - at center position */}

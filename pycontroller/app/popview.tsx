@@ -362,7 +362,7 @@ export default function PopView({
     }).start();
   };
 
-  if (!isVisible || selectedNeedle === null) {
+  if (selectedNeedle === null) {
     return null;
   }
 
@@ -377,6 +377,8 @@ export default function PopView({
           right: 0,
           height: screenHeight * 0.30, // Top 30% area
           backgroundColor: 'transparent',
+          opacity: isVisible ? 1 : 0,
+          pointerEvents: isVisible ? 'auto' : 'none',
         }}
         onPress={(e) => {
           e.stopPropagation();
@@ -427,14 +429,14 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
-        pointerEvents="auto"
+        pointerEvents={isVisible ? "box-none" : "none"}
       >
         <View
           style={{
             flex: 1,
             paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
           }}
-          pointerEvents="auto"
+          pointerEvents={isVisible ? "auto" : "none"}
         >
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Docs />}
@@ -459,6 +461,7 @@ export default function PopView({
           paddingTop: 16,
           zIndex: 1000,
         }}
+        pointerEvents={isVisible ? "box-none" : "none"}
       >
         <Pressable
           onPress={handleClose}
