@@ -199,7 +199,8 @@ export default function ModeZero() {
   let joystickAngle: number | null = null;
   let joystickAtMax = false;
   let targetOffset = { x: 0, y: 0 };
-  let targetNeedle = { idx: animatedNeedle.idx, scale: 1, brightness: 0.45 };
+  // Always interpolate to target scale/brightness, even when unselected
+  let targetNeedle = { idx: animatedNeedle.idx, scale: animatedNeedle.scale, brightness: animatedNeedle.brightness };
   if (showLines && tapPosition && fingerPosition) {
     const dx = fingerPosition.x - tapPosition.x;
     const dy = fingerPosition.y - tapPosition.y;
@@ -240,6 +241,7 @@ export default function ModeZero() {
     };
   } else {
     targetOffset = { x: 0, y: 0 };
+    // Always interpolate back to normal state
     targetNeedle = { idx: null, scale: 1, brightness: 0.45 };
   }
 
@@ -256,8 +258,19 @@ export default function ModeZero() {
       });
       setAnimatedNeedle(prev => {
         const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+        // If targetNeedle.idx is null, keep previous idx until scale/brightness are nearly normal
+        let nextIdx = prev.idx;
+        if (targetNeedle.idx === null) {
+          const scaleClose = Math.abs(prev.scale - 1) < 0.01;
+          const brightClose = Math.abs(prev.brightness - 0.45) < 0.01;
+          if (scaleClose && brightClose) {
+            nextIdx = null;
+          }
+        } else {
+          nextIdx = targetNeedle.idx;
+        }
         return {
-          idx: targetNeedle.idx,
+          idx: nextIdx,
           scale: lerp(prev.scale, targetNeedle.scale, 0.18),
           brightness: lerp(prev.brightness, targetNeedle.brightness, 0.18)
         };
