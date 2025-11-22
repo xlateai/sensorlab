@@ -67,6 +67,7 @@ export default function ModeZero() {
   const orbTranslateX = useRef(new Animated.Value(0)).current;
   const orbTranslateY = useRef(new Animated.Value(0)).current;
   const orbOpacity = useRef(new Animated.Value(1)).current;
+  const orbScale = useRef(new Animated.Value(1)).current;
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -162,62 +163,91 @@ export default function ModeZero() {
     const topY = screenHeight * 0.13; // 13% from top
     
     if (showMenu) {
-      // Move to top center: translate from center to top
-      // translateX stays 0 (centered), translateY moves up
+      // Shrink to singularity and fade out, then move position instantly, then expand and fade in
       const translateYValue = topY - centerY;
-      Animated.parallel([
-        Animated.timing(orbTranslateX, {
-          toValue: 0, // Stay centered horizontally
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.timing(orbTranslateY, {
-          toValue: translateYValue,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.sequence([
-          Animated.timing(orbOpacity, {
+      Animated.sequence([
+        // Shrink to point and fade out (super fast)
+        Animated.parallel([
+          Animated.timing(orbScale, {
             toValue: 0,
-            duration: 100,
+            duration: 80,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(orbOpacity, {
+            toValue: 0,
+            duration: 80,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+        ]),
+        // Instantly move position (no animation)
+        Animated.timing(orbTranslateX, {
+          toValue: 0, // Stay centered horizontally
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbTranslateY, {
+          toValue: translateYValue,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        // Expand from point and fade in (super fast)
+        Animated.parallel([
+          Animated.timing(orbScale, {
             toValue: 1,
-            duration: 100,
+            duration: 80,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.ease),
+          }),
+          Animated.timing(orbOpacity, {
+            toValue: 1,
+            duration: 80,
             useNativeDriver: true,
             easing: Easing.out(Easing.ease),
           }),
         ]),
       ]).start();
     } else {
-      // Move back to center
-      Animated.parallel([
-        Animated.timing(orbTranslateX, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.timing(orbTranslateY, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.sequence([
-          Animated.timing(orbOpacity, {
+      // Reverse: shrink, move back to center, expand
+      Animated.sequence([
+        // Shrink to point and fade out
+        Animated.parallel([
+          Animated.timing(orbScale, {
             toValue: 0,
-            duration: 100,
+            duration: 80,
             useNativeDriver: true,
             easing: Easing.in(Easing.ease),
           }),
           Animated.timing(orbOpacity, {
+            toValue: 0,
+            duration: 80,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+        ]),
+        // Instantly move position back to center
+        Animated.timing(orbTranslateX, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbTranslateY, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        // Expand from point and fade in
+        Animated.parallel([
+          Animated.timing(orbScale, {
             toValue: 1,
-            duration: 100,
+            duration: 80,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.ease),
+          }),
+          Animated.timing(orbOpacity, {
+            toValue: 1,
+            duration: 80,
             useNativeDriver: true,
             easing: Easing.out(Easing.ease),
           }),
@@ -653,6 +683,7 @@ export default function ModeZero() {
           transform: [
             { translateX: orbTranslateX },
             { translateY: orbTranslateY },
+            { scale: orbScale },
           ],
         }}
       />
@@ -670,6 +701,7 @@ export default function ModeZero() {
           transform: [
             { translateX: orbTranslateX },
             { translateY: orbTranslateY },
+            { scale: orbScale },
           ],
         }}
       />
