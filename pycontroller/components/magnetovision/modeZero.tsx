@@ -150,7 +150,7 @@ export default function ModeZero() {
     if (hadSelection) {
       // Start from -10% y offset and 0 opacity, then animate in
       const screenH = Dimensions.get('window').height;
-      const menuHeight = screenH * 0.8; // Menu takes 80% of screen (20% at top)
+      const menuHeight = screenH * 0.7; // Menu takes 70% of screen (30% at top)
       const startY = menuHeight * 0.1; // -10% offset
       menuSlideAnim.setValue(startY);
       menuOpacity.setValue(0);
@@ -372,8 +372,8 @@ export default function ModeZero() {
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
   const needles: { angle: number; Title: string; icon: 'description' | 'settings' }[] = [
-    { angle: 0, Title: 'Hi', icon: 'description' },      // Left needle (0 degrees) - Docs
-    { angle: 180, Title: 'There', icon: 'settings' },    // Right needle (180 degrees) - Settings
+    { angle: 0, Title: 'Hi', icon: 'settings' },      // Left needle (0 degrees) - Settings
+    { angle: 180, Title: 'There', icon: 'description' },    // Right needle (180 degrees) - Docs
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
@@ -570,7 +570,7 @@ export default function ModeZero() {
     
     // Animate menu closing: slide down and fade out
     const screenH = Dimensions.get('window').height;
-    const menuHeight = screenH * 0.8; // Menu takes 80% of screen
+    const menuHeight = screenH * 0.7; // Menu takes 70% of screen
     const endY = menuHeight * 0.1; // Slide down to -10% offset
     
     // Start orb animations immediately (fade out top, fade in center)
@@ -974,8 +974,8 @@ export default function ModeZero() {
                 paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
               }}
             >
-              {menuSelectedNeedle === 0 && <Docs />}
-              {menuSelectedNeedle === 1 && <Settings />}
+              {menuSelectedNeedle === 0 && <Settings />}
+              {menuSelectedNeedle === 1 && <Docs />}
             </View>
           </Animated.View>
           {/* Black region at bottom 12% */}
