@@ -62,6 +62,11 @@ export default function ModeZero() {
   const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const menuPanY = useRef(new Animated.Value(0)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
+  // Orb position animation - moves to top center when menu opens
+  // Using translateX/translateY for native driver support
+  const orbTranslateX = useRef(new Animated.Value(0)).current;
+  const orbTranslateY = useRef(new Animated.Value(0)).current;
+  const orbOpacity = useRef(new Animated.Value(1)).current;
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -149,6 +154,77 @@ export default function ModeZero() {
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
+  
+  // Animate orb position when menu opens/closes
+  useEffect(() => {
+    const centerX = screenWidth / 2;
+    const centerY = canvasHeight / 2;
+    const topY = screenHeight * 0.1; // 10% from top
+    
+    if (showMenu) {
+      // Move to top center: translate from center to top
+      // translateX stays 0 (centered), translateY moves up
+      const translateYValue = topY - centerY;
+      Animated.parallel([
+        Animated.timing(orbTranslateX, {
+          toValue: 0, // Stay centered horizontally
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.timing(orbTranslateY, {
+          toValue: translateYValue,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.sequence([
+          Animated.timing(orbOpacity, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+          Animated.timing(orbOpacity, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.ease),
+          }),
+        ]),
+      ]).start();
+    } else {
+      // Move back to center
+      Animated.parallel([
+        Animated.timing(orbTranslateX, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.timing(orbTranslateY, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.sequence([
+          Animated.timing(orbOpacity, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+            easing: Easing.in(Easing.ease),
+          }),
+          Animated.timing(orbOpacity, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.ease),
+          }),
+        ]),
+      ]).start();
+    }
+  }, [showMenu]);
   
   // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
   const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
@@ -562,7 +638,7 @@ export default function ModeZero() {
     >
   {/* No outer-most tick circles, just icons for those positions */}
       {/* Outer ring (always visible) */}
-      <View
+      <Animated.View
         style={{
           position: 'absolute',
           left: centerX - ringRadius,
@@ -573,10 +649,15 @@ export default function ModeZero() {
           borderWidth: ringThickness,
           borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
           backgroundColor: 'transparent',
+          opacity: orbOpacity,
+          transform: [
+            { translateX: orbTranslateX },
+            { translateY: orbTranslateY },
+          ],
         }}
       />
       {/* Center circle (stationary) */}
-      <View
+      <Animated.View
         style={{
           position: 'absolute',
           left: centerX - innerRadius,
@@ -585,6 +666,11 @@ export default function ModeZero() {
           height: innerRadius * 2,
           borderRadius: innerRadius,
           backgroundColor: currentPixel,
+          opacity: orbOpacity,
+          transform: [
+            { translateX: orbTranslateX },
+            { translateY: orbTranslateY },
+          ],
         }}
       />
       {/* Control point circle - hidden */}
