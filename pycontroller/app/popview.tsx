@@ -402,6 +402,7 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
+        pointerEvents="none"
       />
       <Animated.View
         style={{
@@ -424,12 +425,14 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
+        pointerEvents="box-none"
       >
         <View
           style={{
             flex: 1,
             paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
           }}
+          pointerEvents="auto"
         >
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Docs />}
