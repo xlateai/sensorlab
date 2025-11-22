@@ -15,7 +15,7 @@ interface RGBRangeContextType {
 }
 
 const RGBRangeContext = createContext<RGBRangeContextType>({
-  range: { rMin: 0, rMax: 1, gMin: 0, gMax: 1, bMin: 0, bMax: 1 },
+  range: { rMin: 0.25, rMax: 1, gMin: 0.25, gMax: 1, bMin: 0.25, bMax: 1 },
   setRange: () => {},
 });
 
@@ -25,11 +25,11 @@ export function useRGBRange() {
 
 export function RGBRangeProvider({ children }: { children: React.ReactNode }) {
   const [range, setRange] = useState<RGBRange>({
-    rMin: 0,
+    rMin: 0.25,
     rMax: 1,
-    gMin: 0,
+    gMin: 0.25,
     gMax: 1,
-    bMin: 0,
+    bMin: 0.25,
     bMax: 1,
   });
 
