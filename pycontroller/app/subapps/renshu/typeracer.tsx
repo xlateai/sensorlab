@@ -4,6 +4,7 @@ import { BlurView } from 'expo-blur';
 import { Animated } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { RainbowProgressBar } from './rainbow-progress-bar';
 import { TypeRacerControlMenu } from './typeracer-control-menu';
 import { TypeStatsBar } from './type-stats-bar';
 import { Transliterator } from './romaji-transliterator';
@@ -480,7 +481,7 @@ export default function TypeRacerScreen() {
       {/* Media area fixed at bottom */}
       {/* Media area removed as requested */}
       {/* Media controls at the bottom of the main area, scrolls with content */}
-      <MediaControlCenter
+      <TypeRacerControlMenu
         onRetryPress={() => {
           // Reset the current example from the beginning
           setInput('');
