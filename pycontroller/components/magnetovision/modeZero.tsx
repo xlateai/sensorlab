@@ -369,9 +369,7 @@ export default function ModeZero() {
         }
       }}
     >
-      {/* Dial ticks (conditionally rendered) */}
-      {showLines && ticks}
-      {/* Finger circle is now invisible */}
+  {/* No outer-most tick circles, just icons for those positions */}
       {/* Outer ring (always visible) */}
       <View
         style={{
@@ -386,7 +384,7 @@ export default function ModeZero() {
           backgroundColor: 'transparent',
         }}
       />
-      {/* Inner circle, joystick offset */}
+      {/* Center joystick (inner circle, joystick offset) */}
       <View
         style={{
           position: 'absolute',
@@ -412,8 +410,8 @@ export default function ModeZero() {
         }
         const tipX = edge.x - edge.dx * tickLength;
         const tipY = edge.y - edge.dy * tickLength;
-        // Use Material Icons: left is notes, right is settings
-        const iconName = needle.idx === 0 ? 'music-note' : 'settings';
+  // Use Material Icons: left is docs/notes, right is settings
+  const iconName = needle.idx === 0 ? 'description' : 'settings';
         const iconSize = 32;
         // Fade icons until selected, synchronize with dot brightness
         const isSelected = animatedNeedle.idx === needle.idx;
