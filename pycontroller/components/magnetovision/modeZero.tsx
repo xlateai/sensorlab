@@ -353,18 +353,7 @@ export default function ModeZero() {
     );
   });
 
-  // Animated value for tap circle position
-  const tapCircleAnim = useRef(new Animated.ValueXY()).current;
-  useEffect(() => {
-    if (joystickOrigin) {
-      Animated.spring(tapCircleAnim, {
-        toValue: { x: joystickOrigin.x - 12, y: joystickOrigin.y - 12 },
-        useNativeDriver: false,
-        speed: 12,
-        bounciness: 8,
-      }).start();
-    }
-  }, [joystickOrigin]);
+  // No animation for tap circle; render at joystickOrigin directly
 
   return (
     <View
@@ -381,24 +370,7 @@ export default function ModeZero() {
     >
       {/* Dial ticks (conditionally rendered) */}
       {showLines && ticks}
-      {/* Silver circle at second tap location, animated */}
-      {showLines && joystickOrigin && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            borderWidth: 1.2,
-            borderColor: '#C0C0C0',
-            backgroundColor: 'transparent',
-            transform: [
-              { translateX: tapCircleAnim.x },
-              { translateY: tapCircleAnim.y },
-            ],
-          }}
-        />
-      )}
+      {/* Finger circle is now invisible */}
       {/* Outer ring (always visible) */}
       <View
         style={{
