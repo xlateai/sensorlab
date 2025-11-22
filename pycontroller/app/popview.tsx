@@ -368,8 +368,8 @@ export default function PopView({
 
   return (
     <>
-      {/* Transparent overlay to detect taps outside menu */}
-      <View
+      {/* Transparent overlay to detect taps outside menu - only in top 30% area */}
+      <Pressable
         style={{
           position: 'absolute',
           top: 0,
@@ -378,8 +378,10 @@ export default function PopView({
           height: screenHeight * 0.30, // Top 30% area
           backgroundColor: 'transparent',
         }}
-        onStartShouldSetResponder={() => true}
-        onResponderRelease={handleClose}
+        onPress={(e) => {
+          e.stopPropagation();
+          handleClose();
+        }}
       />
       {/* Slide-up menu */}
       {/* Glow effect behind popover */}
@@ -425,7 +427,7 @@ export default function PopView({
             { translateY: menuSlideAnim },
           ],
         }}
-        pointerEvents="box-none"
+        pointerEvents="auto"
       >
         <View
           style={{

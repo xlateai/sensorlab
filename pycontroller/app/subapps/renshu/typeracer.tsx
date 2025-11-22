@@ -254,13 +254,16 @@ export default function TypeRacerScreen() {
       <View style={{flex: 1}}>
         {/* Overlay to close keyboard when clicking outside flash displays */}
         {inputFocused && (
-          <TouchableOpacity
-            style={styles.overlayTouchable}
-            activeOpacity={1}
-            onPress={() => {
-              if (inputRef.current) inputRef.current.blur();
-            }}
-          />
+          <View style={styles.overlayTouchable} pointerEvents="box-none">
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={(e) => {
+                e.stopPropagation();
+                if (inputRef.current) inputRef.current.blur();
+              }}
+            />
+          </View>
         )}
         {/* Modal for selecting example */}
         {showListModal && (
@@ -626,15 +629,22 @@ export default function TypeRacerScreen() {
             setHistory([...history, nextIdx]);
             setHistoryPos(history.length);
             setCurrentIndex(nextIdx);
-            setTimeout(() => {
+            // Use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                if (inputRef.current) {
+                  inputRef.current.focus();
+                }
+              }, 100);
+            });
+          } else {
+            // Ensure input is enabled before focusing
+            setKeyboardDisabled(false);
+            requestAnimationFrame(() => {
               if (inputRef.current) {
                 inputRef.current.focus();
               }
-            }, 300);
-          } else {
-            if (inputRef.current) {
-              inputRef.current.focus();
-            }
+            });
           }
         }}
         onListPress={() => setShowListModal(true)}
@@ -680,7 +690,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 999,
+    zIndex: 50, // Lower than buttons (zIndex: 100)
   },
   flashBox: {
   minWidth: 108,
