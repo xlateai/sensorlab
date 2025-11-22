@@ -262,7 +262,7 @@ export default function ModeZero() {
     let newScale = 1;
     let newBrightness = 0.45;
     if (joystickAtMax) {
-      joystickAngle = (angleRad * 180 / Math.PI) + 90;
+      joystickAngle = (angleRad * 180 / Math.PI);
       if (joystickAngle < 0) joystickAngle += 360;
       // Find nearest tick
       if (joystickAngle !== null) {
@@ -328,40 +328,26 @@ export default function ModeZero() {
     return () => { running = false; };
   }, [targetOffset.x, targetOffset.y, targetNeedle.idx, targetNeedle.scale, targetNeedle.brightness]);
 
-  // Triangle ticks replaced with styled Views, fixed orientation and position
+  // Render ticks as dots at the tips
   const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
-    // Use a fixed tick length for all ticks
-    const uniformTickLength = Math.min(screenWidth, canvasHeight) / 7;
-    let tickLength = uniformTickLength;
-    let baseWidth = 4;
-    let fillColor = tickColor;
-    let outwardGrowth = 1;
-    if (animatedNeedle.idx === idx) {
-      baseWidth *= animatedNeedle.scale;
-      fillColor = `rgba(255,255,255,${animatedNeedle.brightness})`;
-      outwardGrowth = 1.2; // Grow by 20% when selected
-    }
-    // To grow outward, keep the base at center and extend length outward
-    // So, move the tick up by the extra length
-    const extraLength = tickLength * (outwardGrowth - 1);
+    // Make dots bigger for visibility
+    const dotRadius = animatedNeedle.idx === idx ? 18 : 12;
+    const dotColor = animatedNeedle.idx === idx
+      ? `rgba(255,255,255,${animatedNeedle.brightness})`
+      : tickColor;
     return (
       <View
         key={angle}
         style={{
           position: 'absolute',
-          left: centerX - baseWidth / 2,
-          top: centerY - tickLength - extraLength,
-          width: baseWidth,
-          height: tickLength * outwardGrowth,
-          backgroundColor: fillColor,
-          borderRadius: baseWidth / 2,
-          transform: [
-            { translateY: (tickLength * outwardGrowth) / 2 },
-            { rotate: `${angle}deg` },
-            { translateY: -(tickLength * outwardGrowth) / 2 },
-          ],
+          left: edge.x - dotRadius,
+          top: edge.y - dotRadius,
+          width: dotRadius * 2,
+          height: dotRadius * 2,
+          backgroundColor: dotColor,
+          borderRadius: dotRadius,
         }}
       />
     );
