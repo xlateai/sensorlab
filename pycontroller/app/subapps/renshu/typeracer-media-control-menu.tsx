@@ -32,7 +32,7 @@ export const TypeRacerMediaControlMenu: React.FC<TypeRacerMediaControlMenuProps>
 }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={{position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom, paddingHorizontal: 24, zIndex: 100, backgroundColor: 'transparent'}} pointerEvents="box-none">
+    <View style={{position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom / 2, paddingHorizontal: 24, zIndex: 100, backgroundColor: 'transparent'}} pointerEvents="box-none">
     <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%'}} pointerEvents="box-none">
       {/* Retry button - bottom left */}
       <TouchableOpacity
