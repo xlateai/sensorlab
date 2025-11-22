@@ -81,33 +81,11 @@ export default function Browser() {
         style={styles.webview}
         startInLoadingState={true}
         backgroundColor="#000000"
-        // Inject CSS to force dark mode and black background
-        injectedJavaScript={`
-          (function() {
-            const style = document.createElement('style');
-            style.innerHTML = \`
-              body {
-                background-color: #000000 !important;
-                color: #ffffff !important;
-              }
-              html {
-                background-color: #000000 !important;
-              }
-              * {
-                background-color: inherit;
-              }
-            \`;
-            document.head.appendChild(style);
-            
-            // Also set meta theme-color for browser UI
-            const meta = document.createElement('meta');
-            meta.name = 'theme-color';
-            meta.content = '#000000';
-            document.head.appendChild(meta);
-          })();
-          true; // note: this is required, or you'll sometimes get silent failures
-        `}
-        onMessage={() => {}}
+        renderLoading={() => (
+          <View style={styles.loadingContainer}>
+            <View style={styles.loadingBackground} />
+          </View>
+        )}
       />
     </View>
   );
@@ -116,11 +94,23 @@ export default function Browser() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
   },
   webview: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+  },
+  loadingBackground: {
+    flex: 1,
+    backgroundColor: '#000000',
   },
   hint: {
     color: '#888',
