@@ -828,7 +828,7 @@ export default function ModeZero() {
       />
       {/* Top orb - at top position (16% from top, centered in 30% top region) */}
       {(() => {
-        const topY = screenHeight * 0.16;
+        const topY = screenHeight * 0.16 + (ringRadius * 0.3);
         return (
           <>
             <Animated.View
