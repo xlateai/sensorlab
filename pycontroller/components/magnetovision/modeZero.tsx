@@ -14,13 +14,16 @@ export default function ModeZero() {
   const [showLines, setShowLines] = useState(false);
   const lastTapRef = useRef<number>(0);
   const tapTimeoutRef = useRef<any>(null);
+  const [tapPosition, setTapPosition] = useState<{x: number, y: number} | null>(null);
 
   // Handler for double-tap-and-hold
-  const handlePressIn = () => {
+  const handlePressIn = (event: any) => {
     const now = Date.now();
+    const { locationX, locationY } = event.nativeEvent;
     if (now - lastTapRef.current < 350) {
       // Double-tap detected
       setShowLines(true);
+      setTapPosition({ x: locationX, y: locationY });
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     } else {
       // First tap
@@ -29,10 +32,12 @@ export default function ModeZero() {
       tapTimeoutRef.current = setTimeout(() => {
         lastTapRef.current = 0;
       }, 350);
+      setTapPosition(null);
     }
   };
   const handlePressOut = () => {
     setShowLines(false);
+    setTapPosition(null);
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
@@ -187,7 +192,7 @@ export default function ModeZero() {
     const distToCenter = Math.sqrt(
       Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
     );
-    const tickLength = distToCenter * 0.25;
+    const tickLength = distToCenter * 0.2;
     const tipX = edge.x - edge.dx * tickLength;
     const tipY = edge.y - edge.dy * tickLength;
     // Base width (super thin)
@@ -207,7 +212,6 @@ export default function ModeZero() {
         key={angle}
         d={trianglePath}
         fill={tickColor}
-        opacity={0.8}
       />
     );
   });
@@ -221,6 +225,17 @@ export default function ModeZero() {
       <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
         {/* Dial ticks (conditionally rendered) */}
         {showLines && ticks}
+        {/* Silver circle at second tap location */}
+        {showLines && tapPosition && (
+          <Circle
+            cx={tapPosition.x}
+            cy={tapPosition.y}
+            r={11.9}
+            fill="none"
+            stroke="#C0C0C0"
+            strokeWidth={1.2}
+          />
+        )}
         {/* Outer ring (always visible) */}
         <Circle
           cx={centerX}
