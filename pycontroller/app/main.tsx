@@ -2,12 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
-import { Dimensions, View, Pressable, Text } from 'react-native';
+import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
-import Settings from './widgets/settings';
-import Docs from './widgets/docs';
+import PopView from './popview';
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
@@ -62,8 +61,6 @@ export default function Main() {
   // Slide-up menu state
   const [showMenu, setShowMenu] = useState(false);
   const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
-  const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  const menuOpacity = useRef(new Animated.Value(0)).current;
   // Background colors - explicitly set
   const bgColor = '#000000'; // Pitch black
   const bgColorLightened = '#080808'; // ~5% lighter than black
@@ -75,8 +72,6 @@ export default function Main() {
   const orbCenterScale = useRef(new Animated.Value(1)).current;
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
-  // Flag to track if we're manually closing the menu (to prevent useEffect from interfering)
-  const isManuallyClosingRef = useRef(false);
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -150,12 +145,6 @@ export default function Main() {
     
     // Open menu only if we released while a needle was selected
     if (hadSelection) {
-      // Start from -10% y offset and 0 opacity, then animate in
-      const screenH = Dimensions.get('window').height;
-      const menuHeight = screenH * 0.7; // Menu takes 70% of screen (30% at top)
-      const startY = menuHeight * 0.1; // -10% offset
-      menuSlideAnim.setValue(startY);
-      menuOpacity.setValue(0);
       setMenuSelectedNeedle(selectedNeedle);
       setShowMenu(true);
       // Animate background color to lighter black when menu opens
@@ -165,52 +154,7 @@ export default function Main() {
         useNativeDriver: false,
         easing: Easing.out(Easing.ease),
       }).start();
-      // Animate menu slide and opacity
-      Animated.parallel([
-        Animated.timing(menuSlideAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.timing(menuOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-      ]).start();
-      // Sequential orb fade: first fade out center completely (with shrink), then fade in top (with grow)
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(orbCenterOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterScale, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(orbTopOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbTopScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-      ]).start();
+      // Orb animations are now handled by PopView
     }
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -218,70 +162,7 @@ export default function Main() {
   const pixelSize = screenWidth / PIXEL_WIDTH;
   const canvasHeight = pixelHeight * pixelSize;
   
-  // Animate orb visibility when menu closes (fade out top, then fade in center)
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    if (!showMenu && !isManuallyClosingRef.current) {
-      // Get current values from the drag state
-      const currentTopOpacity = (orbTopOpacity as any)._value || 0;
-      const currentCenterOpacity = (orbCenterOpacity as any)._value || 0;
-      
-      // Always animate smoothly from current state to final state
-      // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(orbTopOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbTopScale, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(orbCenterOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-      ]).start(() => {
-        if (!isMountedRef.current) return;
-        // After animation completes, ensure top orb stays at 0 and center at 1
-        // This prevents any flash-back
-        orbTopOpacity.setValue(0);
-        orbCenterOpacity.setValue(1);
-        orbTopScale.setValue(0);
-        orbCenterScale.setValue(1);
-      });
-    }
-  }, [showMenu]);
-
-  // Lock orb states when menu closes
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    if (!showMenu) {
-      // When menu closes, only lock orb states if we're not manually closing (to allow animation to complete)
-      if (!isManuallyClosingRef.current) {
-        orbTopOpacity.setValue(0);
-        orbCenterOpacity.setValue(1);
-        orbTopScale.setValue(0);
-        orbCenterScale.setValue(1);
-      }
-    }
-  }, [showMenu]);
+  // Orb animations are now handled by PopView
   
   // Left edge threshold for allowing parent gesture (swipe to toggle fullscreen)
   const LEFT_EDGE_THRESHOLD = screenWidth * 0.1;
@@ -565,91 +446,7 @@ export default function Main() {
   }, [targetNeedleIdx, showLines]);
 
   // Handle menu close when needed (e.g., if user taps outside)
-  const closeMenu = (currentDragY: number = 0) => {
-    // Set flag to prevent useEffect from interfering
-    isManuallyClosingRef.current = true;
-    
-    // Stop any ongoing orb animations to prevent conflicts
-    orbTopOpacity.stopAnimation();
-    orbTopScale.stopAnimation();
-    orbCenterOpacity.stopAnimation();
-    orbCenterScale.stopAnimation();
-    
-    // Force orbs to the "menu open" state first (top visible, center hidden)
-    // This ensures we always animate from the correct starting point
-    orbTopOpacity.setValue(1);
-    orbTopScale.setValue(1);
-    orbCenterOpacity.setValue(0);
-    orbCenterScale.setValue(0);
-    
-    // Animate menu closing: slide down and fade out
-    const screenH = Dimensions.get('window').height;
-    const menuHeight = screenH * 0.7; // Menu takes 70% of screen
-    const endY = menuHeight * 0.1; // Slide down to -10% offset
-    
-    // Start orb animations immediately (fade out top, fade in center)
-    // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(orbTopOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbTopScale, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(orbCenterOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbCenterScale, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-    ]).start(() => {
-      // After orb animation completes, ensure states are locked
-      orbTopOpacity.setValue(0);
-      orbCenterOpacity.setValue(1);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
-      // Reset flag after animation completes
-      isManuallyClosingRef.current = false;
-    });
-    
-    // Animate menu slide down and fade out
-    Animated.parallel([
-      Animated.timing(menuSlideAnim, {
-        toValue: endY,
-        duration: 200,
-        useNativeDriver: true,
-        easing: Easing.in(Easing.ease),
-      }),
-      Animated.timing(menuOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-        easing: Easing.in(Easing.ease),
-      }),
-    ]).start(() => {
-      // After animation completes, hide menu and reset values
-      setShowMenu(false);
-      setMenuSelectedNeedle(null);
-      menuSlideAnim.setValue(0);
-      menuOpacity.setValue(0);
-    });
-    
+  const closeMenu = () => {
     // Animate background color back to black smoothly
     Animated.timing(bgColorAnim, {
       toValue: 0,
@@ -657,6 +454,10 @@ export default function Main() {
       useNativeDriver: false,
       easing: Easing.out(Easing.ease),
     }).start();
+    
+    // Close menu (orb animations are handled by PopView)
+    setShowMenu(false);
+    setMenuSelectedNeedle(null);
   };
 
 
@@ -936,117 +737,18 @@ export default function Main() {
           </Animated.View>
         );
       })}
-      {/* Transparent overlay to detect taps outside menu */}
-      {showMenu && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: screenHeight * 0.30, // Top 30% area
-            backgroundColor: 'transparent',
-          }}
-          onStartShouldSetResponder={() => true}
-          onResponderRelease={() => {
-            // Close menu when tapping outside
-            closeMenu();
-          }}
-        />
-      )}
-      {/* Slide-up menu */}
-      {showMenu && (
-        <>
-          {/* Glow effect behind popover */}
-          <Animated.View
-            style={{
-              position: 'absolute',
-              bottom: -4,
-              left: -2,
-              right: -2,
-              top: screenHeight * 0.30 - 8,
-              borderTopLeftRadius: 35,
-              borderTopRightRadius: 35,
-              backgroundColor: 'transparent',
-              opacity: menuOpacity,
-              shadowColor: currentPixel,
-              shadowOffset: { width: 0, height: -12 },
-              shadowOpacity: 0.8,
-              shadowRadius: 35,
-              transform: [
-                { translateY: menuSlideAnim },
-              ],
-            }}
-          />
-          <Animated.View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              top: screenHeight * 0.30, // Leave 30% space at the top
-              backgroundColor: '#000',
-              borderTopLeftRadius: 35,
-              borderTopRightRadius: 35,
-              borderWidth: 1,
-              borderColor: currentPixel,
-              opacity: menuOpacity,
-              shadowColor: currentPixel,
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.4,
-              shadowRadius: 8,
-              transform: [
-                { translateY: menuSlideAnim },
-              ],
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
-              }}
-            >
-              {menuSelectedNeedle === 0 && <Settings />}
-              {menuSelectedNeedle === 1 && <Docs />}
-            </View>
-          </Animated.View>
-          {/* Black region at bottom 12% */}
-          <Animated.View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: screenHeight * 0.12,
-              backgroundColor: '#000',
-              opacity: menuOpacity,
-              transform: [
-                { translateY: menuSlideAnim },
-              ],
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              paddingTop: 16,
-              zIndex: 1000,
-            }}
-          >
-            <Pressable
-              onPress={() => closeMenu()}
-              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-              style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                minWidth: 120,
-                minHeight: 44,
-                zIndex: 1001,
-              }}
-            >
-              <Text style={{ color: '#888', fontWeight: '500', fontSize: 15, textAlign: 'center' }}>Dismiss</Text>
-            </Pressable>
-          </Animated.View>
-        </>
-      )}
+      {/* Popover view */}
+      <PopView
+        isVisible={showMenu}
+        selectedNeedle={menuSelectedNeedle}
+        currentPixel={currentPixel}
+        onClose={closeMenu}
+        onBackgroundColorChange={setCurrentBgColor}
+        orbCenterOpacity={orbCenterOpacity}
+        orbCenterScale={orbCenterScale}
+        orbTopOpacity={orbTopOpacity}
+        orbTopScale={orbTopScale}
+      />
     </View>
   );
 }
