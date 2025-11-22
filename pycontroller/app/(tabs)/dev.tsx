@@ -1,8 +1,20 @@
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
+import type { DeviceMotionMeasurement } from 'expo-sensors';
+import AccelerationScreen from '@/components/sensorvisuals/acceleration';
+import MagneticScreen from '@/components/sensorvisuals/magnetic';
+import AccelerationWithGravityScreen from '@/components/sensorvisuals/accelerationWithGravity';
+import RotationScreen from '@/components/sensorvisuals/rotation';
+import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
+import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
+import Slider from '@/components/ui/slider';
+import RangedSlider from '@/components/ui/ranged-slider';
+
+const screenHeight = Dimensions.get('window').height;
 
 // Blank popup component
 function BlankPopup({ visible, onClose, children }: {
@@ -57,19 +69,6 @@ function BlankPopup({ visible, onClose, children }: {
     </Modal>
   );
 }
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions } from 'react-native';
-import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
-import type { DeviceMotionMeasurement } from 'expo-sensors';
-import AccelerationScreen from '@/components/sensorvisuals/acceleration';
-import MagneticScreen from '@/components/sensorvisuals/magnetic';
-import AccelerationWithGravityScreen from '@/components/sensorvisuals/accelerationWithGravity';
-import RotationScreen from '@/components/sensorvisuals/rotation';
-import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
-import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
-import Slider from '@/components/ui/slider';
-import RangedSlider from '@/components/ui/ranged-slider';
-
-const screenHeight = Dimensions.get('window').height;
 
 // Map measurement to component
 const measurementComponentMap: Record<string, React.ComponentType | null> = {
