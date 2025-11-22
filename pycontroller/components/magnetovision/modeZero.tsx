@@ -49,10 +49,12 @@ export default function ModeZero() {
   // Joystick origin that can drift
   const [joystickOrigin, setJoystickOrigin] = useState<{x: number, y: number} | null>(null);
   const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
+  // Track the active touch identifier to ignore other touches
+  const activeTouchIdRef = useRef<number | null>(null);
   // Animated state for circle and needle
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
-  const iconScaleAnim = useRef([new Animated.Value(1), new Animated.Value(1)]).current;
-  const iconOpacityAnim = useRef([new Animated.Value(0.45), new Animated.Value(0.45)]).current;
+  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
 
@@ -60,12 +62,15 @@ export default function ModeZero() {
   const handlePressIn = (event: any) => {
     const now = Date.now();
     const { locationX, locationY } = event.nativeEvent;
+    const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
+    
     if (now - lastTapRef.current < 350) {
       // Double-tap detected
+      activeTouchIdRef.current = touchId;
       setShowLines(true);
-  setTapPosition({ x: locationX, y: locationY });
-  setJoystickOrigin({ x: locationX, y: locationY });
-  setFingerPosition({ x: locationX, y: locationY });
+      setTapPosition({ x: locationX, y: locationY });
+      setJoystickOrigin({ x: locationX, y: locationY });
+      setFingerPosition({ x: locationX, y: locationY });
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     } else {
       // First tap
@@ -74,24 +79,33 @@ export default function ModeZero() {
       tapTimeoutRef.current = setTimeout(() => {
         lastTapRef.current = 0;
       }, 350);
-  setTapPosition(null);
-  setJoystickOrigin(null);
-  setFingerPosition(null);
+      setTapPosition(null);
+      setJoystickOrigin(null);
+      setFingerPosition(null);
     }
   };
-  const handlePressOut = () => {
+  const handlePressOut = (event?: any) => {
+    // Only respond if this is the active touch or if no active touch is set
+    if (activeTouchIdRef.current !== null && event) {
+      const touchId = event.nativeEvent?.identifier || event.nativeEvent?.changedTouches?.[0]?.identifier;
+      if (touchId !== undefined && touchId !== activeTouchIdRef.current) {
+        return; // Ignore other touches
+      }
+    }
+    
     setShowLines(false);
     setTapPosition(null);
     setFingerPosition(null);
     setJoystickOrigin(null);
+    activeTouchIdRef.current = null;
     // Explicitly reset selection
     setSelectedNeedle(null);
     // Reset animations immediately
     iconScaleAnim.forEach((anim) => {
-      anim.setValue(1);
+      anim.setValue(0);
     });
     iconOpacityAnim.forEach((anim) => {
-      anim.setValue(0.45);
+      anim.setValue(0);
     });
     // Reset blob
     setBlobOffset({ x: 0, y: 0 });
@@ -260,8 +274,8 @@ export default function ModeZero() {
     const dx = fingerPosition.x - origin.x;
     const dy = fingerPosition.y - origin.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = 15;
-    const closeDist = 10; // Distance threshold for bouncing back
+    const maxDist = 20; // Increased for bigger range
+    const closeDist = 15; // Distance threshold for bouncing back (bigger resting spot)
     const driftDist = maxDist * 2;
     
     // If within close distance, bounce back and don't select
@@ -303,32 +317,61 @@ export default function ModeZero() {
     targetNeedleIdx = null;
   }
 
-  // Ensure deselection when showLines becomes false
+  // Bounce fade-in animation when icons first appear
   useEffect(() => {
-    if (!showLines) {
-      // Force deselection when joystick is released
+    if (showLines) {
+      // Bounce fade-in animation
       iconScaleAnim.forEach((anim) => {
-        Animated.spring(anim, {
-          toValue: 1,
+        anim.setValue(0);
+        Animated.sequence([
+          Animated.spring(anim, {
+            toValue: 1.3,
+            useNativeDriver: true,
+            friction: 4,
+            tension: 100,
+          }),
+          Animated.spring(anim, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 6,
+            tension: 120,
+          }),
+        ]).start();
+      });
+      iconOpacityAnim.forEach((anim) => {
+        anim.setValue(0);
+        Animated.timing(anim, {
+          toValue: 0.65,
+          duration: 300,
           useNativeDriver: true,
-          friction: 5,
-          tension: 120,
+          easing: Easing.out(Easing.ease),
+        }).start();
+      });
+    } else {
+      // Fade out when hiding
+      iconScaleAnim.forEach((anim) => {
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
         }).start();
       });
       iconOpacityAnim.forEach((anim) => {
         Animated.timing(anim, {
-          toValue: 0.45,
-          duration: 180,
+          toValue: 0,
+          duration: 150,
           useNativeDriver: true,
-          easing: Easing.inOut(Easing.ease),
+          easing: Easing.in(Easing.ease),
         }).start();
       });
       setSelectedNeedle(null);
     }
   }, [showLines]);
 
-  // Animate icon scale and opacity
+  // Animate icon scale and opacity for selection (only when icons are visible)
   useEffect(() => {
+    if (!showLines) return;
     iconScaleAnim.forEach((anim, idx) => {
       Animated.spring(anim, {
         toValue: targetNeedleIdx === idx ? 1.7 : 1,
@@ -339,14 +382,14 @@ export default function ModeZero() {
     });
     iconOpacityAnim.forEach((anim, idx) => {
       Animated.timing(anim, {
-        toValue: targetNeedleIdx === idx ? 0.85 : 0.45,
+        toValue: targetNeedleIdx === idx ? 0.85 : 0.65,
         duration: 180,
         useNativeDriver: true,
         easing: Easing.inOut(Easing.ease),
       }).start();
     });
     setSelectedNeedle(targetNeedleIdx);
-  }, [targetNeedleIdx]);
+  }, [targetNeedleIdx, showLines]);
 
   // Animation loop for glass blob - smooth melting effect
   useEffect(() => {
@@ -395,15 +438,41 @@ export default function ModeZero() {
     <View
       style={{ flex: 1, backgroundColor: '#000' }}
       onStartShouldSetResponder={(evt) => {
+        // If already in selection mode, detect if another touch is starting
+        if (showLines) {
+          // Cancel selection if another touch occurs
+          handlePressOut();
+          return false;
+        }
         // Don't capture touches that start in the left edge area (let parent handle swipe gesture)
         const touchX = evt.nativeEvent.locationX;
         return touchX >= LEFT_EDGE_THRESHOLD;
+      }}
+      onMoveShouldSetResponder={(evt) => {
+        // Check for multiple touches during selection
+        if (showLines) {
+          const touches = evt.nativeEvent.touches || [];
+          if (touches.length > 1) {
+            // Multiple touches detected - cancel selection
+            handlePressOut();
+            return false;
+          }
+          return true; // Maintain responder during selection
+        }
+        return false;
       }}
       onResponderGrant={handlePressIn}
       onResponderRelease={handlePressOut}
       onResponderTerminate={handlePressOut}
       onResponderMove={event => {
         if (showLines && tapPosition) {
+          // Check for multiple touches
+          const touches = event.nativeEvent.touches || [];
+          if (touches.length > 1) {
+            // Multiple touches detected - cancel selection
+            handlePressOut();
+            return;
+          }
           const { locationX, locationY } = event.nativeEvent;
           setFingerPosition({ x: locationX, y: locationY });
         }
@@ -442,12 +511,13 @@ export default function ModeZero() {
         const dist = Math.sqrt(blobOffset.x * blobOffset.x + blobOffset.y * blobOffset.y);
         const angle = Math.atan2(blobOffset.y, blobOffset.x);
         // Circle extends from center in the direction of joystick
-        const maxDist = 15;
+        const maxDist = 20; // Match the activation threshold
         const distRatio = Math.min(dist / maxDist, 1); // 0 to 1
         // Blend into main circle: smaller and more transparent when close
         const baseRadius = innerRadius * 0.4;
         const circleRadius = baseRadius * (0.3 + distRatio * 0.7); // Scale from 30% to 100%
-        const circleDistance = innerRadius + dist * 0.3;
+        // Position selector circle center on the circumference of the main circle
+        const circleDistance = innerRadius;
         const circleX = centerX + Math.cos(angle) * circleDistance;
         const circleY = centerY + Math.sin(angle) * circleDistance;
         // Opacity blends from 0.2 (close) to 0.5 (far)
