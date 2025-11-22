@@ -67,7 +67,7 @@ export default function ModeZero() {
   const menuOpacity = useRef(new Animated.Value(0)).current;
   // Background colors - explicitly set
   const bgColor = '#000000'; // Pitch black
-  const bgColorLightened = '#050505'; // ~5% lighter than black
+  const bgColorLightened = '#080808'; // ~5% lighter than black
   // Background color animation: 0 = bgColor, 1 = bgColorLightened
   const bgColorAnim = useRef(new Animated.Value(0)).current;
   const [currentBgColor, setCurrentBgColor] = useState(bgColor);
