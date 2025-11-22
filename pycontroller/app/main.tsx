@@ -290,10 +290,10 @@ export default function Main() {
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
-  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | null }[] = [
+  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | 'menu-book' | null }[] = [
     { angle: 0, Title: null, icon: 'settings' },      // Left needle (0 degrees) - Settings
     { angle: 180, Title: null, icon: 'description' },    // Right needle (180 degrees) - Docs
-    { angle: 90, Title: '練習', icon: null },    // Bottom needle (270 degrees) - Practice
+    { angle: 90, Title: null, icon: 'menu-book' },    // Bottom needle (270 degrees) - Practice
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
@@ -746,26 +746,22 @@ export default function Main() {
       {/* Render needle titles at the tip of each needle, only when needles are shown */}
       {showLines && needles.map((needle, i) => {
         const rad = degToRad(needle.angle);
-        const edge = getEdgeIntersection(rad);
-        const distToCenter = Math.sqrt(
-          Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
-        );
-        // Move icons closer to center: 55% of the way from center to edge
-        let tickLength = distToCenter * 0.55;
-        const tipX = centerX + Math.cos(rad) * tickLength;
-        const tipY = centerY + Math.sin(rad) * tickLength;
+        // Calculate orbital ring: center at 50% of screen, radius is 25% of smallest dimension
+        const smallestDimension = Math.min(screenWidth, screenHeight);
+        const radius = smallestDimension * 0.25;
+        const tipX = centerX + Math.cos(rad) * radius;
+        const tipY = centerY + Math.sin(rad) * radius;
         // Icon size: normal 32, enlarged 32*1.36=43.52
         const iconSize = 32;
-        const containerSize = needle.Title ? iconSize * 1.5 : iconSize; // Larger container for text
         return (
           <Animated.View
             key={needle.Title || `needle-${i}`}
             style={{
               position: 'absolute',
-              left: tipX - containerSize / 2,
-              top: tipY - containerSize / 2,
-              width: containerSize,
-              height: containerSize,
+              left: tipX - iconSize / 2,
+              top: tipY - iconSize / 2,
+              width: iconSize,
+              height: iconSize,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ scale: iconScaleAnim[i].interpolate({ inputRange: [1, 1.7], outputRange: [1, 1.36] }) }],
