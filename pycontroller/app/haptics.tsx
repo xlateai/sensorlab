@@ -77,11 +77,11 @@ export async function playChimeHaptic() {
     type: 'continuous',
     // intensity: 1.0,
     // sharpness: 1.0,
-    duration: 0.3,
+    duration: 0.2,
     curve: [
       { time: 0.0, intensity: 0.0, sharpness: 0.0 },
-      { time: 0.15, intensity: 0.6, sharpness: 0.5 },
-      { time: 0.3, intensity: 0.0, sharpness: 0.0 },
+      { time: 0.1, intensity: 0.6, sharpness: 0.5 },
+      { time: 0.2, intensity: 0.0, sharpness: 0.0 },
       // { time: 0.7, intensity: 0.0, sharpness: 0.0 }
     ]
   };
@@ -96,11 +96,11 @@ export async function playReverseChime() {
   // Reverse of playChimeHaptic: fade out instead of fade in
   const pattern: HapticPatternRequest = {
     type: 'continuous',
-    duration: 0.3,
+    duration: 0.2,
     curve: [
       { time: 0.0, intensity: 0.0, sharpness: 0.0 },
-      { time: 0.15, intensity: 0.6, sharpness: 0.5 },
-      { time: 0.3, intensity: 0.0, sharpness: 0.0 },
+      { time: 0.1, intensity: 0.6, sharpness: 0.5 },
+      { time: 0.2, intensity: 0.0, sharpness: 0.0 },
     ]
   };
   await Sensorlib.playHaptic(pattern);
