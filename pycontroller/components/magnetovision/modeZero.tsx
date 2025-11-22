@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { Pressable } from 'react-native';
+import { View } from 'react-native';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
@@ -15,6 +15,7 @@ export default function ModeZero() {
   const lastTapRef = useRef<number>(0);
   const tapTimeoutRef = useRef<any>(null);
   const [tapPosition, setTapPosition] = useState<{x: number, y: number} | null>(null);
+  const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -24,6 +25,7 @@ export default function ModeZero() {
       // Double-tap detected
       setShowLines(true);
       setTapPosition({ x: locationX, y: locationY });
+      setFingerPosition({ x: locationX, y: locationY });
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     } else {
       // First tap
@@ -33,11 +35,13 @@ export default function ModeZero() {
         lastTapRef.current = 0;
       }, 350);
       setTapPosition(null);
+      setFingerPosition(null);
     }
   };
   const handlePressOut = () => {
     setShowLines(false);
     setTapPosition(null);
+    setFingerPosition(null);
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
@@ -217,10 +221,17 @@ export default function ModeZero() {
   });
 
   return (
-    <Pressable
+    <View
       style={{ flex: 1, backgroundColor: '#000' }}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={handlePressIn}
+      onResponderRelease={handlePressOut}
+      onResponderMove={event => {
+        if (showLines && tapPosition) {
+          const { locationX, locationY } = event.nativeEvent;
+          setFingerPosition({ x: locationX, y: locationY });
+        }
+      }}
     >
       <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
         {/* Dial ticks (conditionally rendered) */}
@@ -245,8 +256,24 @@ export default function ModeZero() {
           stroke={`rgba(${smoothR},${smoothG},${smoothB},0.25)`}
           strokeWidth={ringThickness}
         />
-        {/* Inner circle */}
-        <Circle cx={centerX} cy={centerY} r={innerRadius} fill={currentPixel} />
+        {/* Inner circle, joystick offset */}
+        {(() => {
+          let offsetX = centerX;
+          let offsetY = centerY;
+          if (showLines && tapPosition && fingerPosition) {
+            // Calculate angle and distance from tapPosition to fingerPosition
+            const dx = fingerPosition.x - tapPosition.x;
+            const dy = fingerPosition.y - tapPosition.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            // Limit max joystick movement (e.g. 40px)
+            const maxDist = 40;
+            const moveDist = Math.min(dist, maxDist);
+            const angle = Math.atan2(dy, dx);
+            offsetX = centerX + Math.cos(angle) * moveDist;
+            offsetY = centerY + Math.sin(angle) * moveDist;
+          }
+          return <Circle cx={offsetX} cy={offsetY} r={innerRadius} fill={currentPixel} />;
+        })()}
       </Svg>
     </Pressable>
   );
