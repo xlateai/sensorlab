@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { RainbowProgressBar } from '../subapps/renshu/rainbow-progress-bar';
 
 // Try to import WebView, fallback to a message if not available
 let WebView: any = null;
@@ -80,7 +81,7 @@ export default function Browser() {
     <View style={styles.container}>
       {loading && (
         <View style={styles.loadingBarContainer}>
-          <View style={[styles.loadingBar, { width: `${loadingProgress * 100}%` }]} />
+          <RainbowProgressBar progress={loadingProgress} />
         </View>
       )}
       {/* Black overlay that covers the WebView while loading to prevent white flash */}
@@ -130,13 +131,9 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 2,
-    backgroundColor: '#000000',
+    paddingHorizontal: 0,
+    paddingTop: 0,
     zIndex: 1000,
-  },
-  loadingBar: {
-    height: '100%',
-    backgroundColor: '#ffffff',
   },
   loadingOverlay: {
     position: 'absolute',
