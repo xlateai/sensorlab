@@ -78,6 +78,9 @@ export default function Main() {
   const orbCenterScale = useRef(new Animated.Value(0)).current;
   const orbTopOpacity = useRef(new Animated.Value(0)).current;
   const orbTopScale = useRef(new Animated.Value(0)).current;
+  
+  // Height percentage state for calculating top orb position
+  const [heightPercentage, setHeightPercentage] = useState(0.7); // Default to 70%
 
   // Handler for double-tap-and-hold gesture
   const handlePressIn = (event: any) => {
@@ -654,9 +657,13 @@ export default function Main() {
           transform: [{ scale: orbCenterScale }],
         }}
       />
-      {/* Top orb - at top position (16% from top, centered in 30% top region) */}
+      {/* Top orb - positioned at top of menu area based on height percentage */}
       {(() => {
-        const topY = screenHeight * 0.16 + (ringRadius * 0.3);
+        // Calculate top orb position based on height percentage
+        // 0% = viewport center (50%), 100% = full screen (0%)
+        // Orb center is positioned 1.1x radius higher than the menu top edge
+        const menuTop = screenHeight * (1 - heightPercentage);
+        const topY = menuTop - (ringRadius * 1.1);
         return (
           <>
             <Animated.View
@@ -771,6 +778,7 @@ export default function Main() {
         orbCenterScale={orbCenterScale}
         orbTopOpacity={orbTopOpacity}
         orbTopScale={orbTopScale}
+        onHeightPercentageChange={setHeightPercentage}
       />
     </View>
   );

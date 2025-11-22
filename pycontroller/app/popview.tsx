@@ -16,7 +16,16 @@ interface PopViewProps {
   orbCenterScale?: Animated.Value;
   orbTopOpacity?: Animated.Value;
   orbTopScale?: Animated.Value;
+  onHeightPercentageChange?: (percentage: number) => void;
 }
+
+// Height percentage configuration for each component
+// 0% = viewport center (50%), 100% = full screen (0%)
+const HEIGHT_PERCENTAGES: { [key: number]: number } = {
+  0: 0.6,  // Settings: 60%
+  1: 0.7,  // Notes: 70% (default, can be adjusted)
+  2: 0.8,  // Renshu (TypeRacerScreen): 80%
+};
 
 export default function PopView({
   isVisible,
@@ -29,9 +38,19 @@ export default function PopView({
   orbCenterScale: orbCenterScaleProp,
   orbTopOpacity: orbTopOpacityProp,
   orbTopScale: orbTopScaleProp,
+  onHeightPercentageChange,
 }: PopViewProps) {
   const { height: screenHeight } = Dimensions.get('window');
-  const menuHeight = screenHeight * 0.7; // Menu takes 70% of screen (30% at top)
+  
+  // Get height percentage for current component, default to 0.7 (70%)
+  const heightPercentage = selectedNeedle !== null 
+    ? (HEIGHT_PERCENTAGES[selectedNeedle] ?? 0.7)
+    : 0.7;
+  
+  // Calculate menu dimensions based on height percentage
+  // 0% = viewport center (50%), 100% = full screen (0%)
+  const menuTop = screenHeight * (1 - heightPercentage);
+  const menuHeight = screenHeight * heightPercentage;
   
   // Menu animation state
   const menuSlideAnim = useRef(new Animated.Value(menuHeight * 0.1)).current;
@@ -87,6 +106,13 @@ export default function PopView({
       bgColorAnim.removeListener(listenerId);
     };
   }, [onBackgroundColorChange]);
+
+  // Notify parent of height percentage change
+  useEffect(() => {
+    if (selectedNeedle !== null && onHeightPercentageChange) {
+      onHeightPercentageChange(heightPercentage);
+    }
+  }, [selectedNeedle, heightPercentage, onHeightPercentageChange]);
 
   // Handle menu open animation
   useEffect(() => {
@@ -368,14 +394,14 @@ export default function PopView({
 
   return (
     <>
-      {/* Transparent overlay to detect taps outside menu - only in top 30% area */}
+      {/* Transparent overlay to detect taps outside menu - only in top area above menu */}
       <Pressable
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          height: screenHeight * 0.30, // Top 30% area
+          height: menuTop, // Top area above menu
           backgroundColor: 'transparent',
           opacity: isVisible ? 1 : 0,
           pointerEvents: isVisible ? 'auto' : 'none',
@@ -393,7 +419,7 @@ export default function PopView({
           bottom: -4,
           left: -2,
           right: -2,
-          top: screenHeight * 0.30 - 8,
+          top: menuTop - 8,
           borderTopLeftRadius: 35,
           borderTopRightRadius: 35,
           backgroundColor: 'transparent',
@@ -414,7 +440,7 @@ export default function PopView({
           bottom: 0,
           left: 0,
           right: 0,
-          top: screenHeight * 0.30, // Leave 30% space at the top
+          top: menuTop, // Dynamic top position based on height percentage
           backgroundColor: '#000',
           borderTopLeftRadius: 35,
           borderTopRightRadius: 35,
