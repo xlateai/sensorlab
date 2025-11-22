@@ -2,6 +2,8 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer } from 'expo-sensors';
+import { Svg, Circle, Line } from 'react-native-svg';
+
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
@@ -104,9 +106,42 @@ export default function ModeZero() {
   const centerX = screenWidth / 2;
   const centerY = canvasHeight / 2;
 
+  // Dial tick rendering
+  const tickLength = 18; // length of each tick
+  const tickThickness = 2.5;
+  const tickColor = '#C0C0C0'; // silver
+  // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
+  const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+  // Convert degrees to radians
+  const degToRad = (deg: number) => deg * Math.PI / 180;
+  // Calculate tick positions
+  const ticks = tickAngles.map(angle => {
+    const rad = degToRad(angle);
+    // Start at edge, end just inside edge
+    const edgeRadius = Math.min(screenWidth, canvasHeight) / 2;
+    const startX = centerX + edgeRadius * Math.cos(rad);
+    const startY = centerY + edgeRadius * Math.sin(rad);
+    const endX = centerX + (edgeRadius - tickLength) * Math.cos(rad);
+    const endY = centerY + (edgeRadius - tickLength) * Math.sin(rad);
+    return (
+      <Line
+        key={angle}
+        x1={startX}
+        y1={startY}
+        x2={endX}
+        y2={endY}
+        stroke={tickColor}
+        strokeWidth={tickThickness}
+        strokeLinecap="round"
+      />
+    );
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Svg width={screenWidth} height={canvasHeight} style={{ position: 'absolute', left: 0, top: 0 }}>
+        {/* Dial ticks */}
+        {ticks}
         {/* Outer ring */}
         <Circle
           cx={centerX}
