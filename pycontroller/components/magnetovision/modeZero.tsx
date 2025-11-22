@@ -85,9 +85,9 @@ export default function ModeZero() {
     
     // If menu is open, handle single tap to close
     if (showMenu) {
-      // Check if tap is outside menu (in top 20% area)
+      // Check if tap is outside menu (in top 30% area)
       const tapY = locationY;
-      const menuTopY = screenH * 0.20;
+      const menuTopY = screenH * 0.30;
       if (tapY < menuTopY) {
         // Tap is outside menu - close it
         closeMenu();
@@ -744,8 +744,8 @@ export default function ModeZero() {
         if (showMenu) {
           const { height: screenH } = Dimensions.get('window');
           const tapY = evt.nativeEvent.locationY;
-          const menuTopY = screenH * 0.20;
-          // Only capture taps in the top 20% area (outside menu)
+          const menuTopY = screenH * 0.30;
+          // Only capture taps in the top 30% area (outside menu)
           return tapY < menuTopY;
         }
         // If already in selection mode, detect if another touch is starting
@@ -826,9 +826,9 @@ export default function ModeZero() {
           transform: [{ scale: orbCenterScale }],
         }}
       />
-      {/* Top orb - at top position (13% from top) */}
+      {/* Top orb - at top position (16% from top, centered in 30% top region) */}
       {(() => {
-        const topY = screenHeight * 0.13;
+        const topY = screenHeight * 0.16;
         return (
           <>
             <Animated.View
@@ -939,7 +939,7 @@ export default function ModeZero() {
             top: 0,
             left: 0,
             right: 0,
-            height: screenHeight * 0.20, // Top 20% area
+            height: screenHeight * 0.30, // Top 30% area
             backgroundColor: 'transparent',
           }}
           onStartShouldSetResponder={() => true}
@@ -958,7 +958,7 @@ export default function ModeZero() {
               bottom: 0,
               left: 0,
               right: 0,
-              top: screenHeight * 0.20, // Leave 20% space at the top
+              top: screenHeight * 0.30, // Leave 30% space at the top
               backgroundColor: '#000',
               borderTopLeftRadius: 35,
               borderTopRightRadius: 35,
