@@ -737,7 +737,7 @@ export default function ModeZero() {
     <View
       style={{ 
         flex: 1, 
-        backgroundColor: bgColor,
+        backgroundColor: '#000000',
       }}
       onStartShouldSetResponder={(evt) => {
         // If menu is open, allow responder to handle taps outside menu
