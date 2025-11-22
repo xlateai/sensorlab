@@ -239,7 +239,7 @@ export default function PopView({
         <View
           style={{
             flex: 1,
-            paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
+            paddingBottom: screenHeight * 0.066, // Reserve bottom ~6.6% for black region
           }}
           pointerEvents={isVisible ? "auto" : "none"}
         >
@@ -265,22 +265,21 @@ export default function PopView({
           }}
         />
       </Animated.View>
-      {/* Black region at bottom 12% */}
+      {/* Black region at bottom ~6.6% */}
       <Animated.View
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: screenHeight * 0.12,
+          height: screenHeight * 0.066,
           backgroundColor: '#000',
           opacity: menuOpacity,
           transform: [
             { translateY: menuSlideAnim },
           ],
           alignItems: 'center',
-          justifyContent: 'flex-start',
-          paddingTop: 16,
+          justifyContent: 'center',
           zIndex: 1000,
         }}
         pointerEvents={isVisible ? "box-none" : "none"}
@@ -295,6 +294,7 @@ export default function PopView({
             paddingVertical: 12,
             minWidth: 120,
             minHeight: 44,
+            marginTop: -8,
             zIndex: 1001,
           }}
         >
