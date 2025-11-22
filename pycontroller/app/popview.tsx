@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
 import Settings from './widgets/settings';
 import Docs from './widgets/docs';
+import TypeRacerScreen from './subapps/renshu/typeracer';
 import { playChimeHaptic, playReverseChime } from './haptics';
 
 interface PopViewProps {
@@ -432,6 +433,7 @@ export default function PopView({
         >
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Docs />}
+          {selectedNeedle === 2 && <TypeRacerScreen />}
         </View>
       </Animated.View>
       {/* Black region at bottom 12% */}

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
-import { Dimensions, View } from 'react-native';
+import { Dimensions, View, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
@@ -57,8 +57,8 @@ export default function Main() {
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
   // Track previous highlighted icon for haptic feedback
   const prevTargetNeedleIdxRef = useRef<number | null>(null);
-  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
-  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
   // Slide-up menu state
@@ -290,9 +290,10 @@ export default function Main() {
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
-  const needles: { angle: number; Title: string; icon: 'description' | 'settings' }[] = [
-    { angle: 0, Title: 'Hi', icon: 'settings' },      // Left needle (0 degrees) - Settings
-    { angle: 180, Title: 'There', icon: 'description' },    // Right needle (180 degrees) - Docs
+  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | null }[] = [
+    { angle: 0, Title: null, icon: 'settings' },      // Left needle (0 degrees) - Settings
+    { angle: 180, Title: null, icon: 'description' },    // Right needle (180 degrees) - Docs
+    { angle: 270, Title: '練習', icon: null },    // Bottom needle (270 degrees) - Practice
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
@@ -757,7 +758,7 @@ export default function Main() {
         const iconSize = 32;
         return (
           <Animated.View
-            key={needle.Title}
+            key={needle.Title || `needle-${i}`}
             style={{
               position: 'absolute',
               left: tipX - iconSize / 2,
@@ -770,7 +771,11 @@ export default function Main() {
               opacity: iconOpacityAnim[i],
             }}
           >
-            <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
+            {needle.icon ? (
+              <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
+            ) : needle.Title ? (
+              <Text style={{ color: '#fff', fontSize: iconSize * 0.6, fontWeight: '500' }}>{needle.Title}</Text>
+            ) : null}
           </Animated.View>
         );
       })}
