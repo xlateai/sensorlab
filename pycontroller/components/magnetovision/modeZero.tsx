@@ -178,49 +178,50 @@ export default function ModeZero() {
   // Animate orb visibility when menu closes (fade out top, then fade in center)
   useEffect(() => {
     if (!showMenu) {
-      // Stop any ongoing orb animations first
-      orbTopOpacity.stopAnimation();
-      orbCenterOpacity.stopAnimation();
-      
-      // Get current values to see if we need to animate
+      // Get current values from the drag state
       const currentTopOpacity = (orbTopOpacity as any)._value || 0;
       const currentCenterOpacity = (orbCenterOpacity as any)._value || 0;
       
-      // Only animate if top is visible or center is not fully visible
-      if (currentTopOpacity > 0 || currentCenterOpacity < 1) {
-        // Sequential: first fade out top completely, then fade in center
-        Animated.sequence([
-          Animated.timing(orbTopOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]).start();
-      } else {
-        // Already in correct state, just ensure values are set
+      // Always animate smoothly from current state to final state
+      // Sequential: first fade out top completely, then fade in center
+      Animated.sequence([
+        Animated.timing(orbTopOpacity, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.timing(orbCenterOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.quad),
+        }),
+      ]).start(() => {
+        // After animation completes, ensure top orb stays at 0 and center at 1
+        // This prevents any flash-back
         orbTopOpacity.setValue(0);
         orbCenterOpacity.setValue(1);
-      }
+      });
     }
   }, [showMenu]);
 
   // Make background color and orb visibility respond to drag in real-time
   useEffect(() => {
     if (!showMenu) {
-      // When menu closes, immediately remove listener and ensure final orb state
+      // When menu closes, immediately lock orb states and cleanup
+      orbTopOpacity.setValue(0);
+      orbCenterOpacity.setValue(1);
       return;
     }
     
     const threshold = screenHeight * 0.2; // Same threshold as dismiss
+    let isActive = true; // Flag to prevent listener from running after cleanup
     
     const listenerId = menuPanY.addListener(({ value }) => {
+      // Don't update if menu has closed
+      if (!isActive) return;
+      
       // Interpolate background color: 0 drag = full light (#0a0a0a), threshold drag = black (#000)
       const bgProgress = Math.max(0, Math.min(1, 1 - (value / threshold)));
       bgColorAnim.setValue(bgProgress);
@@ -233,7 +234,11 @@ export default function ModeZero() {
     });
     
     return () => {
+      isActive = false; // Disable listener before removing
       menuPanY.removeListener(listenerId);
+      // Always lock orb states when listener is removed (menu closing)
+      orbTopOpacity.setValue(0);
+      orbCenterOpacity.setValue(1);
     };
   }, [showMenu, screenHeight]);
   
@@ -515,24 +520,27 @@ export default function ModeZero() {
 
   // Handle menu close when needed (e.g., if user taps outside)
   const closeMenu = (currentDragY: number = 0) => {
-    // Stop any ongoing animations
+    // Stop any ongoing animations (but let orb animations run smoothly)
     menuPanY.stopAnimation();
     menuSlideAnim.stopAnimation();
     menuOpacity.stopAnimation();
-    orbTopOpacity.stopAnimation();
-    orbCenterOpacity.stopAnimation();
     
-    // Immediately set orb states to final values (top invisible, center visible)
-    // This prevents any flash from the drag listener when menuPanY is reset
-    orbTopOpacity.setValue(0);
-    orbCenterOpacity.setValue(1);
+    // Don't stop orb animations - let them animate smoothly
+    // Don't set orb values immediately - let the useEffect handle the smooth transition
     
-    // Hide menu first, then reset values
+    // Hide menu - this will trigger the smooth closing animation in useEffect
     setShowMenu(false);
-    menuPanY.setValue(0);
-    menuSlideAnim.setValue(0);
-    menuOpacity.setValue(0);
-    bgColorAnim.setValue(0);
+    
+    // Reset menu values after animation completes to prevent any interference
+    // Wait longer to ensure orb animation has started
+    setTimeout(() => {
+      menuPanY.setValue(0);
+      menuSlideAnim.setValue(0);
+      menuOpacity.setValue(0);
+      bgColorAnim.setValue(0);
+      // Ensure top orb stays invisible - lock it in place
+      orbTopOpacity.setValue(0);
+    }, 300); // Wait for orb animation to complete
   };
 
   // Pan responder for swipe-down to dismiss
