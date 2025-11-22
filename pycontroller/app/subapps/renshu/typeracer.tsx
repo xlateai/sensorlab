@@ -36,7 +36,7 @@ import { BlurView } from 'expo-blur';
 import { Animated } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { MediaControlCenter } from '../components/mediaControlCenter';
+import { TypeRacerControlMenu } from './typeracer-control-menu';
 import { TypeStatsBar } from './type-stats-bar';
 import { Transliterator } from './romaji-transliterator';
 import { View, Text, TextInput, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
