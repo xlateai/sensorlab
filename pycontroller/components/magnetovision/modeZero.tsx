@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { Text, Animated } from 'react-native';
+import { Animated } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
 import { Dimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -411,24 +412,28 @@ export default function ModeZero() {
         }
         const tipX = edge.x - edge.dx * tickLength;
         const tipY = edge.y - edge.dy * tickLength;
+        // Use Material Icons: left is notes, right is settings
+        const iconName = needle.idx === 0 ? 'music-note' : 'settings';
+        const iconSize = 32;
+        // Fade icons until selected, synchronize with dot brightness
+        const isSelected = animatedNeedle.idx === needle.idx;
+        const iconOpacity = isSelected ? animatedNeedle.brightness : 0.45;
         return (
-          <Animated.View
+          <View
             key={needle.Title}
             style={{
               position: 'absolute',
-              left: tipX - 20,
-              top: tipY - 12,
-              transform: [{
-                rotate: rotationAnim.interpolate({
-                  inputRange: [-360, 360],
-                  outputRange: ['-360deg', '360deg'],
-                  extrapolate: 'clamp',
-                })
-              }],
+              left: tipX - iconSize / 2,
+              top: tipY - iconSize / 2,
+              width: iconSize,
+              height: iconSize,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: iconOpacity,
             }}
           >
-            <Text style={{ color: '#fff', fontSize: 18 }}>{needle.Title}</Text>
-          </Animated.View>
+            <MaterialIcons name={iconName} size={iconSize} color="#fff" />
+          </View>
         );
       })}
     </View>
