@@ -669,7 +669,14 @@ export default function ModeZero() {
             backgroundColor: '#fff',
             borderTopLeftRadius: 35,
             borderTopRightRadius: 35,
-            opacity: menuOpacity,
+            opacity: Animated.multiply(
+              menuOpacity,
+              menuPanY.interpolate({
+                inputRange: [0, screenHeight * 0.12], // Fade out over 12% of screen height
+                outputRange: [1, 0],
+                extrapolate: 'clamp',
+              })
+            ),
             transform: [
               { translateY: Animated.add(menuSlideAnim, menuPanY) },
             ],
