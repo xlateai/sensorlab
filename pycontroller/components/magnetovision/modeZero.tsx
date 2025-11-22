@@ -82,6 +82,16 @@ export default function ModeZero() {
     setShowLines(false);
     setTapPosition(null);
     setFingerPosition(null);
+    setJoystickOrigin(null);
+    // Explicitly reset selection
+    setSelectedNeedle(null);
+    // Reset animations immediately
+    iconScaleAnim.forEach((anim) => {
+      anim.setValue(1);
+    });
+    iconOpacityAnim.forEach((anim) => {
+      anim.setValue(0.45);
+    });
   };
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const pixelHeight = Math.round((screenHeight / screenWidth) * PIXEL_WIDTH);
@@ -280,6 +290,30 @@ export default function ModeZero() {
     targetNeedleIdx = null;
   }
 
+  // Ensure deselection when showLines becomes false
+  useEffect(() => {
+    if (!showLines) {
+      // Force deselection when joystick is released
+      iconScaleAnim.forEach((anim) => {
+        Animated.spring(anim, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 5,
+          tension: 120,
+        }).start();
+      });
+      iconOpacityAnim.forEach((anim) => {
+        Animated.timing(anim, {
+          toValue: 0.45,
+          duration: 180,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }).start();
+      });
+      setSelectedNeedle(null);
+    }
+  }, [showLines]);
+
   // Animate icon scale and opacity
   useEffect(() => {
     iconScaleAnim.forEach((anim, idx) => {
@@ -354,6 +388,7 @@ export default function ModeZero() {
       }}
       onResponderGrant={handlePressIn}
       onResponderRelease={handlePressOut}
+      onResponderTerminate={handlePressOut}
       onResponderMove={event => {
         if (showLines && tapPosition) {
           const { locationX, locationY } = event.nativeEvent;
