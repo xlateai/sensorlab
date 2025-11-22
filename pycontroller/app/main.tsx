@@ -9,6 +9,7 @@ import { Magnetometer, DeviceMotion } from 'expo-sensors';
 import PopView from './popview';
 import { playSimpleHaptic } from './haptics';
 import { useRGBRange } from './RGBRangeContext';
+import { calculateColorFromMagnetometer, blendRGB } from './color-decoding';
 
 const PIXEL_WIDTH = 256;
 const BUFFER_SIZE = 64;
@@ -208,33 +209,19 @@ export default function Main() {
 
   // Interpolate between colors for smooth transitions
   const prevRGBRef = useRef<[number, number, number]>([0, 0, 0]);
-  let r = 0, g = 0, b = 0;
-  if (magnetometer !== null) {
-    const norm = (val: number, min: number, max: number) => {
-      if (max === min) return 0.5;
-      return Math.max(0, Math.min(1, (val - min) / (max - min)));
-    };
-    // Normalize to [0, 1]
-    const rNorm = norm(magnetometer.x, minMax.minX, minMax.maxX);
-    const gNorm = norm(magnetometer.y, minMax.minY, minMax.maxY);
-    const bNorm = norm(magnetometer.z, minMax.minZ, minMax.maxZ);
-    // Apply range transformation: squash into [rangeMin, rangeMax]
-    const rSquashed = rNorm * (range.rMax - range.rMin) + range.rMin;
-    const gSquashed = gNorm * (range.gMax - range.gMin) + range.gMin;
-    const bSquashed = bNorm * (range.bMax - range.bMin) + range.bMin;
-    // Convert to [0, 255] range
-    r = Math.round(rSquashed * 255);
-    g = Math.round(gSquashed * 255);
-    b = Math.round(bSquashed * 255);
-  }
+  
+  // Calculate color from magnetometer data
+  const currentRGB = calculateColorFromMagnetometer(magnetometer, minMax, range);
+  
   // Blend previous and current RGB
   const blend = 0.2; // 0 = no smoothing, 1 = full smoothing
-  const prev = prevRGBRef.current;
-  const smoothR = Math.round(prev[0] * (1 - blend) + r * blend);
-  const smoothG = Math.round(prev[1] * (1 - blend) + g * blend);
-  const smoothB = Math.round(prev[2] * (1 - blend) + b * blend);
-  prevRGBRef.current = [smoothR, smoothG, smoothB];
-  const currentPixel = `rgb(${smoothR},${smoothG},${smoothB})`;
+  const blended = blendRGB(currentRGB, prevRGBRef.current, blend);
+  prevRGBRef.current = [blended.r, blended.g, blended.b];
+  const currentPixel = blended.rgbString;
+  
+  const smoothR = blended.r;
+  const smoothG = blended.g;
+  const smoothB = blended.b;
 
 
   if (!isFocused) {
