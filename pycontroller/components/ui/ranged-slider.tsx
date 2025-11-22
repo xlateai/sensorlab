@@ -29,6 +29,20 @@ export default function RangedSlider({
   const thumbHeight = isVertical ? 30 : 32;
   const trackThickness = isVertical ? 50 : 32;
 
+  // Calculate minimum distance between knobs (thumb size + small gap)
+  // This ensures there's always space to pull them apart
+  const getMinDistance = (): number => {
+    if (isVertical) {
+      if (containerHeight === 0) return 0.05; // Default fallback
+      // Minimum distance = thumb height + small gap (about 10% more)
+      return (thumbHeight * 1.1) / (containerHeight - thumbHeight);
+    } else {
+      if (containerWidth === 0) return 0.05; // Default fallback
+      // Minimum distance = thumb width + small gap (about 10% more)
+      return (thumbWidth * 1.1) / (containerWidth - thumbWidth);
+    }
+  };
+
   const valueToPosition = (value: number) => {
     if (isVertical) {
       return (1 - value) * (containerHeight - thumbHeight);
@@ -122,13 +136,15 @@ export default function RangedSlider({
     
     if (!dragMode || !dragStartRef.current) return;
     
+    const minDistance = getMinDistance();
+    
     if (dragMode === 'min') {
       const newValue = positionToValue(isVertical ? locationY : locationX);
-      const clampedValue = Math.max(0, Math.min(newValue, maxValue - 0.01)); // Prevent overlap
+      const clampedValue = Math.max(0, Math.min(newValue, maxValue - minDistance)); // Maintain minimum distance
       onRangeChange(Number(clampedValue.toFixed(2)), maxValue);
     } else if (dragMode === 'max') {
       const newValue = positionToValue(isVertical ? locationY : locationX);
-      const clampedValue = Math.max(minValue + 0.01, Math.min(newValue, 1)); // Prevent overlap
+      const clampedValue = Math.max(minValue + minDistance, Math.min(newValue, 1)); // Maintain minimum distance
       onRangeChange(minValue, Number(clampedValue.toFixed(2)));
     } else if (dragMode === 'range') {
       // Move both thumbs by the same delta from the original start position
