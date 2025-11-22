@@ -61,8 +61,8 @@ export default function Main() {
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
   // Track previous highlighted icon for haptic feedback
   const prevTargetNeedleIdxRef = useRef<number | null>(null);
-  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
-  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
   // Slide-up menu state
@@ -222,10 +222,11 @@ export default function Main() {
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
-  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | 'menu-book' | null }[] = [
+  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | 'menu-book' | 'language' | null }[] = [
     { angle: 0, Title: null, icon: 'settings' },      // Left needle (0 degrees) - Settings
     { angle: 180, Title: null, icon: 'description' },    // Right needle (180 degrees) - Docs
-    { angle: 90, Title: null, icon: 'menu-book' },    // Bottom needle (270 degrees) - Practice
+    { angle: 90, Title: null, icon: 'menu-book' },    // Bottom needle (90 degrees) - Practice
+    { angle: 270, Title: null, icon: 'language' },    // Top needle (270 degrees) - Browser
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;

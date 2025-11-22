@@ -3,6 +3,7 @@ import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-nativ
 import Settings from './widgets/settings';
 import Notes from './widgets/notes';
 import TypeRacerScreen from './subapps/renshu/typeracer';
+import Browser from './widgets/browser';
 import { playChimeHaptic, playReverseChime } from './haptics';
 
 interface PopViewProps {
@@ -16,9 +17,10 @@ interface PopViewProps {
 // Height percentage configuration for each component
 // 0% = viewport center (50%), 100% = full screen (0%)
 const HEIGHT_PERCENTAGES: { [key: number]: number } = {
-  0: 0.75,  // Settings: 60%
-  1: 0.75,  // Notes: 70% (default, can be adjusted)
-  2: 0.75,  // Renshu (TypeRacerScreen): 80%
+  0: 0.75,  // Settings: 75%
+  1: 0.75,  // Notes: 75%
+  2: 0.75,  // Renshu (TypeRacerScreen): 75%
+  3: 0.75,  // Browser: 75%
 };
 
 export default function PopView({
@@ -246,6 +248,7 @@ export default function PopView({
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Notes />}
           {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
+          {selectedNeedle === 3 && <Browser />}
         </View>
       </Animated.View>
       {/* Black region at bottom 12% */}
