@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { Animated } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
 import { Dimensions, View } from 'react-native';
@@ -51,7 +51,9 @@ export default function ModeZero() {
   const [fingerPosition, setFingerPosition] = useState<{x: number, y: number} | null>(null);
   // Animated state for circle and needle
   const [animatedOffset, setAnimatedOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
-  const [animatedNeedle, setAnimatedNeedle] = useState<{idx: number | null, scale: number, brightness: number}>({ idx: null, scale: 1, brightness: 0.45 });
+  const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
+  const iconScaleAnim = useRef([new Animated.Value(1), new Animated.Value(1)]).current;
+  const iconOpacityAnim = useRef([new Animated.Value(0.45), new Animated.Value(0.45)]).current;
 
   // Handler for double-tap-and-hold
   const handlePressIn = (event: any) => {
@@ -179,10 +181,10 @@ export default function ModeZero() {
   const tickColor = 'rgba(216,216,216,0.45)'; // silvery and faded
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
-  // Needles array with Title property
-  const needles = [
-    { idx: 0, Title: 'Hi' },      // Left needle (0 degrees)
-    { idx: 4, Title: 'There' },   // Right needle (180 degrees)
+  // Needles array with explicit angles
+  const needles: { angle: number; Title: string; icon: 'description' | 'settings' }[] = [
+    { angle: 0, Title: 'Hi', icon: 'description' },      // Left needle (0 degrees)
+    { angle: 180, Title: 'There', icon: 'settings' },    // Right needle (180 degrees)
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
@@ -236,18 +238,16 @@ export default function ModeZero() {
   let joystickAtMax = false;
   let targetOffset = { x: 0, y: 0 };
   // Always interpolate to target scale/brightness, even when unselected
-  let targetNeedle = { idx: animatedNeedle.idx, scale: animatedNeedle.scale, brightness: animatedNeedle.brightness };
+  let targetNeedleIdx: number | null = null;
   if (showLines && joystickOrigin && fingerPosition) {
     let origin = joystickOrigin;
     const dx = fingerPosition.x - origin.x;
     const dy = fingerPosition.y - origin.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = 18; // 50% of previous reach
+    const maxDist = 18;
     const driftDist = maxDist * 2;
-    // If finger is further than 2x maxDist, drift the origin towards the finger
     if (dist > driftDist) {
-      // Move origin a fraction towards the finger
-      const driftFrac = 0.18; // smooth drift
+      const driftFrac = 0.18;
       origin = {
         x: origin.x + (fingerPosition.x - origin.x) * driftFrac,
         y: origin.y + (fingerPosition.y - origin.y) * driftFrac,
@@ -259,41 +259,46 @@ export default function ModeZero() {
     targetOffset.x = Math.cos(angleRad) * moveDist;
     targetOffset.y = Math.sin(angleRad) * moveDist;
     joystickAtMax = dist >= maxDist - 0.5;
-    let newIdx: number | null = null;
-    let newScale = 1;
-    let newBrightness = 0.45;
     if (joystickAtMax) {
       joystickAngle = (angleRad * 180 / Math.PI);
       if (joystickAngle < 0) joystickAngle += 360;
-      // Find nearest tick
-      if (joystickAngle !== null) {
-        let minDiff = 999;
-        tickAngles.forEach((angle, idx) => {
-          if (joystickAngle !== null) {
-            let diff = Math.abs(angle - joystickAngle);
-            if (diff > 180) diff = 360 - diff;
-            if (diff < minDiff) {
-              minDiff = diff;
-              newIdx = idx;
-            }
-          }
-        });
-        newScale = 1.7;
-        newBrightness = 0.85;
-      }
+      let minDiff = 999;
+      needles.forEach((needle, idx) => {
+        let diff = Math.abs(needle.angle - joystickAngle!);
+        if (diff > 180) diff = 360 - diff;
+        if (diff < minDiff) {
+          minDiff = diff;
+          targetNeedleIdx = idx;
+        }
+      });
     }
-    targetNeedle = {
-      idx: newIdx,
-      scale: newScale,
-      brightness: newBrightness
-    };
   } else {
     targetOffset = { x: 0, y: 0 };
-    // Always interpolate back to normal state
-    targetNeedle = { idx: null, scale: 1, brightness: 0.45 };
+    targetNeedleIdx = null;
   }
 
-  // Animation loop for interpolation
+  // Animate icon scale and opacity
+  useEffect(() => {
+    iconScaleAnim.forEach((anim, idx) => {
+      Animated.spring(anim, {
+        toValue: targetNeedleIdx === idx ? 1.7 : 1,
+        useNativeDriver: true,
+        friction: 5,
+        tension: 120,
+      }).start();
+    });
+    iconOpacityAnim.forEach((anim, idx) => {
+      Animated.timing(anim, {
+        toValue: targetNeedleIdx === idx ? 0.85 : 0.45,
+        duration: 180,
+        useNativeDriver: true,
+        easing: Easing.inOut(Easing.ease),
+      }).start();
+    });
+    setSelectedNeedle(targetNeedleIdx);
+  }, [targetNeedleIdx]);
+
+  // Animation loop for joystick offset only
   useEffect(() => {
     let running = true;
     function animate() {
@@ -304,39 +309,19 @@ export default function ModeZero() {
           y: lerp(prev.y, targetOffset.y, 0.18)
         };
       });
-      setAnimatedNeedle(prev => {
-        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-        // If targetNeedle.idx is null, keep previous idx until scale/brightness are nearly normal
-        let nextIdx = prev.idx;
-        if (targetNeedle.idx === null) {
-          const scaleClose = Math.abs(prev.scale - 1) < 0.01;
-          const brightClose = Math.abs(prev.brightness - 0.45) < 0.01;
-          if (scaleClose && brightClose) {
-            nextIdx = null;
-          }
-        } else {
-          nextIdx = targetNeedle.idx;
-        }
-        return {
-          idx: nextIdx,
-          scale: lerp(prev.scale, targetNeedle.scale, 0.18),
-          brightness: lerp(prev.brightness, targetNeedle.brightness, 0.18)
-        };
-      });
       if (running) requestAnimationFrame(animate);
     }
     animate();
     return () => { running = false; };
-  }, [targetOffset.x, targetOffset.y, targetNeedle.idx, targetNeedle.scale, targetNeedle.brightness]);
+  }, [targetOffset.x, targetOffset.y]);
 
   // Render ticks as dots at the tips
   const ticks = tickAngles.map((angle, idx) => {
     const rad = degToRad(angle);
     const edge = getEdgeIntersection(rad);
-    // Make dots bigger for visibility
-    const dotRadius = animatedNeedle.idx === idx ? 18 : 12;
-    const dotColor = animatedNeedle.idx === idx
-      ? `rgba(255,255,255,${animatedNeedle.brightness})`
+    const dotRadius = selectedNeedle === idx ? 18 : 12;
+    const dotColor = selectedNeedle === idx
+      ? `rgba(255,255,255,0.85)`
       : tickColor;
     return (
       <View
@@ -398,26 +383,17 @@ export default function ModeZero() {
       />
       {/* Render needle titles at the tip of each needle, only when needles are shown */}
       {showLines && needles.map((needle, i) => {
-        const angle = tickAngles[needle.idx];
-        const rad = degToRad(angle);
+        const rad = degToRad(needle.angle);
         const edge = getEdgeIntersection(rad);
         const distToCenter = Math.sqrt(
           Math.pow(edge.x - centerX, 2) + Math.pow(edge.y - centerY, 2)
         );
         let tickLength = distToCenter * 0.2;
-        if (animatedNeedle.idx === needle.idx) {
-          tickLength *= animatedNeedle.scale;
-        }
         const tipX = edge.x - edge.dx * tickLength;
         const tipY = edge.y - edge.dy * tickLength;
-  // Use Material Icons: left is docs/notes, right is settings
-  const iconName = needle.idx === 0 ? 'description' : 'settings';
         const iconSize = 32;
-        // Fade icons until selected, synchronize with dot brightness
-        const isSelected = animatedNeedle.idx === needle.idx;
-        const iconOpacity = isSelected ? animatedNeedle.brightness : 0.45;
         return (
-          <View
+          <Animated.View
             key={needle.Title}
             style={{
               position: 'absolute',
@@ -427,11 +403,12 @@ export default function ModeZero() {
               height: iconSize,
               alignItems: 'center',
               justifyContent: 'center',
-              opacity: iconOpacity,
+              transform: [{ scale: iconScaleAnim[i] }],
+              opacity: iconOpacityAnim[i],
             }}
           >
-            <MaterialIcons name={iconName} size={iconSize} color="#fff" />
-          </View>
+            <MaterialIcons name={needle.icon} size={iconSize} color="#fff" />
+          </Animated.View>
         );
       })}
     </View>
