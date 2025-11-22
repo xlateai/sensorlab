@@ -99,22 +99,10 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         style={styles.webview}
         startInLoadingState={true}
         backgroundColor="#000000"
-        // Cookie sharing limitations:
-        // - sharedCookiesEnabled only works with Safari on iOS, NOT Chrome
-        // - On Android, there's no built-in cookie sharing with Chrome
-        // - Chrome on iOS uses its own cookie store separate from Safari
-        // To get logged-in sessions: Use Safari on iOS, or log in within this WebView
-        sharedCookiesEnabled={true}
-        // Enable third-party cookies for cross-site authentication
-        thirdPartyCookiesEnabled={true}
         // Enable JavaScript (required for most auth flows)
         javaScriptEnabled={true}
         // Enable DOM storage (for localStorage, sessionStorage)
         domStorageEnabled={true}
-        // Cache mode: helps preserve cookies and session data
-        cacheEnabled={true}
-        // Cache mode: use cache and network
-        cacheMode="LOAD_DEFAULT"
         // Keep videos playing inline instead of fullscreen (iOS)
         allowsInlineMediaPlayback={true}
         // Prevent fullscreen video on Android
