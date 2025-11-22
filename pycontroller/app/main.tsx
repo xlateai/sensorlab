@@ -293,7 +293,7 @@ export default function Main() {
   const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | null }[] = [
     { angle: 0, Title: null, icon: 'settings' },      // Left needle (0 degrees) - Settings
     { angle: 180, Title: null, icon: 'description' },    // Right needle (180 degrees) - Docs
-    { angle: 270, Title: '練習', icon: null },    // Bottom needle (270 degrees) - Practice
+    { angle: 90, Title: '練習', icon: null },    // Bottom needle (270 degrees) - Practice
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
