@@ -97,7 +97,7 @@ export async function playReverseChime() {
     type: 'continuous',
     duration: 0.35,
     curve: [
-      { time: 0.0, intensity: 1.0, sharpness: 0.3 },
+      { time: 0.0, intensity: 8.0, sharpness: 0.2 },
       { time: 0.35, intensity: 0.0, sharpness: 0.0 },
     ]
   };
