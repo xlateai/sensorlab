@@ -1,0 +1,5666 @@
+[
+  {
+    "level": "1",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "時",
+        "english": "toki",
+        "reading": "とき"
+      },
+      {
+        "string": "言わなきゃ",
+        "english": "iwanakya",
+        "reading": "いわなきゃ"
+      },
+      {
+        "string": "よかった",
+        "english": "yokatta",
+        "reading": "よかった"
+      },
+      {
+        "string": "って",
+        "english": "tte",
+        "reading": "って"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "今さら",
+        "english": "imasara",
+        "reading": "いまさら"
+      },
+      {
+        "string": "後悔",
+        "english": "koukai",
+        "reading": "こうかい"
+      },
+      {
+        "string": "しても",
+        "english": "shitemo",
+        "reading": "しても"
+      },
+      {
+        "string": "遅い",
+        "english": "osoi",
+        "reading": "おそい"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "カフェ",
+        "english": "kafe",
+        "reading": "かふぇ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "新しい",
+        "english": "atarashii",
+        "reading": "あたらしい"
+      },
+      {
+        "string": "メニュー",
+        "english": "menyuu",
+        "reading": "めにゅー"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "始まった",
+        "english": "hajimatta",
+        "reading": "はじまった"
+      },
+      {
+        "string": "らしい",
+        "english": "rashii",
+        "reading": "らしい"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "今度",
+        "english": "kondo",
+        "reading": "こんど"
+      },
+      {
+        "string": "一緒に",
+        "english": "isshoni",
+        "reading": "いっしょに"
+      },
+      {
+        "string": "行こう",
+        "english": "ikou",
+        "reading": "いこう"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "店",
+        "english": "mise",
+        "reading": "みせ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "ラーメン",
+        "english": "ra-men",
+        "reading": "らーめん"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "久しぶり",
+        "english": "hisashiburi",
+        "reading": "ひさしぶり"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "食べた",
+        "english": "tabeta",
+        "reading": "たべた"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "やっぱ",
+        "english": "yappa",
+        "reading": "やっぱ"
+      },
+      {
+        "string": "最高",
+        "english": "saikou",
+        "reading": "さいこう"
+      },
+      {
+        "string": "だった",
+        "english": "datta",
+        "reading": "だった"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "店",
+        "english": "mise",
+        "reading": "みせ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "ラーメン",
+        "english": "ra-men",
+        "reading": "らーめん"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "マジで",
+        "english": "majide",
+        "reading": "まじで"
+      },
+      {
+        "string": "やばい",
+        "english": "yabai",
+        "reading": "やばい"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "一回",
+        "english": "ikkai",
+        "reading": "いっかい"
+      },
+      {
+        "string": "食って",
+        "english": "kutte",
+        "reading": "くって"
+      },
+      {
+        "string": "みて",
+        "english": "mite",
+        "reading": "みて"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "絶対",
+        "english": "zettai",
+        "reading": "ぜったい"
+      },
+      {
+        "string": "ハマる",
+        "english": "hamaru",
+        "reading": "はまる"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "夜",
+        "english": "yoru",
+        "reading": "よる"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "話",
+        "english": "hanashi",
+        "reading": "はなし"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "誰",
+        "english": "dare",
+        "reading": "だれ"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "言わない",
+        "english": "iwanai",
+        "reading": "いわない"
+      },
+      {
+        "string": "って",
+        "english": "tte",
+        "reading": "って"
+      },
+      {
+        "string": "約束",
+        "english": "yakusoku",
+        "reading": "やくそく"
+      },
+      {
+        "string": "した",
+        "english": "shita",
+        "reading": "した"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "何人か",
+        "english": "nanninka",
+        "reading": "なんにんか"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "バラしちゃってる",
+        "english": "barashichatteru",
+        "reading": "ばらしちゃってる"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "昨日",
+        "english": "kinou",
+        "reading": "きのう"
+      },
+      {
+        "string": "海",
+        "english": "umi",
+        "reading": "うみ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "あった",
+        "english": "atta",
+        "reading": "あった"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "人",
+        "english": "hito",
+        "reading": "ひと"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "なんか",
+        "english": "nanka",
+        "reading": "なんか"
+      },
+      {
+        "string": "絶対",
+        "english": "zettai",
+        "reading": "ぜったい"
+      },
+      {
+        "string": "秘密",
+        "english": "himitsu",
+        "reading": "ひみつ"
+      },
+      {
+        "string": "ありそう",
+        "english": "arisou",
+        "reading": "ありそう"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "傘",
+        "english": "kasa",
+        "reading": "かさ"
+      },
+      {
+        "string": "取って",
+        "english": "totte",
+        "reading": "とって"
+      },
+      {
+        "string": "こよう",
+        "english": "koyou",
+        "reading": "こよう"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "って",
+        "english": "tte",
+        "reading": "って"
+      },
+      {
+        "string": "言ったら",
+        "english": "ittara",
+        "reading": "いったら"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "雨",
+        "english": "ame",
+        "reading": "あめ"
+      },
+      {
+        "string": "止んで",
+        "english": "yande",
+        "reading": "やんで"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "今日",
+        "english": "kyou",
+        "reading": "きょう"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "がっこう",
+        "english": "gakkou",
+        "reading": "がっこう"
+      },
+      {
+        "string": "めんどくさくて",
+        "english": "mendokusakute",
+        "reading": "めんどくさくて"
+      },
+      {
+        "string": "いきたく",
+        "english": "ikitaku",
+        "reading": "いきたく"
+      },
+      {
+        "string": "ない",
+        "english": "nai",
+        "reading": "ない"
+      },
+      {
+        "string": "なあ",
+        "english": "naa",
+        "reading": "なあ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "今日",
+        "english": "kyou",
+        "reading": "きょう"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "ずっと",
+        "english": "zutto",
+        "reading": "ずっと"
+      },
+      {
+        "string": "ゲーム",
+        "english": "ge-mu",
+        "reading": "げーむ"
+      },
+      {
+        "string": "して",
+        "english": "shite",
+        "reading": "して"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "お腹",
+        "english": "onaka",
+        "reading": "おなか"
+      },
+      {
+        "string": "すい",
+        "english": "sui",
+        "reading": "すい"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "明日",
+        "english": "ashita",
+        "reading": "あした"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "夜",
+        "english": "yoru",
+        "reading": "よる"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "どうする",
+        "english": "dousuru",
+        "reading": "どうする"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "まだ",
+        "english": "mada",
+        "reading": "まだ"
+      },
+      {
+        "string": "決まって",
+        "english": "kimatte",
+        "reading": "きまって"
+      },
+      {
+        "string": "ない",
+        "english": "nai",
+        "reading": "ない"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "もし",
+        "english": "moshi",
+        "reading": "もし"
+      },
+      {
+        "string": "よかったら",
+        "english": "yokattara",
+        "reading": "よかったら"
+      },
+      {
+        "string": "誘って",
+        "english": "sasotte",
+        "reading": "さそって"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "駅前",
+        "english": "ekimae",
+        "reading": "えきまえ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "見かけた",
+        "english": "mikaketa",
+        "reading": "みかけた"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "子",
+        "english": "ko",
+        "reading": "こ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "スマホ",
+        "english": "sumaho",
+        "reading": "すまほ"
+      },
+      {
+        "string": "ばっかり",
+        "english": "bakkari",
+        "reading": "ばっかり"
+      },
+      {
+        "string": "見て",
+        "english": "mite",
+        "reading": "みて"
+      },
+      {
+        "string": "本当に",
+        "english": "hontouni",
+        "reading": "ほんとうに"
+      },
+      {
+        "string": "面白くない",
+        "english": "omoshirokunai",
+        "reading": "おもしろくない"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "海",
+        "english": "umi",
+        "reading": "うみ"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "飛び込ん",
+        "english": "tobikon",
+        "reading": "とびこん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "とたん",
+        "english": "totan",
+        "reading": "とたん"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "こんな",
+        "english": "konna",
+        "reading": "こんな"
+      },
+      {
+        "string": "瞬間",
+        "english": "shunkan",
+        "reading": "しゅんかん"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "世界",
+        "english": "sekai",
+        "reading": "せかい"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "時間",
+        "english": "jikan",
+        "reading": "じかん"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "止まっ",
+        "english": "tomat",
+        "reading": "とまっ"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "気",
+        "english": "ki",
+        "reading": "き"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "し",
+        "english": "shi",
+        "reading": "し"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "その",
+        "english": "sono",
+        "reading": "その"
+      },
+      {
+        "string": "映画",
+        "english": "eiga",
+        "reading": "えいが"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "意外と",
+        "english": "igaito",
+        "reading": "いがいと"
+      },
+      {
+        "string": "はまって",
+        "english": "hamatte",
+        "reading": "はまって"
+      },
+      {
+        "string": "今日",
+        "english": "kyou",
+        "reading": "きょう"
+      },
+      {
+        "string": "三回",
+        "english": "sankai",
+        "reading": "さんかい"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "見ちゃった",
+        "english": "michatta",
+        "reading": "みちゃった"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "少し",
+        "english": "sukoshi",
+        "reading": "すこし"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "待って",
+        "english": "matte",
+        "reading": "まって"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "いい",
+        "english": "ii",
+        "reading": "いい"
+      },
+      {
+        "string": "報告",
+        "english": "houkoku",
+        "reading": "ほうこく"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "できる",
+        "english": "dekiru",
+        "reading": "できる"
+      },
+      {
+        "string": "はず",
+        "english": "hazu",
+        "reading": "はず"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "今日",
+        "english": "kyou",
+        "reading": "きょう"
+      },
+      {
+        "string": "仕事",
+        "english": "shigoto",
+        "reading": "しごと"
+      },
+      {
+        "string": "終わったら",
+        "english": "owattara",
+        "reading": "おわったら"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "そのまま",
+        "english": "sonomama",
+        "reading": "そのまま"
+      },
+      {
+        "string": "ライブ",
+        "english": "raibu",
+        "reading": "らいぶ"
+      },
+      {
+        "string": "行こう",
+        "english": "ikou",
+        "reading": "いこう"
+      },
+      {
+        "string": "ぜ",
+        "english": "ze",
+        "reading": "ぜ"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "スマホ",
+        "english": "sumaho",
+        "reading": "すまほ"
+      },
+      {
+        "string": "見",
+        "english": "mi",
+        "reading": "み"
+      },
+      {
+        "string": "すぎて",
+        "english": "sugite",
+        "reading": "すぎて"
+      },
+      {
+        "string": "目",
+        "english": "me",
+        "reading": "め"
+      },
+      {
+        "string": "痛い",
+        "english": "itai",
+        "reading": "いたい"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "今夜",
+        "english": "konya",
+        "reading": "こんや"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "寝る",
+        "english": "neru",
+        "reading": "ねる"
+      },
+      {
+        "string": "わ",
+        "english": "wa",
+        "reading": "わ"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "昨日",
+        "english": "kinou",
+        "reading": "きのう"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "ドラマ",
+        "english": "dorama",
+        "reading": "どらま"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "本当に",
+        "english": "hontouni",
+        "reading": "ほんとうに"
+      },
+      {
+        "string": "つまらなさ",
+        "english": "tsumaranasa",
+        "reading": "つまらなさ"
+      },
+      {
+        "string": "過ぎて",
+        "english": "sugite",
+        "reading": "すぎて"
+      },
+      {
+        "string": "途中",
+        "english": "tochuu",
+        "reading": "とちゅう"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "寝ちゃった",
+        "english": "nechatta",
+        "reading": "ねちゃった"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "生きてる",
+        "english": "ikiteru",
+        "reading": "いきてる"
+      },
+      {
+        "string": "だけで",
+        "english": "dakede",
+        "reading": "だけで"
+      },
+      {
+        "string": "丸儲け",
+        "english": "marumouke",
+        "reading": "まるもうけ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "生き急ぐ",
+        "english": "ikiisogu",
+        "reading": "いきいそぐ"
+      },
+      {
+        "string": "みたいな",
+        "english": "mitaina",
+        "reading": "みたいな"
+      },
+      {
+        "string": "奴",
+        "english": "yatsu",
+        "reading": "やつ"
+      },
+      {
+        "string": "ばっか",
+        "english": "bakka",
+        "reading": "ばっか"
+      },
+      {
+        "string": "だろ",
+        "english": "daro",
+        "reading": "だろ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "例え",
+        "english": "tatoe",
+        "reading": "たとえ"
+      },
+      {
+        "string": "痛み",
+        "english": "itami",
+        "reading": "いたみ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "未来",
+        "english": "mirai",
+        "reading": "みらい"
+      },
+      {
+        "string": "へ",
+        "english": "e",
+        "reading": "へ"
+      },
+      {
+        "string": "裂け目",
+        "english": "sakeme",
+        "reading": "さけめ"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "開く",
+        "english": "hiraku",
+        "reading": "ひらく"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "しても",
+        "english": "shitemo",
+        "reading": "しても"
+      },
+      {
+        "string": "俺",
+        "english": "ore",
+        "reading": "おれ"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "まだ",
+        "english": "mada",
+        "reading": "まだ"
+      },
+      {
+        "string": "ここ",
+        "english": "koko",
+        "reading": "ここ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "笑う",
+        "english": "warau",
+        "reading": "わらう"
+      },
+      {
+        "string": "選択",
+        "english": "sentaku",
+        "reading": "せんたく"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "したい",
+        "english": "shitai",
+        "reading": "したい"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "どれだけ",
+        "english": "doredake",
+        "reading": "どれだけ"
+      },
+      {
+        "string": "遠く",
+        "english": "tooku",
+        "reading": "とおく"
+      },
+      {
+        "string": "離れて",
+        "english": "hanarete",
+        "reading": "はなれて"
+      },
+      {
+        "string": "いても",
+        "english": "itemo",
+        "reading": "いても"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "心",
+        "english": "kokoro",
+        "reading": "こころ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "繋がって",
+        "english": "tsunagatte",
+        "reading": "つながって"
+      },
+      {
+        "string": "いる",
+        "english": "iru",
+        "reading": "いる"
+      },
+      {
+        "string": "なら",
+        "english": "nara",
+        "reading": "なら"
+      },
+      {
+        "string": "何も",
+        "english": "nanimo",
+        "reading": "なにも"
+      },
+      {
+        "string": "恐れる",
+        "english": "osoreru",
+        "reading": "おそれる"
+      },
+      {
+        "string": "こと",
+        "english": "koto",
+        "reading": "こと"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "ない",
+        "english": "nai",
+        "reading": "ない"
+      },
+      {
+        "string": "さ",
+        "english": "sa",
+        "reading": "さ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "今日",
+        "english": "kyou",
+        "reading": "きょう"
+      },
+      {
+        "string": "なに",
+        "english": "nani",
+        "reading": "なに"
+      },
+      {
+        "string": "食べる",
+        "english": "taberu",
+        "reading": "たべる"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      },
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "遅い",
+        "english": "osoi",
+        "reading": "おそい"
+      },
+      {
+        "string": "し",
+        "english": "shi",
+        "reading": "し"
+      },
+      {
+        "string": "コンビニ",
+        "english": "konbini",
+        "reading": "こんびに"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "さっと",
+        "english": "satto",
+        "reading": "さっと"
+      },
+      {
+        "string": "済ませたい",
+        "english": "sumasetai",
+        "reading": "すませたい"
+      },
+      {
+        "string": "感じ",
+        "english": "kanji",
+        "reading": "かんじ"
+      },
+      {
+        "string": "なん",
+        "english": "nan",
+        "reading": "なん"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "さ",
+        "english": "sa",
+        "reading": "さ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "ハンバーガー",
+        "english": "hanba-ga-",
+        "reading": "はんばーがー"
+      },
+      {
+        "string": "おごる",
+        "english": "ogoru",
+        "reading": "おごる"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "あとで",
+        "english": "atode",
+        "reading": "あとで"
+      },
+      {
+        "string": "えきまえ",
+        "english": "ekimae",
+        "reading": "えきまえ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "今夜",
+        "english": "konya",
+        "reading": "こんや"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "雨っぽい",
+        "english": "ameppoi",
+        "reading": "あめっぽい"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "傘",
+        "english": "kasa",
+        "reading": "かさ"
+      },
+      {
+        "string": "忘れないで",
+        "english": "wasurenaide",
+        "reading": "わすれないで"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "明日",
+        "english": "ashita",
+        "reading": "あした"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "飲み会",
+        "english": "nomikai",
+        "reading": "のみかい"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "行けそう",
+        "english": "ikesou",
+        "reading": "いけそう"
+      },
+      {
+        "string": "だったら",
+        "english": "dattara",
+        "reading": "だったら"
+      },
+      {
+        "string": "すぐ",
+        "english": "sugu",
+        "reading": "すぐ"
+      },
+      {
+        "string": "連絡",
+        "english": "renraku",
+        "reading": "れんらく"
+      },
+      {
+        "string": "ちょうだい",
+        "english": "choudai",
+        "reading": "ちょうだい"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "星",
+        "english": "hoshi",
+        "reading": "ほし"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "数",
+        "english": "kazu",
+        "reading": "かず"
+      },
+      {
+        "string": "より",
+        "english": "yori",
+        "reading": "より"
+      },
+      {
+        "string": "多い",
+        "english": "ooi",
+        "reading": "おおい"
+      },
+      {
+        "string": "秘密",
+        "english": "himitsu",
+        "reading": "ひみつ"
+      },
+      {
+        "string": "、",
+        "english": "",
+        "reading": "、"
+      },
+      {
+        "string": "君",
+        "english": "kimi",
+        "reading": "きみ"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "話さない",
+        "english": "hanasanai",
+        "reading": "はなさない"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "ha",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "静か",
+        "english": "shizuka",
+        "reading": "しずか"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "覚えてて",
+        "english": "oboetete",
+        "reading": "おぼえてて"
+      },
+      {
+        "string": "欲しい",
+        "english": "hoshii",
+        "reading": "ほしい"
+      },
+      {
+        "string": "。",
+        "english": "",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "たまに",
+        "english": "tamani",
+        "reading": "たまに"
+      },
+      {
+        "string": "空",
+        "english": "sora",
+        "reading": "そら"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "見上げる",
+        "english": "miageru",
+        "reading": "みあげる"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "世界",
+        "english": "sekai",
+        "reading": "せかい"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "ゆっくり",
+        "english": "yukkuri",
+        "reading": "ゆっくり"
+      },
+      {
+        "string": "動いている",
+        "english": "ugoiteiru",
+        "reading": "うごいている"
+      },
+      {
+        "string": "気",
+        "english": "ki",
+        "reading": "き"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "する",
+        "english": "suru",
+        "reading": "する"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "映画",
+        "english": "eiga",
+        "reading": "えいが"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "まるで",
+        "english": "marude",
+        "reading": "まるで"
+      },
+      {
+        "string": "現実",
+        "english": "genjitsu",
+        "reading": "げんじつ"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "勝手に",
+        "english": "katteni",
+        "reading": "かってに"
+      },
+      {
+        "string": "抜け出して",
+        "english": "nukedashite",
+        "reading": "ぬけだして"
+      },
+      {
+        "string": "きた",
+        "english": "kita",
+        "reading": "きた"
+      },
+      {
+        "string": "みたい",
+        "english": "mitai",
+        "reading": "みたい"
+      },
+      {
+        "string": "だった",
+        "english": "datta",
+        "reading": "だった"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "こんな",
+        "english": "konna",
+        "reading": "こんな"
+      },
+      {
+        "string": "夜",
+        "english": "yoru",
+        "reading": "よる"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "限って",
+        "english": "kagitte",
+        "reading": "かぎって"
+      },
+      {
+        "string": "電車",
+        "english": "densha",
+        "reading": "でんしゃ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "遅れて",
+        "english": "okurete",
+        "reading": "おくれて"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "本気で",
+        "english": "honkide",
+        "reading": "ほんきで"
+      },
+      {
+        "string": "終電",
+        "english": "shuuden",
+        "reading": "しゅうでん"
+      },
+      {
+        "string": "心配",
+        "english": "shinpai",
+        "reading": "しんぱい"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "なってる",
+        "english": "natteru",
+        "reading": "なってる"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "深夜",
+        "english": "shinya",
+        "reading": "しんや"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "空",
+        "english": "sora",
+        "reading": "そら"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "君",
+        "english": "kimi",
+        "reading": "きみ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "名前",
+        "english": "namae",
+        "reading": "なまえ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "星",
+        "english": "hoshi",
+        "reading": "ほし"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "ように",
+        "english": "youni",
+        "reading": "ように"
+      },
+      {
+        "string": "ちらつく",
+        "english": "chiratsuku",
+        "reading": "ちらつく"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "それ",
+        "english": "sore",
+        "reading": "それ"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "囁く",
+        "english": "sasayaku",
+        "reading": "ささやく"
+      },
+      {
+        "string": "風",
+        "english": "kaze",
+        "reading": "かぜ"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "確か",
+        "english": "tashika",
+        "reading": "たしか"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "気配",
+        "english": "kehai",
+        "reading": "けはい"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "持って",
+        "english": "motte",
+        "reading": "もって"
+      },
+      {
+        "string": "いない",
+        "english": "inai",
+        "reading": "いない"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "カフェ",
+        "english": "kafe",
+        "reading": "かふぇ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "ねこ",
+        "english": "neko",
+        "reading": "ねこ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "おと",
+        "english": "oto",
+        "reading": "おと"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "きいて",
+        "english": "kiite",
+        "reading": "きいて"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "にゃんこ",
+        "english": "nyanko",
+        "reading": "にゃんこ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "ポカポカ",
+        "english": "pokapoka",
+        "reading": "ぽかぽか"
+      },
+      {
+        "string": "ひなた",
+        "english": "hinata",
+        "reading": "ひなた"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "お昼寝",
+        "english": "ohirune",
+        "reading": "おひるね"
+      },
+      {
+        "string": "してる",
+        "english": "shiteru",
+        "reading": "してる"
+      },
+      {
+        "string": "にゃー",
+        "english": "nyaa",
+        "reading": "にゃー"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "いっしょに",
+        "english": "isshoni",
+        "reading": "いっしょに"
+      },
+      {
+        "string": "映画",
+        "english": "eiga",
+        "reading": "えいが"
+      },
+      {
+        "string": "みたい",
+        "english": "mitai",
+        "reading": "みたい"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "おつり",
+        "english": "otsuri",
+        "reading": "おつり"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "たのめる",
+        "english": "tanomeru",
+        "reading": "たのめる"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "土砂降り",
+        "english": "doshaburi",
+        "reading": "どしゃぶり"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "商店街",
+        "english": "shoutengai",
+        "reading": "しょうてんがい"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "縫う",
+        "english": "nuu",
+        "reading": "ぬう"
+      },
+      {
+        "string": "ように",
+        "english": "youni",
+        "reading": "ように"
+      },
+      {
+        "string": "走ったら",
+        "english": "hashittara",
+        "reading": "はしったら"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "見慣れた",
+        "english": "minareta",
+        "reading": "みなれた"
+      },
+      {
+        "string": "顔",
+        "english": "kao",
+        "reading": "かお"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "露骨に",
+        "english": "rokotsuni",
+        "reading": "ろこつに"
+      },
+      {
+        "string": "困惑してた",
+        "english": "konwakushiteta",
+        "reading": "こんわくしてた"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "ねこ",
+        "english": "neko",
+        "reading": "ねこ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "えき",
+        "english": "eki",
+        "reading": "えき"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "はしった",
+        "english": "hashitta",
+        "reading": "はしった"
+      },
+      {
+        "string": "はやぶさ",
+        "english": "hayabusa",
+        "reading": "はやぶさ"
+      },
+      {
+        "string": "より",
+        "english": "yori",
+        "reading": "より"
+      },
+      {
+        "string": "はやい",
+        "english": "hayai",
+        "reading": "はやい"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "！",
+        "english": "!",
+        "reading": "！"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "盛り上がり",
+        "english": "moriagari",
+        "reading": "もりあがり"
+      },
+      {
+        "string": "過ぎて",
+        "english": "sugite",
+        "reading": "すぎて"
+      },
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "終電",
+        "english": "shuuden",
+        "reading": "しゅうでん"
+      },
+      {
+        "string": "どころか",
+        "english": "dokoroka",
+        "reading": "どころか"
+      },
+      {
+        "string": "始発",
+        "english": "shihatsu",
+        "reading": "しはつ"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "スルー",
+        "english": "suruu",
+        "reading": "するー"
+      },
+      {
+        "string": "した",
+        "english": "shita",
+        "reading": "した"
+      },
+      {
+        "string": "俺たち",
+        "english": "oretachi",
+        "reading": "おれたち"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "ただただ",
+        "english": "tadatada",
+        "reading": "ただただ"
+      },
+      {
+        "string": "路上",
+        "english": "rojou",
+        "reading": "ろじょう"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "着地点",
+        "english": "chakuchiten",
+        "reading": "ちゃくちてん"
+      },
+      {
+        "string": "探してた",
+        "english": "sagashiteta",
+        "reading": "さがしてた"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "昨日",
+        "english": "kinou",
+        "reading": "きのう"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "映画",
+        "english": "eiga",
+        "reading": "えいが"
+      },
+      {
+        "string": "すごく",
+        "english": "sugoku",
+        "reading": "すごく"
+      },
+      {
+        "string": "よかった",
+        "english": "yokatta",
+        "reading": "よかった"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "最後",
+        "english": "saigo",
+        "reading": "さいご"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "シーン",
+        "english": "shi-n",
+        "reading": "しーん"
+      },
+      {
+        "string": "全然",
+        "english": "zenzen",
+        "reading": "ぜんぜん"
+      },
+      {
+        "string": "わからなかった",
+        "english": "wakaranakatta",
+        "reading": "わからなかった"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "突然",
+        "english": "totsuzen",
+        "reading": "とつぜん"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "おばあちゃん",
+        "english": "obaachan",
+        "reading": "おばあちゃん"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "腕",
+        "english": "ude",
+        "reading": "うで"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "実は",
+        "english": "jitsuwa",
+        "reading": "じつは"
+      },
+      {
+        "string": "秘密",
+        "english": "himitsu",
+        "reading": "ひみつ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "呪文",
+        "english": "jumon",
+        "reading": "じゅもん"
+      },
+      {
+        "string": "覚えてた",
+        "english": "oboeteta",
+        "reading": "おぼえてた"
+      },
+      {
+        "string": "らしい",
+        "english": "rashii",
+        "reading": "らしい"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "俳優",
+        "english": "haiyuu",
+        "reading": "はいゆう"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "微か",
+        "english": "kasuka",
+        "reading": "かすか"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "切実",
+        "english": "setsujitsu",
+        "reading": "せつじつ"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "目線",
+        "english": "mesen",
+        "reading": "めせん"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "スクリーン",
+        "english": "sukuriin",
+        "reading": "すくりーん"
+      },
+      {
+        "string": "全体",
+        "english": "zentai",
+        "reading": "ぜんたい"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "染み込ませた",
+        "english": "shimikomaseta",
+        "reading": "しみこませた"
+      },
+      {
+        "string": "かのよう",
+        "english": "kanoyou",
+        "reading": "かのよう"
+      },
+      {
+        "string": "だった",
+        "english": "datta",
+        "reading": "だった"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "雨上がり",
+        "english": "ameagari",
+        "reading": "あめあがり"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "街",
+        "english": "machi",
+        "reading": "まち"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "知らない",
+        "english": "shiranai",
+        "reading": "しらない"
+      },
+      {
+        "string": "もの",
+        "english": "mono",
+        "reading": "もの"
+      },
+      {
+        "string": "ばかり",
+        "english": "bakari",
+        "reading": "ばかり"
+      },
+      {
+        "string": "賑わって",
+        "english": "nigiwatte",
+        "reading": "にぎわって"
+      },
+      {
+        "string": "いる",
+        "english": "iru",
+        "reading": "いる"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "場所",
+        "english": "basho",
+        "reading": "ばしょ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "話した",
+        "english": "hanashita",
+        "reading": "はなした"
+      },
+      {
+        "string": "こと",
+        "english": "koto",
+        "reading": "こと"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "まだ",
+        "english": "mada",
+        "reading": "まだ"
+      },
+      {
+        "string": "ほんまに",
+        "english": "honmani",
+        "reading": "ほんまに"
+      },
+      {
+        "string": "覚えてる",
+        "english": "oboeteru",
+        "reading": "おぼえてる"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "夜",
+        "english": "yoru",
+        "reading": "よる"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "ラーメン",
+        "english": "raamen",
+        "reading": "らーめん"
+      },
+      {
+        "string": "て",
+        "english": "te",
+        "reading": "て"
+      },
+      {
+        "string": "まじで",
+        "english": "majide",
+        "reading": "まじで"
+      },
+      {
+        "string": "何回",
+        "english": "nankai",
+        "reading": "なんかい"
+      },
+      {
+        "string": "思い出して",
+        "english": "omoidasite",
+        "reading": "おもいだして"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "ずるい",
+        "english": "zurui",
+        "reading": "ずるい"
+      },
+      {
+        "string": "って",
+        "english": "tte",
+        "reading": "って"
+      },
+      {
+        "string": "感じ",
+        "english": "kanji",
+        "reading": "かんじ"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "店",
+        "english": "mise",
+        "reading": "みせ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "こっそり",
+        "english": "kossori",
+        "reading": "こっそり"
+      },
+      {
+        "string": "味",
+        "english": "aji",
+        "reading": "あじ"
+      },
+      {
+        "string": "変わった",
+        "english": "kawatta",
+        "reading": "かわった"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "もっぱら",
+        "english": "moppara",
+        "reading": "もっぱら"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "噂",
+        "english": "uwasa",
+        "reading": "うわさ"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "…",
+        "english": "...",
+        "reading": "…"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "こんな",
+        "english": "konna",
+        "reading": "こんな"
+      },
+      {
+        "string": "夜",
+        "english": "yoru",
+        "reading": "よる"
+      },
+      {
+        "string": "だからこそ",
+        "english": "dakarakoso",
+        "reading": "だからこそ"
+      },
+      {
+        "string": "昔",
+        "english": "mukashi",
+        "reading": "むかし"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "愛称",
+        "english": "aishou",
+        "reading": "あいしょう"
+      },
+      {
+        "string": "や",
+        "english": "ya",
+        "reading": "や"
+      },
+      {
+        "string": "極秘",
+        "english": "gokuhi",
+        "reading": "ごくひ"
+      },
+      {
+        "string": "プロジェクト",
+        "english": "purojekuto",
+        "reading": "ぷろじぇくと"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "名残",
+        "english": "nagori",
+        "reading": "なごり"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "ぽつり",
+        "english": "potsuri",
+        "reading": "ぽつり"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "思い出して",
+        "english": "omoidasite",
+        "reading": "おもいだして"
+      },
+      {
+        "string": "しまう",
+        "english": "shimau",
+        "reading": "しまう"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "分かってる",
+        "english": "wakatte",
+        "reading": "わかってる"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "それ",
+        "english": "sore",
+        "reading": "それ"
+      },
+      {
+        "string": "じゃ",
+        "english": "ja",
+        "reading": "じゃ"
+      },
+      {
+        "string": "絶対",
+        "english": "zettai",
+        "reading": "ぜったい"
+      },
+      {
+        "string": "先に",
+        "english": "sakini",
+        "reading": "さきに"
+      },
+      {
+        "string": "進めない",
+        "english": "susumenai",
+        "reading": "すすめない"
+      },
+      {
+        "string": "気がする",
+        "english": "kigasuru",
+        "reading": "きがする"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だよね",
+        "english": "dayone",
+        "reading": "だよね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "帰って",
+        "english": "kaette",
+        "reading": "かえって"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "大丈夫",
+        "english": "daijoubu",
+        "reading": "だいじょうぶ"
+      },
+      {
+        "string": "だから",
+        "english": "dakara",
+        "reading": "だから"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "気にしないで",
+        "english": "kinishinaide",
+        "reading": "きにしないで"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "ここで",
+        "english": "kokode",
+        "reading": "ここで"
+      },
+      {
+        "string": "呑み明かす",
+        "english": "nomiakasu",
+        "reading": "のみあかす"
+      },
+      {
+        "string": "とか",
+        "english": "toka",
+        "reading": "とか"
+      },
+      {
+        "string": "無理",
+        "english": "muri",
+        "reading": "むり"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "たまには",
+        "english": "tamaniwa",
+        "reading": "たまには"
+      },
+      {
+        "string": "ゆるく",
+        "english": "yuruku",
+        "reading": "ゆるく"
+      },
+      {
+        "string": "騒ぎたい",
+        "english": "sawagitai",
+        "reading": "さわぎたい"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "一度",
+        "english": "ichido",
+        "reading": "いちど"
+      },
+      {
+        "string": "山道",
+        "english": "yamamichi",
+        "reading": "やまみち"
+      },
+      {
+        "string": "ほう",
+        "english": "hou",
+        "reading": "ほう"
+      },
+      {
+        "string": "林",
+        "english": "hayashi",
+        "reading": "はやし"
+      },
+      {
+        "string": "たいぎょう",
+        "english": "taigyou",
+        "reading": "たいぎょう"
+      },
+      {
+        "string": "する",
+        "english": "suru",
+        "reading": "する"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "ライブ",
+        "english": "raibu",
+        "reading": "らいぶ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "最後まで",
+        "english": "saigomade",
+        "reading": "さいごまで"
+      },
+      {
+        "string": "いられなくて",
+        "english": "irarenakute",
+        "reading": "いられなくて"
+      },
+      {
+        "string": "残念",
+        "english": "zannen",
+        "reading": "ざんねん"
+      },
+      {
+        "string": "だった",
+        "english": "datta",
+        "reading": "だった"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "声援",
+        "english": "seien",
+        "reading": "せいえん"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "全力で",
+        "english": "zenryokude",
+        "reading": "ぜんりょくで"
+      },
+      {
+        "string": "送った",
+        "english": "okutta",
+        "reading": "おくった"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "夢中",
+        "english": "muchuu",
+        "reading": "むちゅう"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "はまった",
+        "english": "hamatta",
+        "reading": "はまった"
+      },
+      {
+        "string": "レトノ",
+        "english": "retono",
+        "reading": "れとの"
+      },
+      {
+        "string": "画面",
+        "english": "gamen",
+        "reading": "がめん"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "でも",
+        "english": "demo",
+        "reading": "でも"
+      },
+      {
+        "string": "その",
+        "english": "sono",
+        "reading": "その"
+      },
+      {
+        "string": "苦投",
+        "english": "kutou",
+        "reading": "くとう"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "盤代",
+        "english": "bandai",
+        "reading": "ばんだい"
+      },
+      {
+        "string": "さえ",
+        "english": "sae",
+        "reading": "さえ"
+      },
+      {
+        "string": "許さなかった",
+        "english": "yurusanakatta",
+        "reading": "ゆるさなかった"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "あいつ",
+        "english": "aitsu",
+        "reading": "あいつ"
+      },
+      {
+        "string": "最近",
+        "english": "saikin",
+        "reading": "さいきん"
+      },
+      {
+        "string": "あんま",
+        "english": "anma",
+        "reading": "あんま"
+      },
+      {
+        "string": "連絡",
+        "english": "renraku",
+        "reading": "れんらく"
+      },
+      {
+        "string": "して",
+        "english": "shite",
+        "reading": "して"
+      },
+      {
+        "string": "こなくて",
+        "english": "konakute",
+        "reading": "こなくて"
+      },
+      {
+        "string": "ヤバい",
+        "english": "yabai",
+        "reading": "やばい"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "大丈夫",
+        "english": "daijoubu",
+        "reading": "だいじょうぶ"
+      },
+      {
+        "string": "かな",
+        "english": "kana",
+        "reading": "かな"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "朝まで",
+        "english": "asamade",
+        "reading": "あさまで"
+      },
+      {
+        "string": "ねばっても",
+        "english": "nebatttemo",
+        "reading": "ねばっても"
+      },
+      {
+        "string": "何も",
+        "english": "nanimo",
+        "reading": "なにも"
+      },
+      {
+        "string": "変わらなかった",
+        "english": "kawaranakatta",
+        "reading": "かわらなかった"
+      },
+      {
+        "string": "気がする",
+        "english": "kigasuru",
+        "reading": "きがする"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "かれ",
+        "english": "kare",
+        "reading": "かれ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "こころ",
+        "english": "kokoro",
+        "reading": "こころ"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "おしえて",
+        "english": "oshiete",
+        "reading": "おしえて"
+      },
+      {
+        "string": "くれた",
+        "english": "kureta",
+        "reading": "くれた"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "いま",
+        "english": "ima",
+        "reading": "いま"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "きえない",
+        "english": "kienai",
+        "reading": "きえない"
+      },
+      {
+        "string": "きおく",
+        "english": "kioku",
+        "reading": "きおく"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "あります",
+        "english": "arimasu",
+        "reading": "あります"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "昨日",
+        "english": "kinou",
+        "reading": "きのう"
+      },
+      {
+        "string": "遅刻",
+        "english": "chikoku",
+        "reading": "ちこく"
+      },
+      {
+        "string": "した",
+        "english": "shita",
+        "reading": "した"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "理由",
+        "english": "riyuu",
+        "reading": "りゆう"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "雨",
+        "english": "ame",
+        "reading": "あめ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "バス",
+        "english": "basu",
+        "reading": "ばす"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "遅れた",
+        "english": "okureta",
+        "reading": "おくれた"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "です",
+        "english": "desu",
+        "reading": "です"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "だから",
+        "english": "dakara",
+        "reading": "だから"
+      },
+      {
+        "string": "ちゃっかり",
+        "english": "chakkari",
+        "reading": "ちゃっかり"
+      },
+      {
+        "string": "コーヒー",
+        "english": "ko-hi-",
+        "reading": "こーひー"
+      },
+      {
+        "string": "買って",
+        "english": "katte",
+        "reading": "かって"
+      },
+      {
+        "string": "行きました",
+        "english": "ikimashita",
+        "reading": "いきました"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "スマホ",
+        "english": "sumaho",
+        "reading": "すまほ"
+      },
+      {
+        "string": "だめ",
+        "english": "dame",
+        "reading": "だめ"
+      },
+      {
+        "string": "だら",
+        "english": "dara",
+        "reading": "だら"
+      },
+      {
+        "string": "油断",
+        "english": "yudan",
+        "reading": "ゆだん"
+      },
+      {
+        "string": "する",
+        "english": "suru",
+        "reading": "する"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "深夜",
+        "english": "shinya",
+        "reading": "しんや"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "なって",
+        "english": "natte",
+        "reading": "なって"
+      },
+      {
+        "string": "た",
+        "english": "ta",
+        "reading": "た"
+      },
+      {
+        "string": "ヘトヘト",
+        "english": "hetoheto",
+        "reading": "へとへと"
+      },
+      {
+        "string": "うぽーしよ",
+        "english": "upo-shiyo",
+        "reading": "うぽーしよ"
+      },
+      {
+        "string": "かな",
+        "english": "kana",
+        "reading": "かな"
+      },
+      {
+        "string": "カンタン",
+        "english": "kantan",
+        "reading": "かんたん"
+      },
+      {
+        "string": "分",
+        "english": "bun",
+        "reading": "ぶん"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "裸足",
+        "english": "hadashi",
+        "reading": "はだし"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "走った",
+        "english": "hashitta",
+        "reading": "はしった"
+      },
+      {
+        "string": "砂浜",
+        "english": "sunahama",
+        "reading": "すなはま"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "記憶",
+        "english": "kioku",
+        "reading": "きおく"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "夕暮れ",
+        "english": "yuugure",
+        "reading": "ゆうぐれ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "温度",
+        "english": "ondo",
+        "reading": "おんど"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "風",
+        "english": "kaze",
+        "reading": "かぜ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "匂い",
+        "english": "nioi",
+        "reading": "におい"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "未だに",
+        "english": "imadani",
+        "reading": "いまだに"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "お盆",
+        "english": "obon",
+        "reading": "おぼん"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "呼び起こす",
+        "english": "yobiokosu",
+        "reading": "よびおこす"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "灯り",
+        "english": "akari",
+        "reading": "あかり"
+      },
+      {
+        "string": "も",
+        "english": "mo",
+        "reading": "も"
+      },
+      {
+        "string": "消した",
+        "english": "keshita",
+        "reading": "けした"
+      },
+      {
+        "string": "部屋",
+        "english": "heya",
+        "reading": "へや"
+      },
+      {
+        "string": "でっかち",
+        "english": "dekkachi",
+        "reading": "でっかち"
+      },
+      {
+        "string": "猫",
+        "english": "neko",
+        "reading": "ねこ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "真夜中",
+        "english": "mayonaka",
+        "reading": "まよなか"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "密かに",
+        "english": "hisokani",
+        "reading": "ひそかに"
+      },
+      {
+        "string": "電話",
+        "english": "denwa",
+        "reading": "でんわ"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "鳴らし",
+        "english": "narashi",
+        "reading": "ならし"
+      },
+      {
+        "string": "やがった",
+        "english": "yagatta",
+        "reading": "やがった"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だが",
+        "english": "daga",
+        "reading": "だが"
+      },
+      {
+        "string": "やっぱ",
+        "english": "yappa",
+        "reading": "やっぱ"
+      },
+      {
+        "string": "蜘蛛系",
+        "english": "kumokei",
+        "reading": "くもけい"
+      },
+      {
+        "string": "だったり",
+        "english": "dattari",
+        "reading": "だったり"
+      },
+      {
+        "string": "芝居",
+        "english": "shibai",
+        "reading": "しばい"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "ねえねえ",
+        "english": "neenee",
+        "reading": "ねえねえ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "手て状じょう",
+        "english": "tejijou",
+        "reading": "てじじょう"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "本当とお花",
+        "english": "hontoutoohana",
+        "reading": "ほんとうとおはな"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "那なら",
+        "english": "nara",
+        "reading": "なら"
+      },
+      {
+        "string": "大丈夫",
+        "english": "daijoubu",
+        "reading": "だいじょうぶ"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よね",
+        "english": "yone",
+        "reading": "よね"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "夕暮れ時",
+        "english": "yuuguretoki",
+        "reading": "ゆうぐれどき"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "響く",
+        "english": "hibiku",
+        "reading": "ひびく"
+      },
+      {
+        "string": "ギター",
+        "english": "gitaa",
+        "reading": "ぎたー"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "音",
+        "english": "oto",
+        "reading": "おと"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "何年",
+        "english": "nannen",
+        "reading": "なんねん"
+      },
+      {
+        "string": "経っても",
+        "english": "tattemo",
+        "reading": "たっても"
+      },
+      {
+        "string": "色あせない",
+        "english": "iroasenai",
+        "reading": "いろあせない"
+      },
+      {
+        "string": "夢",
+        "english": "yume",
+        "reading": "ゆめ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "証拠",
+        "english": "shouko",
+        "reading": "しょうこ"
+      },
+      {
+        "string": "さ",
+        "english": "sa",
+        "reading": "さ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "うっすら",
+        "english": "ussura",
+        "reading": "うっすら"
+      },
+      {
+        "string": "萌えた",
+        "english": "moeta",
+        "reading": "もえた"
+      },
+      {
+        "string": "黄昏",
+        "english": "tasogare",
+        "reading": "たそがれ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "街角",
+        "english": "machikado",
+        "reading": "まちかど"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "軒先",
+        "english": "nokisaki",
+        "reading": "のきさき"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "約束",
+        "english": "yakusoku",
+        "reading": "やくそく"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "つなぐ",
+        "english": "tsunagu",
+        "reading": "つなぐ"
+      },
+      {
+        "string": "音",
+        "english": "oto",
+        "reading": "おと"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "ひそやかに",
+        "english": "hisoyakani",
+        "reading": "ひそやかに"
+      },
+      {
+        "string": "閉じ込めた",
+        "english": "tojikometa",
+        "reading": "とじこめた"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "映画",
+        "english": "eiga",
+        "reading": "えいが"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "行く",
+        "english": "iku",
+        "reading": "いく"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "どうか",
+        "english": "douka",
+        "reading": "どうか"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "みんなで",
+        "english": "minnade",
+        "reading": "みんなで"
+      },
+      {
+        "string": "まだ",
+        "english": "mada",
+        "reading": "まだ"
+      },
+      {
+        "string": "相談している",
+        "english": "soudanshiteiru",
+        "reading": "そうだんしている"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "ねん",
+        "english": "nen",
+        "reading": "ねん"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "店",
+        "english": "mise",
+        "reading": "みせ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "ラーメン",
+        "english": "raamen",
+        "reading": "らーめん"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "やっぱ",
+        "english": "yappa",
+        "reading": "やっぱ"
+      },
+      {
+        "string": "スープ",
+        "english": "suupu",
+        "reading": "すーぷ"
+      },
+      {
+        "string": "全然",
+        "english": "zenzen",
+        "reading": "ぜんぜん"
+      },
+      {
+        "string": "足りてない",
+        "english": "taritenai",
+        "reading": "たりてない"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "なあ",
+        "english": "naa",
+        "reading": "なあ"
+      },
+      {
+        "string": "完食",
+        "english": "kanshoku",
+        "reading": "かんしょく"
+      },
+      {
+        "string": "しても",
+        "english": "shitemo",
+        "reading": "しても"
+      },
+      {
+        "string": "クセ",
+        "english": "kuse",
+        "reading": "くせ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "強すぎる",
+        "english": "tsuyosugiru",
+        "reading": "つよすぎる"
+      },
+      {
+        "string": "し",
+        "english": "shi",
+        "reading": "し"
+      },
+      {
+        "string": "しゃべってて",
+        "english": "shabettete",
+        "reading": "しゃべってて"
+      },
+      {
+        "string": "腹減った",
+        "english": "harahietta",
+        "reading": "はらへった"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "くもり",
+        "english": "kumori",
+        "reading": "くもり"
+      },
+      {
+        "string": "でも",
+        "english": "demo",
+        "reading": "でも"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "おどりたい",
+        "english": "odoritai",
+        "reading": "おどりたい"
+      },
+      {
+        "string": "ひ",
+        "english": "hi",
+        "reading": "ひ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "ある",
+        "english": "aru",
+        "reading": "ある"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "猫",
+        "english": "neko",
+        "reading": "ねこ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "屋根",
+        "english": "yane",
+        "reading": "やね"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "うえ",
+        "english": "ue",
+        "reading": "うえ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "昼寝",
+        "english": "hirune",
+        "reading": "ひるね"
+      },
+      {
+        "string": "してる",
+        "english": "shiteru",
+        "reading": "してる"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "いい",
+        "english": "ii",
+        "reading": "いい"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "別に",
+        "english": "betsuni",
+        "reading": "べつに"
+      },
+      {
+        "string": "気に",
+        "english": "kini",
+        "reading": "きに"
+      },
+      {
+        "string": "しちゃいない",
+        "english": "shichainai",
+        "reading": "しちゃいない"
+      },
+      {
+        "string": "って",
+        "english": "tte",
+        "reading": "って"
+      },
+      {
+        "string": "ば",
+        "english": "ba",
+        "reading": "ば"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "車",
+        "english": "kuruma",
+        "reading": "くるま"
+      },
+      {
+        "string": "火",
+        "english": "hi",
+        "reading": "ひ"
+      },
+      {
+        "string": "つけた",
+        "english": "tsuketa",
+        "reading": "つけた"
+      },
+      {
+        "string": "っていう",
+        "english": "tteiu",
+        "reading": "っていう"
+      },
+      {
+        "string": "話",
+        "english": "hanashi",
+        "reading": "はなし"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "本当",
+        "english": "hontou",
+        "reading": "ほんとう"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "！",
+        "english": "!",
+        "reading": "！"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "もう",
+        "english": "mou",
+        "reading": "もう"
+      },
+      {
+        "string": "話す",
+        "english": "hanasu",
+        "reading": "はなす"
+      },
+      {
+        "string": "時間",
+        "english": "jikan",
+        "reading": "じかん"
+      },
+      {
+        "string": "ない",
+        "english": "nai",
+        "reading": "ない"
+      },
+      {
+        "string": "から",
+        "english": "kara",
+        "reading": "から"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "なるべく",
+        "english": "narubeku",
+        "reading": "なるべく"
+      },
+      {
+        "string": "急いで",
+        "english": "isoide",
+        "reading": "いそいで"
+      },
+      {
+        "string": "来て",
+        "english": "kite",
+        "reading": "きて"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "2",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "なんで",
+        "english": "nande",
+        "reading": "なんで"
+      },
+      {
+        "string": "急に",
+        "english": "kyuuni",
+        "reading": "きゅうに"
+      },
+      {
+        "string": "そんな",
+        "english": "sonna",
+        "reading": "そんな"
+      },
+      {
+        "string": "話に",
+        "english": "hanashini",
+        "reading": "はなしに"
+      },
+      {
+        "string": "なった",
+        "english": "natta",
+        "reading": "なった"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "不思議",
+        "english": "fushigi",
+        "reading": "ふしぎ"
+      },
+      {
+        "string": "だけど",
+        "english": "dakedo",
+        "reading": "だけど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "まあ",
+        "english": "maa",
+        "reading": "まあ"
+      },
+      {
+        "string": "いい",
+        "english": "ii",
+        "reading": "いい"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "明日",
+        "english": "ashita",
+        "reading": "あした"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "帰り道",
+        "english": "kaerimichi",
+        "reading": "かえりみち"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "たぶん",
+        "english": "tabun",
+        "reading": "たぶん"
+      },
+      {
+        "string": "コンビニ",
+        "english": "konbini",
+        "reading": "こんびに"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "待ってる",
+        "english": "matteru",
+        "reading": "まってる"
+      },
+      {
+        "string": "は",
+        "english": "ha",
+        "reading": "は"
+      },
+      {
+        "string": "いかが",
+        "english": "ikaga",
+        "reading": "いかが"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "潮",
+        "english": "shio",
+        "reading": "しお"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "香り",
+        "english": "kaori",
+        "reading": "かおり"
+      },
+      {
+        "string": "吸い込んで",
+        "english": "suikonde",
+        "reading": "すいこんで"
+      },
+      {
+        "string": "彼",
+        "english": "kare",
+        "reading": "かれ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "笑み",
+        "english": "emi",
+        "reading": "えみ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "一瞬",
+        "english": "isshun",
+        "reading": "いっしゅん"
+      },
+      {
+        "string": "動いた",
+        "english": "ugoita",
+        "reading": "うごいた"
+      },
+      {
+        "string": "のに",
+        "english": "noni",
+        "reading": "のに"
+      },
+      {
+        "string": "気づいた",
+        "english": "kiduita",
+        "reading": "きづいた"
+      },
+      {
+        "string": "のは",
+        "english": "noha",
+        "reading": "のは"
+      },
+      {
+        "string": "虹",
+        "english": "niji",
+        "reading": "にじ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "うた",
+        "english": "uta",
+        "reading": "うた"
+      },
+      {
+        "string": "だった",
+        "english": "datta",
+        "reading": "だった"
+      }
+    ]
+  },
+  {
+    "level": "3",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "聞いて",
+        "english": "kiite",
+        "reading": "きいて"
+      },
+      {
+        "string": "みたい",
+        "english": "mitai",
+        "reading": "みたい"
+      },
+      {
+        "string": "こと",
+        "english": "koto",
+        "reading": "こと"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "ある",
+        "english": "aru",
+        "reading": "ある"
+      },
+      {
+        "string": "なら",
+        "english": "nara",
+        "reading": "なら"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "今度",
+        "english": "kondo",
+        "reading": "こんど"
+      },
+      {
+        "string": "じっくり",
+        "english": "jikkuri",
+        "reading": "じっくり"
+      },
+      {
+        "string": "話そう",
+        "english": "hanasou",
+        "reading": "はなそう"
+      },
+      {
+        "string": "か",
+        "english": "ka",
+        "reading": "か"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "2",
+    "tokens": [
+      {
+        "string": "どうせ",
+        "english": "douse",
+        "reading": "どうせ"
+      },
+      {
+        "string": "過去",
+        "english": "kako",
+        "reading": "かこ"
+      },
+      {
+        "string": "を",
+        "english": "wo",
+        "reading": "を"
+      },
+      {
+        "string": "変え",
+        "english": "kae",
+        "reading": "かえ"
+      },
+      {
+        "string": "られ",
+        "english": "rare",
+        "reading": "られ"
+      },
+      {
+        "string": "ない",
+        "english": "nai",
+        "reading": "ない"
+      },
+      {
+        "string": "なら",
+        "english": "nara",
+        "reading": "なら"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "嫌",
+        "english": "iya",
+        "reading": "いや"
+      },
+      {
+        "string": "でも",
+        "english": "demo",
+        "reading": "でも"
+      },
+      {
+        "string": "進み",
+        "english": "susumi",
+        "reading": "すすみ"
+      },
+      {
+        "string": "続ける",
+        "english": "tsuzukeru",
+        "reading": "つづける"
+      },
+      {
+        "string": "しか",
+        "english": "shika",
+        "reading": "しか"
+      },
+      {
+        "string": "ない",
+        "english": "nai",
+        "reading": "ない"
+      },
+      {
+        "string": "ん",
+        "english": "n",
+        "reading": "ん"
+      },
+      {
+        "string": "だ",
+        "english": "da",
+        "reading": "だ"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "ね",
+        "english": "ne",
+        "reading": "ね"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "1",
+    "casual": "3",
+    "tokens": [
+      {
+        "string": "風鈴",
+        "english": "fuurin",
+        "reading": "ふうりん"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "音",
+        "english": "oto",
+        "reading": "おと"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "遠ざかる",
+        "english": "toozakaru",
+        "reading": "とおざかる"
+      },
+      {
+        "string": "夏",
+        "english": "natsu",
+        "reading": "なつ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "終わり",
+        "english": "owari",
+        "reading": "おわり"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "君",
+        "english": "kimi",
+        "reading": "きみ"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "言葉",
+        "english": "kotoba",
+        "reading": "ことば"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "が",
+        "english": "ga",
+        "reading": "が"
+      },
+      {
+        "string": "ひっそり",
+        "english": "hissori",
+        "reading": "ひっそり"
+      },
+      {
+        "string": "と",
+        "english": "to",
+        "reading": "と"
+      },
+      {
+        "string": "胸",
+        "english": "mune",
+        "reading": "むね"
+      },
+      {
+        "string": "に",
+        "english": "ni",
+        "reading": "に"
+      },
+      {
+        "string": "残っている",
+        "english": "nokotteiru",
+        "reading": "のこっている"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "4",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "さっき",
+        "english": "sakki",
+        "reading": "さっき"
+      },
+      {
+        "string": "駅",
+        "english": "eki",
+        "reading": "えき"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "ばったり",
+        "english": "battari",
+        "reading": "ばったり"
+      },
+      {
+        "string": "系",
+        "english": "kei",
+        "reading": "けい"
+      },
+      {
+        "string": "の",
+        "english": "no",
+        "reading": "の"
+      },
+      {
+        "string": "話",
+        "english": "hanashi",
+        "reading": "はなし"
+      },
+      {
+        "string": "した",
+        "english": "shita",
+        "reading": "した"
+      },
+      {
+        "string": "けど",
+        "english": "kedo",
+        "reading": "けど"
+      },
+      {
+        "string": "、",
+        "english": ",",
+        "reading": "、"
+      },
+      {
+        "string": "結局",
+        "english": "kekkyoku",
+        "reading": "けっきょく"
+      },
+      {
+        "string": "あの",
+        "english": "ano",
+        "reading": "あの"
+      },
+      {
+        "string": "場所",
+        "english": "basho",
+        "reading": "ばしょ"
+      },
+      {
+        "string": "へ",
+        "english": "e",
+        "reading": "へ"
+      },
+      {
+        "string": "純粋",
+        "english": "junsui",
+        "reading": "じゅんすい"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "理由",
+        "english": "riyuu",
+        "reading": "りゆう"
+      },
+      {
+        "string": "だけ",
+        "english": "dake",
+        "reading": "だけ"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "戻れない",
+        "english": "modorenai",
+        "reading": "もどれない"
+      },
+      {
+        "string": "みたい",
+        "english": "mitai",
+        "reading": "みたい"
+      },
+      {
+        "string": "な",
+        "english": "na",
+        "reading": "な"
+      },
+      {
+        "string": "感じ",
+        "english": "kanji",
+        "reading": "かんじ"
+      },
+      {
+        "string": "。",
+        "english": ".",
+        "reading": "。"
+      }
+    ]
+  },
+  {
+    "level": "5",
+    "casual": "1",
+    "tokens": [
+      {
+        "string": "雨",
+        "english": "ame",
+        "reading": "あめ"
+      },
+      {
+        "string": "ぐらい",
+        "english": "gurai",
+        "reading": "ぐらい"
+      },
+      {
+        "string": "で",
+        "english": "de",
+        "reading": "で"
+      },
+      {
+        "string": "帰る",
+        "english": "kaeru",
+        "reading": "かえる"
+      },
+      {
+        "string": "やつ",
+        "english": "yatsu",
+        "reading": "やつ"
+      },
+      {
+        "string": "いんの",
+        "english": "inno",
+        "reading": "いんの"
+      },
+      {
+        "string": "？",
+        "english": "?",
+        "reading": "？"
+      },
+      {
+        "string": "もっと",
+        "english": "motto",
+        "reading": "もっと"
+      },
+      {
+        "string": "遊べ",
+        "english": "asobe",
+        "reading": "あそべ"
+      },
+      {
+        "string": "よ",
+        "english": "yo",
+        "reading": "よ"
+      },
+      {
+        "string": "！",
+        "english": "!",
+        "reading": "！"
+      }
+    ]
+  }
+]

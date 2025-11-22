@@ -1,7 +1,8 @@
 import { View } from 'react-native';
+import TypeRacerScreen from '../subapps/renshu/typeracer';
 
 export default function RenshuScreen() {
   return (
-    <View style={{ flex: 1 }} />
+    <TypeRacerScreen></TypeRacerScreen>
   );
 }
