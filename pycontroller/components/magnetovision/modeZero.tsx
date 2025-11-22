@@ -15,14 +15,11 @@ export default function ModeZero() {
   const [deviceRotation, setDeviceRotation] = useState(0); // in radians
   useEffect(() => {
     let sub = DeviceMotion.addListener(motion => {
-      // Use yaw (rotation around Z axis) for screen rotation
-      // DeviceMotion returns rotation in radians
-      if (motion?.rotation?.gamma !== undefined) {
-        // gamma is rotation around Z axis (portrait)
-        setDeviceRotation(motion.rotation.gamma);
-      } else if (motion?.rotation?.alpha !== undefined) {
-        // fallback to alpha if gamma is not available
+      // Use alpha (rotation around Z axis, 0 to 2π) for full 360° rotation
+      if (motion?.rotation?.alpha !== undefined) {
         setDeviceRotation(motion.rotation.alpha);
+      } else if (motion?.rotation?.gamma !== undefined) {
+        setDeviceRotation(motion.rotation.gamma);
       }
     });
     DeviceMotion.setUpdateInterval(33);
@@ -400,9 +397,8 @@ export default function ModeZero() {
         }
         const tipX = edge.x - edge.dx * tickLength;
         const tipY = edge.y - edge.dy * tickLength;
-    // Rotation in degrees, wrapped to [0, 360)
-  let rotationDeg = (-deviceRotation * 180) / Math.PI - 45;
-  rotationDeg = ((rotationDeg % 360) + 360) % 360;
+    // Rotation in degrees, allow full 360+ rotation
+  let rotationDeg = (deviceRotation * 180) / Math.PI + 45;
         return (
           <Animated.View
             key={needle.Title}
