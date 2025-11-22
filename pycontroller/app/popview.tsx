@@ -10,11 +10,7 @@ interface PopViewProps {
   selectedNeedle: number | null;
   currentPixel: string;
   onClose: () => void;
-  onOrbStateChange?: (centerVisible: boolean, topVisible: boolean) => void;
-  orbCenterOpacity?: Animated.Value;
-  orbCenterScale?: Animated.Value;
-  orbTopOpacity?: Animated.Value;
-  orbTopScale?: Animated.Value;
+  orbPositionY: Animated.Value;
 }
 
 // Height percentage configuration for each component
@@ -30,11 +26,7 @@ export default function PopView({
   selectedNeedle,
   currentPixel,
   onClose,
-  onOrbStateChange,
-  orbCenterOpacity: orbCenterOpacityProp,
-  orbCenterScale: orbCenterScaleProp,
-  orbTopOpacity: orbTopOpacityProp,
-  orbTopScale: orbTopScaleProp,
+  orbPositionY,
 }: PopViewProps) {
   const { height: screenHeight } = Dimensions.get('window');
   
@@ -52,17 +44,6 @@ export default function PopView({
   const menuSlideAnim = useRef(new Animated.Value(menuHeight * 0.1)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
   
-  // Fallback refs (only used if props not provided)
-  const fallbackOrbCenterOpacity = useRef(new Animated.Value(1)).current;
-  const fallbackOrbCenterScale = useRef(new Animated.Value(1)).current;
-  const fallbackOrbTopOpacity = useRef(new Animated.Value(0)).current;
-  const fallbackOrbTopScale = useRef(new Animated.Value(0)).current;
-  
-  // Use provided orb animation refs, or fallback to local ones
-  const orbCenterOpacity = orbCenterOpacityProp || fallbackOrbCenterOpacity;
-  const orbCenterScale = orbCenterScaleProp || fallbackOrbCenterScale;
-  const orbTopOpacity = orbTopOpacityProp || fallbackOrbTopOpacity;
-  const orbTopScale = orbTopScaleProp || fallbackOrbTopScale;
   const isManuallyClosingRef = useRef(false);
   const isAnimatingRef = useRef(false);
   const hasMountedRef = useRef(false);
@@ -75,17 +56,8 @@ export default function PopView({
       hasMountedRef.current = true;
       isAnimatingRef.current = true;
       
-      // Stop all ongoing animations first
-      orbTopOpacity.stopAnimation();
-      orbTopScale.stopAnimation();
-      orbCenterOpacity.stopAnimation();
-      orbCenterScale.stopAnimation();
-      
-      // Ensure only center orb is visible before starting (safety check)
-      orbCenterOpacity.setValue(1);
-      orbCenterScale.setValue(1);
-      orbTopOpacity.setValue(0);
-      orbTopScale.setValue(0);
+      // Stop ongoing orb animation
+      orbPositionY.stopAnimation();
       
       // Play chime haptic when opening popview
       playChimeHaptic();
@@ -95,7 +67,7 @@ export default function PopView({
       menuSlideAnim.setValue(startY);
       menuOpacity.setValue(0);
       
-      // Animate menu slide and opacity
+      // Animate menu slide and opacity, and orb position simultaneously
       Animated.parallel([
         Animated.timing(menuSlideAnim, {
           toValue: 0,
@@ -109,47 +81,16 @@ export default function PopView({
           useNativeDriver: true,
           easing: Easing.out(Easing.ease),
         }),
-      ]).start();
-      
-      // Sequential orb fade: first fade out center completely (with shrink), then fade in top (with grow)
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(orbCenterOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterScale, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(orbTopOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbTopScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
+        // Animate orb from center (0) to top (1) - fast and fluid
+        Animated.timing(orbPositionY, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.cubic),
+        }),
       ]).start(() => {
-        // Ensure final state: top visible, center hidden
-        orbTopOpacity.setValue(1);
-        orbTopScale.setValue(1);
-        orbCenterOpacity.setValue(0);
-        orbCenterScale.setValue(0);
-        if (onOrbStateChange) {
-          onOrbStateChange(false, true);
-        }
+        // Ensure final state: orb at top position
+        orbPositionY.setValue(1);
         isAnimatingRef.current = false;
       });
     }
@@ -161,80 +102,20 @@ export default function PopView({
     if (!isVisible && hasMountedRef.current && !isManuallyClosingRef.current && !isAnimatingRef.current) {
       isAnimatingRef.current = true;
       
-      // Stop all ongoing animations first
-      orbTopOpacity.stopAnimation();
-      orbTopScale.stopAnimation();
-      orbCenterOpacity.stopAnimation();
-      orbCenterScale.stopAnimation();
+      // Stop ongoing orb animation
+      orbPositionY.stopAnimation();
       
-      // Ensure only top orb is visible before starting (safety check)
-      orbTopOpacity.setValue(1);
-      orbTopScale.setValue(1);
-      orbCenterOpacity.setValue(0);
-      orbCenterScale.setValue(0);
-      
-      // Sequential: first fade out top completely (with shrink), then fade in center (with grow)
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(orbTopOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbTopScale, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(orbCenterOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-          Animated.timing(orbCenterScale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-            easing: Easing.out(Easing.quad),
-          }),
-        ]),
-      ]).start(() => {
-        // Ensure final state: center visible, top hidden
-        orbTopOpacity.setValue(0);
-        orbCenterOpacity.setValue(1);
-        orbTopScale.setValue(0);
-        orbCenterScale.setValue(1);
-        if (onOrbStateChange) {
-          onOrbStateChange(true, false);
-        }
+      // Animate orb from top (1) back to center (0) - fast and fluid
+      Animated.timing(orbPositionY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }).start(() => {
+        // Ensure final state: orb at center position
+        orbPositionY.setValue(0);
         isAnimatingRef.current = false;
       });
-    }
-  }, [isVisible]);
-
-  // Lock orb states when menu closes (safety fallback)
-  useEffect(() => {
-    // Only run if we've mounted and the menu was previously visible (not on initial load)
-    if (!isVisible && hasMountedRef.current && !isManuallyClosingRef.current && !isAnimatingRef.current) {
-      // Stop any animations
-      orbTopOpacity.stopAnimation();
-      orbTopScale.stopAnimation();
-      orbCenterOpacity.stopAnimation();
-      orbCenterScale.stopAnimation();
-      
-      // Force final state: center visible, top hidden
-      orbTopOpacity.setValue(0);
-      orbCenterOpacity.setValue(1);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
-      if (onOrbStateChange) {
-        onOrbStateChange(true, false);
-      }
     }
   }, [isVisible]);
 
@@ -248,65 +129,12 @@ export default function PopView({
     // Play reverse chime haptic when closing popview
     playReverseChime();
     
-    // Stop any ongoing orb animations to prevent conflicts
-    orbTopOpacity.stopAnimation();
-    orbTopScale.stopAnimation();
-    orbCenterOpacity.stopAnimation();
-    orbCenterScale.stopAnimation();
+    // Stop ongoing orb animation
+    orbPositionY.stopAnimation();
     
-    // Force orbs to the "menu open" state first (top visible, center hidden)
-    orbTopOpacity.setValue(1);
-    orbTopScale.setValue(1);
-    orbCenterOpacity.setValue(0);
-    orbCenterScale.setValue(0);
-    
-    // Animate menu closing: slide down and fade out
+    // Animate menu closing: slide down and fade out, and orb position simultaneously
     const endY = menuHeight * 0.1;
     
-    // Start orb animations immediately (fade out top, fade in center)
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(orbTopOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbTopScale, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(orbCenterOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-        Animated.timing(orbCenterScale, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-    ]).start(() => {
-      // Ensure final state: center visible, top hidden
-      orbTopOpacity.setValue(0);
-      orbCenterOpacity.setValue(1);
-      orbTopScale.setValue(0);
-      orbCenterScale.setValue(1);
-      if (onOrbStateChange) {
-        onOrbStateChange(true, false);
-      }
-      isManuallyClosingRef.current = false;
-      isAnimatingRef.current = false;
-    });
-    
-    // Animate menu slide down and fade out
     Animated.parallel([
       Animated.timing(menuSlideAnim, {
         toValue: endY,
@@ -320,9 +148,20 @@ export default function PopView({
         useNativeDriver: true,
         easing: Easing.in(Easing.ease),
       }),
+      // Animate orb from top (1) back to center (0) - fast and fluid
+      Animated.timing(orbPositionY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
     ]).start(() => {
+      // Ensure final state: orb at center position
+      orbPositionY.setValue(0);
       menuSlideAnim.setValue(0);
       menuOpacity.setValue(0);
+      isManuallyClosingRef.current = false;
+      isAnimatingRef.current = false;
       onClose();
     });
   };

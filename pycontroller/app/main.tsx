@@ -68,12 +68,9 @@ export default function Main() {
   const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
   // Background color - solid pitch black
   const bgColor = '#000000';
-  // Two separate orbs: one at center, one at top - toggle visibility for teleport effect
-  // Center orb starts at 0 and animates in on mount; top orb stays at 0 until popview opens
-  const orbCenterOpacity = useRef(new Animated.Value(0)).current;
-  const orbCenterScale = useRef(new Animated.Value(0)).current;
-  const orbTopOpacity = useRef(new Animated.Value(0)).current;
-  const orbTopScale = useRef(new Animated.Value(0)).current;
+  // Single orb that animates between center and top positions
+  // 0 = center position, 1 = top position
+  const orbPositionY = useRef(new Animated.Value(0)).current;
 
   // Handler for double-tap-and-hold gesture
   const handlePressIn = (event: any) => {
@@ -152,23 +149,14 @@ export default function Main() {
   const [isFocused, setIsFocused] = useState(true);
   const isMountedRef = useRef(true);
   
-  // Animate center orb in on initial mount
+  // Animate orb in on initial mount (fade in at center position)
   useEffect(() => {
-    // Fade in and grow the center orb on initial load
-    Animated.parallel([
-      Animated.timing(orbCenterOpacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.ease),
-      }),
-      Animated.spring(orbCenterScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        friction: 6,
-        tension: 100,
-      }),
-    ]).start();
+    // Fade in the orb on initial load (position stays at 0 = center)
+    Animated.timing(orbPositionY, {
+      toValue: 0,
+      duration: 0,
+      useNativeDriver: true,
+    }).start();
   }, []); // Run only once on mount
   
   useFocusEffect(
@@ -574,66 +562,51 @@ export default function Main() {
       onResponderMove={handleResponderMove}
     >
   {/* No outer-most tick circles, just icons for those positions */}
-      {/* Center orb - at center position */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: centerX - ringRadius,
-          top: centerY - ringRadius,
-          width: ringRadius * 2,
-          height: ringRadius * 2,
-          borderRadius: ringRadius,
-          borderWidth: ringThickness,
-          borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
-          backgroundColor: 'transparent',
-          opacity: orbCenterOpacity,
-          transform: [{ scale: orbCenterScale }],
-        }}
-      />
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: centerX - innerRadius,
-          top: centerY - innerRadius,
-          width: innerRadius * 2,
-          height: innerRadius * 2,
-          borderRadius: innerRadius,
-          backgroundColor: currentPixel,
-          opacity: orbCenterOpacity,
-          transform: [{ scale: orbCenterScale }],
-        }}
-      />
-      {/* Top orb - fixed at top center, positioned at 15% viewport height */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: centerX - ringRadius,
-          top: screenHeight * 0.15 - ringRadius,
-          width: ringRadius * 2,
-          height: ringRadius * 2,
-          borderRadius: ringRadius,
-          borderWidth: ringThickness,
-          borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
-          backgroundColor: 'transparent',
-          opacity: orbTopOpacity,
-          transform: [{ scale: orbTopScale }],
-          zIndex: 1000,
-        }}
-      />
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: centerX - innerRadius,
-          top: screenHeight * 0.15 - innerRadius,
-          width: innerRadius * 2,
-          height: innerRadius * 2,
-          borderRadius: innerRadius,
-          backgroundColor: currentPixel,
-          opacity: orbTopOpacity,
-          transform: [{ scale: orbTopScale }],
-          zIndex: 1000,
-        }}
-      />
+      {/* Single orb that animates between center and top positions */}
+      {(() => {
+        // Calculate Y offset: center position to top position (13% viewport height)
+        const topY = screenHeight * 0.13;
+        const yOffset = topY - centerY;
+        
+        // Interpolate translateY: 0 = center, 1 = top
+        const translateY = orbPositionY.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, yOffset],
+        });
+        
+        return (
+          <>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                left: centerX - ringRadius,
+                top: centerY - ringRadius,
+                width: ringRadius * 2,
+                height: ringRadius * 2,
+                borderRadius: ringRadius,
+                borderWidth: ringThickness,
+                borderColor: `rgba(${smoothR},${smoothG},${smoothB},0.25)`,
+                backgroundColor: 'transparent',
+                transform: [{ translateY }],
+                zIndex: 1000,
+              }}
+            />
+            <Animated.View
+              style={{
+                position: 'absolute',
+                left: centerX - innerRadius,
+                top: centerY - innerRadius,
+                width: innerRadius * 2,
+                height: innerRadius * 2,
+                borderRadius: innerRadius,
+                backgroundColor: currentPixel,
+                transform: [{ translateY }],
+                zIndex: 1000,
+              }}
+            />
+          </>
+        );
+      })()}
       {/* Control point circle - hidden */}
       {/* Simple circle that extends from center in joystick direction */}
       {showLines && (blobOffset.x !== 0 || blobOffset.y !== 0) && (() => {
@@ -710,10 +683,7 @@ export default function Main() {
         selectedNeedle={menuSelectedNeedle}
         currentPixel={currentPixel}
         onClose={closeMenu}
-        orbCenterOpacity={orbCenterOpacity}
-        orbCenterScale={orbCenterScale}
-        orbTopOpacity={orbTopOpacity}
-        orbTopScale={orbTopScale}
+        orbPositionY={orbPositionY}
       />
     </View>
   );
