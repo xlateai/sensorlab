@@ -61,7 +61,11 @@ function getSentenceString(objs: { string: string }[]) {
 const TOTAL_ENGLISH_CHARS = getTotalEnglishChars(JAPANESE_OBJECTS);
 const JAPANESE_SENTENCE = getSentenceString(JAPANESE_OBJECTS);
 
-export default function TypeRacerScreen() {
+interface TypeRacerScreenProps {
+  isVisible?: boolean;
+}
+
+export default function TypeRacerScreen({ isVisible = true }: TypeRacerScreenProps) {
   const insets = useSafeAreaInsets();
   // Navigation history: back/forward stacks
   const [history, setHistory] = useState([0]); // visited indices
@@ -82,7 +86,8 @@ export default function TypeRacerScreen() {
   const [endTime, setEndTime] = useState<number | null>(null);
   const [cps, setCps] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const inputAccessoryViewID = 'bufferAccessoryView';
+  // Unique ID per component instance to prevent InputAccessoryView from persisting across screens
+  const inputAccessoryViewID = useRef(`bufferAccessoryView-${Date.now()}-${Math.random()}`).current;
   const [inputFocused, setInputFocused] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const inputRef = React.useRef<TextInput>(null);
@@ -118,6 +123,14 @@ export default function TypeRacerScreen() {
     const ex = textExamplesJSONData[idx];
     return ex ? ex.tokens : [];
   };
+
+  // Blur input and cleanup InputAccessoryView when component becomes hidden
+  useEffect(() => {
+    if (!isVisible && inputRef.current) {
+      inputRef.current.blur();
+      setInputFocused(false);
+    }
+  }, [isVisible]);
 
   // Update example and transliterator when currentIndex changes
   useEffect(() => {
@@ -535,7 +548,7 @@ export default function TypeRacerScreen() {
               </View>
             </View>
           )}
-          {Platform.OS === 'ios' && (
+          {Platform.OS === 'ios' && inputFocused && isVisible && (
             <InputAccessoryView nativeID={inputAccessoryViewID}>
               <View style={{width: '100%', alignItems: 'center', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: insets.bottom / 2, paddingTop: 0}}>
                 {/* Target flash display: shows next obj.string to type */}

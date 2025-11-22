@@ -440,7 +440,7 @@ export default function PopView({
         >
           {selectedNeedle === 0 && <Settings />}
           {selectedNeedle === 1 && <Notes />}
-          {selectedNeedle === 2 && <TypeRacerScreen />}
+          {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
         </View>
       </Animated.View>
       {/* Black region at bottom 12% */}
