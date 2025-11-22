@@ -224,8 +224,6 @@ export default function PopView({
           backgroundColor: '#000',
           borderTopLeftRadius: 35,
           borderTopRightRadius: 35,
-          borderWidth: 1,
-          borderColor: currentPixel,
           opacity: menuOpacity,
           shadowColor: currentPixel,
           shadowOffset: { width: 0, height: -4 },
@@ -234,13 +232,13 @@ export default function PopView({
           transform: [
             { translateY: menuSlideAnim },
           ],
+          overflow: 'hidden',
         }}
         pointerEvents={isVisible ? "auto" : "none"}
       >
         <View
           style={{
             flex: 1,
-            paddingTop: 20, // Top margin to prevent overlap with border
             paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
           }}
           pointerEvents={isVisible ? "auto" : "none"}
@@ -250,6 +248,22 @@ export default function PopView({
           {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
           {selectedNeedle === 3 && <Browser />}
         </View>
+        {/* Border overlay that always sits on top */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderTopLeftRadius: 35,
+            borderTopRightRadius: 35,
+            borderWidth: 1,
+            borderColor: currentPixel,
+            pointerEvents: 'none',
+            zIndex: 10000,
+          }}
+        />
       </Animated.View>
       {/* Black region at bottom 12% */}
       <Animated.View
