@@ -71,7 +71,16 @@ export default function Browser({ isVisible = true }: BrowserProps) {
 
   const handleSearch = () => {
     if (searchText.trim()) {
-      handleNavigate(searchText.trim());
+      // Always search on Google when using the search bar
+      const searchQuery = encodeURIComponent(searchText.trim());
+      const googleSearchUrl = `https://www.google.com/search?q=${searchQuery}`;
+      setUrl(googleSearchUrl);
+      setCurrentUrl(googleSearchUrl);
+      setAddressBarText(googleSearchUrl);
+      setIsInvalidUrl(false);
+      if (searchInputRef.current) {
+        searchInputRef.current.blur();
+      }
     }
   };
 
@@ -122,9 +131,24 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   };
 
   const handleBack = () => {
-    if (webViewRef.current && canGoBack) {
+    if (canGoBack && webViewRef.current) {
       webViewRef.current.goBack();
+    } else {
+      // If no history, go back to home (initial screen)
+      handleGoHome();
     }
+  };
+
+  const handleGoHome = () => {
+    setUrl('');
+    setCurrentUrl('');
+    setAddressBarText('');
+    setSearchText('');
+    setCanGoBack(false);
+    setCanGoForward(false);
+    setIsInvalidUrl(false);
+    // Re-check clipboard when going home
+    checkClipboard();
   };
 
   const handleForward = () => {
@@ -335,14 +359,13 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         {/* Navigation buttons */}
         <View style={styles.navButtons}>
           <TouchableOpacity
-            style={[styles.navButton, !canGoBack && styles.navButtonDisabled]}
+            style={styles.navButton}
             onPress={handleBack}
-            disabled={!canGoBack}
           >
             <MaterialIcons 
-              name="arrow-back" 
+              name={canGoBack ? "arrow-back" : "home"} 
               size={20} 
-              color={canGoBack ? '#fff' : '#666'} 
+              color="#fff" 
             />
           </TouchableOpacity>
           <TouchableOpacity
