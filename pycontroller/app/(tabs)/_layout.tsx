@@ -14,13 +14,6 @@ export default function TabLayout() {
   const screenWidth = Dimensions.get('window').width;
   const { fullscreen, setFullscreen } = useFullscreen();
 
-  // Update tab bar when fullscreen changes
-  useEffect(() => {
-    navigation.setOptions({
-      tabBarStyle: fullscreen ? { display: 'none' } : undefined,
-    });
-  }, [fullscreen, navigation]);
-  
   const gestureReadyRef = useRef(false);
   const swipeCompleteTimeRef = useRef<number | null>(null);
   const swipeActiveRef = useRef(false);
@@ -104,6 +97,7 @@ export default function TabLayout() {
           tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
           headerShown: false,
           tabBarButton: HapticTab,
+          tabBarStyle: fullscreen ? { display: 'none' } : undefined,
         }}>
       <Tabs.Screen
         name="index"
