@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 interface TypeRacerMediaControlMenuProps {
@@ -28,8 +29,10 @@ export const TypeRacerMediaControlMenu: React.FC<TypeRacerMediaControlMenuProps>
   history,
   currentIndex,
   textExamplesJSONData,
-}) => (
-  <View style={{position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: 24, paddingHorizontal: 24, zIndex: 100, backgroundColor: 'transparent'}} pointerEvents="box-none">
+}) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom, paddingHorizontal: 24, zIndex: 100, backgroundColor: 'transparent'}} pointerEvents="box-none">
     <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%'}} pointerEvents="box-none">
       {/* Retry button - bottom left */}
       <TouchableOpacity
@@ -112,6 +115,7 @@ export const TypeRacerMediaControlMenu: React.FC<TypeRacerMediaControlMenuProps>
       </TouchableOpacity>
     </View>
   </View>
-);
+  );
+};
 
 export default TypeRacerMediaControlMenu;
