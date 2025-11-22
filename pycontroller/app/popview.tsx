@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
 import Settings from './widgets/settings';
-import Docs from './widgets/docs';
+import Notes from './widgets/notes';
 import TypeRacerScreen from './subapps/renshu/typeracer';
 import { playChimeHaptic, playReverseChime } from './haptics';
 
@@ -439,7 +439,7 @@ export default function PopView({
           pointerEvents={isVisible ? "auto" : "none"}
         >
           {selectedNeedle === 0 && <Settings />}
-          {selectedNeedle === 1 && <Docs />}
+          {selectedNeedle === 1 && <Notes />}
           {selectedNeedle === 2 && <TypeRacerScreen />}
         </View>
       </Animated.View>
