@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Animated, Easing, PanResponder } from 'react-native';
+import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
 import { Dimensions, View } from 'react-native';
@@ -63,7 +63,6 @@ export default function ModeZero() {
   const [showMenu, setShowMenu] = useState(false);
   const [menuSelectedNeedle, setMenuSelectedNeedle] = useState<number | null>(null);
   const menuSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  const menuPanY = useRef(new Animated.Value(0)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
   // Background color animation: 0 = black (#000), 1 = dark gray (#0a0a0a)
   const bgColorAnim = useRef(new Animated.Value(0)).current;
@@ -149,7 +148,6 @@ export default function ModeZero() {
     
     // Open menu only if we released while a needle was selected
     if (hadSelection) {
-      menuPanY.setValue(0);
       // Start from -10% y offset and 0 opacity, then animate in
       const screenH = Dimensions.get('window').height;
       const menuHeight = screenH * 0.8; // Menu takes 80% of screen (20% at top)
@@ -634,7 +632,6 @@ export default function ModeZero() {
       // After animation completes, hide menu and reset values
       setShowMenu(false);
       setMenuSelectedNeedle(null);
-      menuPanY.setValue(0);
       menuSlideAnim.setValue(0);
       menuOpacity.setValue(0);
     });
@@ -954,25 +951,49 @@ export default function ModeZero() {
       )}
       {/* Slide-up menu */}
       {showMenu && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            top: screenHeight * 0.20, // Leave 20% space at the top
-            backgroundColor: '#000',
-            borderTopLeftRadius: 35,
-            borderTopRightRadius: 35,
-            opacity: menuOpacity,
-            transform: [
-              { translateY: menuSlideAnim },
-            ],
-          }}
-        >
-          {menuSelectedNeedle === 0 && <Docs />}
-          {menuSelectedNeedle === 1 && <Settings />}
-        </Animated.View>
+        <>
+          <Animated.View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              top: screenHeight * 0.20, // Leave 20% space at the top
+              backgroundColor: '#000',
+              borderTopLeftRadius: 35,
+              borderTopRightRadius: 35,
+              opacity: menuOpacity,
+              transform: [
+                { translateY: menuSlideAnim },
+              ],
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                paddingBottom: screenHeight * 0.10, // Reserve bottom 10% for white region
+              }}
+            >
+              {menuSelectedNeedle === 0 && <Docs />}
+              {menuSelectedNeedle === 1 && <Settings />}
+            </View>
+          </Animated.View>
+          {/* White region at bottom 10% */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: screenHeight * 0.10,
+              backgroundColor: '#fff',
+              opacity: menuOpacity,
+              transform: [
+                { translateY: menuSlideAnim },
+              ],
+            }}
+          />
+        </>
       )}
     </View>
   );
