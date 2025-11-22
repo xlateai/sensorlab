@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, TextInput } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, TextInput, InputAccessoryView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RainbowProgressBar } from '../subapps/renshu/rainbow-progress-bar';
@@ -25,7 +25,11 @@ export default function Browser({ isVisible = true }: BrowserProps) {
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
   const [canGoForward, setCanGoForward] = useState<boolean>(false);
+  const [isInvalidUrl, setIsInvalidUrl] = useState<boolean>(false);
+  const [addressBarFocused, setAddressBarFocused] = useState<boolean>(false);
   const webViewRef = useRef<any>(null);
+  const addressBarRef = useRef<TextInput>(null);
+  const inputAccessoryViewID = useRef(`addressBarAccessoryView-${Date.now()}-${Math.random()}`).current;
 
   useEffect(() => {
     // Try to get URL from clipboard when component mounts or becomes visible
@@ -85,17 +89,12 @@ export default function Browser({ isVisible = true }: BrowserProps) {
       setUrl(normalized);
       setCurrentUrl(normalized);
       setAddressBarText(normalized);
-    }
-  };
-
-  const handlePasteAndGo = async () => {
-    try {
-      const clipboardText = await Clipboard.getStringAsync();
-      if (clipboardText) {
-        handleNavigate(clipboardText.trim());
+      setIsInvalidUrl(false);
+      if (addressBarRef.current) {
+        addressBarRef.current.blur();
       }
-    } catch (error) {
-      console.error('Error pasting from clipboard:', error);
+    } else {
+      setIsInvalidUrl(true);
     }
   };
 
@@ -128,7 +127,7 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     );
   }
 
-  if (!url) {
+  if (!url && !isInvalidUrl) {
     return (
       <View style={styles.container}>
         <Text style={styles.hint}>No URL found in clipboard. Copy a URL and reopen this view.</Text>
@@ -136,18 +135,36 @@ export default function Browser({ isVisible = true }: BrowserProps) {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {loading && (
-        <View style={styles.loadingBarContainer}>
-          <RainbowProgressBar progress={loadingProgress} />
+  if (isInvalidUrl && !url) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.invalidAddressContainer}>
+          <Text style={styles.invalidAddressText}>Invalid address</Text>
         </View>
-      )}
-      {/* Black overlay that covers the WebView while loading to prevent white flash */}
-      {loading && (
-        <View style={styles.loadingOverlay} pointerEvents="none" />
-      )}
-      <WebView
+      </View>
+    );
+  }
+
+  const handleContainerPress = () => {
+    if (addressBarRef.current) {
+      addressBarRef.current.blur();
+    }
+    Keyboard.dismiss();
+  };
+
+  return (
+    <TouchableWithoutFeedback onPress={handleContainerPress}>
+      <View style={styles.container}>
+        {loading && (
+          <View style={styles.loadingBarContainer}>
+            <RainbowProgressBar progress={loadingProgress} />
+          </View>
+        )}
+        {/* Black overlay that covers the WebView while loading to prevent white flash */}
+        {loading && (
+          <View style={styles.loadingOverlay} pointerEvents="none" />
+        )}
+        <WebView
         ref={webViewRef}
         source={{ uri: url }}
         style={styles.webview}
@@ -263,8 +280,9 @@ export default function Browser({ isVisible = true }: BrowserProps) {
             setCurrentUrl(event.nativeEvent.url);
           }
         }}
-        onError={() => {
+        onError={(error: any) => {
           setLoading(false);
+          setIsInvalidUrl(true);
         }}
         onNavigationStateChange={(navState: any) => {
           setCanGoBack(navState.canGoBack);
@@ -310,23 +328,24 @@ export default function Browser({ isVisible = true }: BrowserProps) {
         {/* Address bar */}
         <View style={styles.addressBarContainer}>
           <TextInput
+            ref={addressBarRef}
             style={styles.addressBar}
             value={addressBarText}
-            onChangeText={setAddressBarText}
+            onChangeText={(text) => {
+              setAddressBarText(text);
+              setIsInvalidUrl(false);
+            }}
             onSubmitEditing={(e) => handleNavigate(e.nativeEvent.text)}
-            placeholder="Enter URL or paste"
+            onFocus={() => setAddressBarFocused(true)}
+            onBlur={() => setAddressBarFocused(false)}
+            placeholder="Enter URL"
             placeholderTextColor="#666"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
             returnKeyType="go"
+            inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
           />
-          <TouchableOpacity
-            style={styles.pasteButton}
-            onPress={handlePasteAndGo}
-          >
-            <MaterialIcons name="content-paste" size={18} color="#fff" />
-          </TouchableOpacity>
           <CopyButton
             textToCopy={currentUrl || url}
             size={18}
@@ -334,7 +353,45 @@ export default function Browser({ isVisible = true }: BrowserProps) {
           />
         </View>
       </View>
-    </View>
+      {/* Input accessory view for iOS keyboard */}
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={inputAccessoryViewID}>
+          <View style={styles.inputAccessory}>
+            <TextInput
+              style={styles.inputAccessoryInput}
+              value={addressBarText}
+              onChangeText={(text) => {
+                setAddressBarText(text);
+                setIsInvalidUrl(false);
+              }}
+              onSubmitEditing={(e) => {
+                handleNavigate(e.nativeEvent.text);
+                if (addressBarRef.current) {
+                  addressBarRef.current.blur();
+                }
+              }}
+              placeholder="Enter URL"
+              placeholderTextColor="#666"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              returnKeyType="go"
+            />
+            <TouchableOpacity
+              style={styles.inputAccessoryButton}
+              onPress={() => {
+                if (addressBarRef.current) {
+                  addressBarRef.current.blur();
+                }
+              }}
+            >
+              <Text style={styles.inputAccessoryButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </InputAccessoryView>
+      )}
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -396,13 +453,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginRight: 4,
   },
-  pasteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#222',
+  invalidAddressContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  invalidAddressText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  inputAccessory: {
+    backgroundColor: '#111',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputAccessoryInput: {
+    flex: 1,
+    height: 36,
+    backgroundColor: '#222',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#fff',
+    fontSize: 14,
+    marginRight: 8,
+  },
+  inputAccessoryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#333',
+    borderRadius: 6,
+  },
+  inputAccessoryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingBarContainer: {
     position: 'absolute',
