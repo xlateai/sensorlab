@@ -11,7 +11,6 @@ export default function Settings() {
     <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
       <View style={styles.sliderContainer}>
-        <Text style={styles.label}>R</Text>
         <Slider
           value={r}
           onValueChange={setR}
@@ -19,7 +18,6 @@ export default function Settings() {
         />
       </View>
       <View style={styles.sliderContainer}>
-        <Text style={styles.label}>G</Text>
         <Slider
           value={g}
           onValueChange={setG}
@@ -27,7 +25,6 @@ export default function Settings() {
         />
       </View>
       <View style={styles.sliderContainer}>
-        <Text style={styles.label}>B</Text>
         <Slider
           value={b}
           onValueChange={setB}
@@ -44,17 +41,14 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '300',
+    fontFamily: 'System',
     color: '#fff',
-    marginBottom: 24,
+    marginBottom: 32,
+    letterSpacing: 0.5,
   },
   sliderContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 8,
+    marginBottom: 20,
   },
 });
