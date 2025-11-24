@@ -6,7 +6,7 @@ const Sensorlib = requireNativeModule('Sensorlib');
 const SAMPLE_RATE = 44100;
 const CHANNEL_COUNT = 1;
 const AUDIO_SAMPLE_BATCH_SIZE = 2048;
-const MAX_BUFFERED_SAMPLES = 44100 * 2; // Max 2 seconds of audio buffered ahead
+const MAX_BUFFERED_SAMPLES = AUDIO_SAMPLE_BATCH_SIZE * 4; // Max k batches
 const YIELD_INTERVAL = 1000; // Yield to event loop every N samples
 
 export interface AudioController {
