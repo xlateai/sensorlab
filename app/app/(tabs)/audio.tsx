@@ -124,36 +124,24 @@ export default function AudioTab() {
       const sampleRate = 44100;
       const frequency = 440; // A4 note
       const volume = 0.3;
-      const batchSize = 4096; // Samples per batch
+      const phaseIncrement = (2 * Math.PI * frequency) / sampleRate;
+      let phase = 0;
       
-      const generateBatch = (): Float32Array => {
-        const samples = new Float32Array(batchSize);
-        const phaseIncrement = (2 * Math.PI * frequency) / sampleRate;
-        let phase = 0;
-        
-        for (let i = 0; i < batchSize; i++) {
-          samples[i] = Math.sin(phase) * volume;
+      // Stream single samples continuously
+      const streamAudio = async () => {
+        while (true) {
+          // Check cancellation and break if stopped
+          if (audioCancelledRef.current) {
+            break;
+          }
+          
+          // Generate single sample
+          const sample = Math.sin(phase) * volume;
           phase += phaseIncrement;
           if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
-        }
-        
-        return samples;
-      };
-      
-      // Stream batches continuously
-      const streamAudio = async () => {
-        while (!audioCancelledRef.current) {
-          // Check cancellation before generating batch
-          if (audioCancelledRef.current) break;
           
-          const batch = generateBatch();
-          Sensorlib.playSamplesBatch({ samples: Array.from(batch) });
-          
-          // Check cancellation again before throttling
-          if (audioCancelledRef.current) break;
-          
-          // Small delay to prevent overwhelming the buffer
-          await new Promise(resolve => setTimeout(resolve, 5));
+          // Send single sample
+          Sensorlib.playSamplesBatch({ samples: [sample] });
         }
         setIsAudioPlaying(false);
       };
