@@ -157,6 +157,7 @@ export default function AudioTab() {
       bufferUpdateIntervalRef.current = null;
     }
     
+    // Clear buffer but keep engine running for quick restart
     Sensorlib.stopAudio().catch((error: unknown) => {
       console.error('Failed to stop audio:', error);
     });

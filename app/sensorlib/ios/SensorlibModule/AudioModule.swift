@@ -26,7 +26,9 @@ class AudioEngineManager {
     private var channelCount: Int = 1
     
     // Shared buffer - samples are appended here, render callback reads from here
+    // Use read index instead of removing from front for O(1) performance
     private var sampleBuffer: [Float] = []
+    private var readIndex: Int = 0
     private let bufferQueue = DispatchQueue(label: "com.sensorlib.audio.buffer", attributes: .concurrent)
     
     private init() {}
@@ -48,6 +50,7 @@ class AudioEngineManager {
         bufferQueue.sync(flags: .barrier) {
             self.channelCount = channelCount
             self.sampleBuffer = []
+            self.readIndex = 0
         }
         
         // Create audio format
@@ -70,18 +73,21 @@ class AudioEngineManager {
             let samplesPerFrame = channelCountCapture
             let samplesNeeded = framesRequested * samplesPerFrame
             
-            // Read samples from buffer
+            // Read samples from buffer using read index for O(1) performance
             let toRead = self.bufferQueue.sync {
-                let available = self.sampleBuffer.count
+                let available = self.sampleBuffer.count - self.readIndex
                 let count = min(samplesNeeded, available)
                 
                 if count > 0 {
+                    let startIndex = self.readIndex
+                    
                     if channelCountCapture == 1 {
                         // Mono - direct copy
                         if let channelData = bufferList[0].mData {
                             let output = channelData.assumingMemoryBound(to: Float.self)
-                            self.sampleBuffer[0..<count].withUnsafeBufferPointer { source in
-                                output.initialize(from: source.baseAddress!, count: count)
+                            // Copy from readIndex position
+                            self.sampleBuffer.withUnsafeBufferPointer { source in
+                                output.initialize(from: source.baseAddress!.advanced(by: startIndex), count: count)
                             }
                         }
                     } else {
@@ -91,15 +97,25 @@ class AudioEngineManager {
                             let rightOutput = rightData.assumingMemoryBound(to: Float.self)
                             let framesRead = count / 2
                             
-                            for i in 0..<framesRead {
-                                leftOutput[i] = self.sampleBuffer[i * 2]
-                                rightOutput[i] = self.sampleBuffer[i * 2 + 1]
+                            self.sampleBuffer.withUnsafeBufferPointer { source in
+                                let base = source.baseAddress!.advanced(by: startIndex)
+                                for i in 0..<framesRead {
+                                    leftOutput[i] = base[i * 2]
+                                    rightOutput[i] = base[i * 2 + 1]
+                                }
                             }
                         }
                     }
                     
-                    // Remove consumed samples
-                    self.sampleBuffer.removeFirst(count)
+                    // Advance read index instead of removing from front
+                    self.readIndex += count
+                    
+                    // Periodically clean up consumed samples to prevent memory growth
+                    // Clean up when we've consumed more than 50% of the buffer
+                    if self.readIndex > self.sampleBuffer.count / 2 {
+                        self.sampleBuffer.removeFirst(self.readIndex)
+                        self.readIndex = 0
+                    }
                 }
                 
                 return count
@@ -146,14 +162,27 @@ class AudioEngineManager {
     
     func getCurrentBufferLength() -> Int {
         return bufferQueue.sync {
-            return sampleBuffer.count
+            // Return available samples (not yet consumed)
+            return sampleBuffer.count - readIndex
         }
     }
     
     func stop() {
         bufferQueue.sync(flags: .barrier) {
+            // Don't stop the engine, just clear the buffer
+            // This allows restarting playback without reinitializing
+            sampleBuffer = []
+            readIndex = 0
+        }
+    }
+    
+    func stopEngine() {
+        bufferQueue.sync(flags: .barrier) {
             engine?.stop()
             sampleBuffer = []
+            readIndex = 0
+            engine = nil
+            sourceNode = nil
         }
     }
 }
@@ -175,7 +204,12 @@ func getCurrentBufferLength() -> Int {
     return AudioEngineManager.shared.getCurrentBufferLength()
 }
 
-// Stop audio playback
+// Stop audio playback (clears buffer but keeps engine running)
 func stopAudio() {
     AudioEngineManager.shared.stop()
+}
+
+// Stop audio engine completely (for cleanup)
+func stopAudioEngine() {
+    AudioEngineManager.shared.stopEngine()
 }
