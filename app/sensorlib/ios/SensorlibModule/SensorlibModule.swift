@@ -28,6 +28,23 @@ public class SensorlibModule: Module {
       try playHaptic(input: input)
     }
 
+    // Audio streaming functions - delegates to AudioModule
+    AsyncFunction("initializeAudio") { (input: AudioInitInput) in
+      try initializeAudio(input: input)
+    }
+
+    AsyncFunction("playSamplesBatch") { (input: AudioSamplesInput) in
+      playSamplesBatch(input: input)
+    }
+
+    Function("getCurrentBufferLength") {
+      return getCurrentBufferLength()
+    }
+
+    AsyncFunction("stopAudio") {
+      stopAudio()
+    }
+
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
     // view definition: Prop, Events.
     View(SensorlibView.self) {
