@@ -21,6 +21,10 @@ final class AudioModule {
   private var channels: Int = 1
 
   private var format: AVAudioFormat?
+  
+  // Track scheduled buffer length
+  private var scheduledFrameCount: Int = 0
+  private let queue = DispatchQueue(label: "com.audiolab.audio.buffer")
 
   private init() {}
 
@@ -43,6 +47,11 @@ final class AudioModule {
     self.engine = engine
     self.player = player
     self.format = format
+    
+    // Reset frame count
+    queue.async {
+      self.scheduledFrameCount = 0
+    }
 
     engine.attach(player)
     engine.connect(player, to: engine.mainMixerNode, format: format)
@@ -59,9 +68,27 @@ final class AudioModule {
     buffer.frameLength = frameCount
 
     let dst = buffer.floatChannelData![0]
-    memcpy(dst, input.samples, input.samples.count * MemoryLayout<Float>.size)
+    input.samples.withUnsafeBufferPointer { src in
+      dst.initialize(from: src.baseAddress!, count: src.count)
+    }
 
-    player.scheduleBuffer(buffer, completionHandler: nil)
+    // Track scheduled frames
+    queue.async {
+      self.scheduledFrameCount += Int(frameCount)
+    }
+
+    player.scheduleBuffer(buffer) { [weak self] in
+      // Decrement when buffer completes
+      self?.queue.async {
+        self?.scheduledFrameCount = max(0, self!.scheduledFrameCount - Int(frameCount))
+      }
+    }
+  }
+
+  func getCurrentBufferLength() -> Int {
+    return queue.sync {
+      return scheduledFrameCount
+    }
   }
 
   func stopAudio() {
@@ -70,6 +97,9 @@ final class AudioModule {
     engine?.reset()
     engine = nil
     player = nil
+    queue.async {
+      self.scheduledFrameCount = 0
+    }
   }
 }
 
@@ -88,4 +118,8 @@ func playSamplesBatch(input: AudioSamplesInput) {
 
 func stopAudio() {
   AudioModule.shared.stopAudio()
+}
+
+func getCurrentBufferLength() -> Int {
+  return AudioModule.shared.getCurrentBufferLength()
 }

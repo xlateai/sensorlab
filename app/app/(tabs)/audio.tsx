@@ -20,7 +20,7 @@ export default function AudioTab() {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
   const audioCancelledRef = useRef(false);
-  const audioInitializedRef = useRef(false);
+  const audioStreamingPromiseRef = useRef<Promise<void> | null>(null);
   const bufferUpdateIntervalRef = useRef<number | null>(null);
 
   // Stream generator for continuous haptic
@@ -36,6 +36,11 @@ export default function AudioTab() {
   const hapticRunnerRef = React.useRef<Promise<void> | null>(null);
 
   const startHaptic = () => {
+    // Don't start if already playing
+    if (isPlaying || hapticRunnerRef.current) {
+      return;
+    }
+    
     let cancelled = false;
     controllerRef.current = {
       cancel: () => { cancelled = true; }
@@ -49,18 +54,34 @@ export default function AudioTab() {
     }
     hapticRunnerRef.current = playContinuousHaptic(cancellableStream()).then(() => {
       setIsPlaying(false);
+      hapticRunnerRef.current = null;
+      controllerRef.current = null;
+    }).catch(() => {
+      setIsPlaying(false);
+      hapticRunnerRef.current = null;
+      controllerRef.current = null;
     });
   };
 
-  const stopHaptic = () => {
+  const stopHaptic = async () => {
     controllerRef.current?.cancel();
-    hapticRunnerRef.current = null;
     setIsPlaying(false);
+    
+    // Wait for the promise to complete
+    if (hapticRunnerRef.current) {
+      try {
+        await hapticRunnerRef.current;
+      } catch (error) {
+        // Ignore errors from cancellation
+      }
+      hapticRunnerRef.current = null;
+    }
+    controllerRef.current = null;
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     if (isPlaying) {
-      stopHaptic();
+      await stopHaptic();
       return;
     }
     setIsPlaying(true);
@@ -79,17 +100,19 @@ export default function AudioTab() {
 
   // Initialize audio and start streaming constant volume samples
   const startTestAudio = async () => {
+    // Don't start if already playing
+    if (isAudioPlaying || audioStreamingPromiseRef.current) {
+      return;
+    }
+    
     try {
-      // Initialize audio engine if not already done
-      if (!audioInitializedRef.current) {
-        await Sensorlib.initializeAudio({ sampleRate: 44100, channelCount: 1 });
-        audioInitializedRef.current = true;
-      }
+      // Always create a new audio object on every play
+      await Sensorlib.initializeAudio({ sampleRate: 44100, channelCount: 1 });
       
       audioCancelledRef.current = false;
       setIsAudioPlaying(true);
       
-      // Start updating buffer length display (always update, not just when playing)
+      // Start updating buffer length display
       if (bufferUpdateIntervalRef.current) {
         clearInterval(bufferUpdateIntervalRef.current);
       }
@@ -129,22 +152,13 @@ export default function AudioTab() {
           // Check cancellation again before throttling
           if (audioCancelledRef.current) break;
           
-          // Check buffer length and throttle if needed (keep buffer between 8192-16384 samples)
-          const bufferLength = Sensorlib.getCurrentBufferLength();
-          if (bufferLength > 16384) {
-            // Buffer too full, wait a bit
-            await new Promise(resolve => setTimeout(resolve, 10));
-          } else if (bufferLength < 8192) {
-            // Buffer getting low, send more immediately
-            continue;
-          } else {
-            // Normal rate - small delay
-            await new Promise(resolve => setTimeout(resolve, 50));
-          }
+          // Small delay to prevent overwhelming the buffer
+          await new Promise(resolve => setTimeout(resolve, 5));
         }
+        setIsAudioPlaying(false);
       };
       
-      streamAudio().catch((error) => {
+      audioStreamingPromiseRef.current = streamAudio().catch((error) => {
         console.error('Audio streaming error:', error);
         setIsAudioPlaying(false);
       });
@@ -154,17 +168,33 @@ export default function AudioTab() {
     }
   };
   
-  const stopTestAudio = () => {
+  const stopTestAudio = async () => {
     audioCancelledRef.current = true;
     setIsAudioPlaying(false);
     
-    // Keep buffer length updates running to show current state
-    // Don't clear the interval here - let it continue showing buffer length
+    // Stop updating buffer length
+    if (bufferUpdateIntervalRef.current) {
+      clearInterval(bufferUpdateIntervalRef.current);
+      bufferUpdateIntervalRef.current = null;
+    }
     
-    // Clear buffer but keep engine running for quick restart
-    Sensorlib.stopAudio().catch((error: unknown) => {
+    // Wait for streaming to stop
+    if (audioStreamingPromiseRef.current) {
+      try {
+        await audioStreamingPromiseRef.current;
+      } catch (error) {
+        // Ignore errors from cancellation
+      }
+      audioStreamingPromiseRef.current = null;
+    }
+    
+    // Stop audio engine
+    try {
+      await Sensorlib.stopAudio();
+      setBufferLength(0);
+    } catch (error) {
       console.error('Failed to stop audio:', error);
-    });
+    }
   };
   
   const handleTestAudioToggle = () => {
@@ -214,7 +244,7 @@ export default function AudioTab() {
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
         <Button
-          title={isAudioPlaying ? 'Pause' : 'Play Test Audio'}
+          title={isAudioPlaying ? 'Stop' : 'Start Test Audio'}
           color="#39ff14"
           onPress={handleTestAudioToggle}
         />
