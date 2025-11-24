@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
+import { Animated, Easing, Dimensions, View, Pressable, Text, Keyboard } from 'react-native';
 import Settings from './widgets/settings';
 import Notes from './widgets/notes';
 import TypeRacerScreen from './subapps/renshu/typeracer';
+import Browser from './widgets/browser';
 import { playChimeHaptic, playReverseChime } from './haptics';
+import { useDeviceOrientation } from './orientation';
 
 interface PopViewProps {
   isVisible: boolean;
@@ -16,9 +18,10 @@ interface PopViewProps {
 // Height percentage configuration for each component
 // 0% = viewport center (50%), 100% = full screen (0%)
 const HEIGHT_PERCENTAGES: { [key: number]: number } = {
-  0: 0.75,  // Settings: 60%
-  1: 0.75,  // Notes: 70% (default, can be adjusted)
-  2: 0.75,  // Renshu (TypeRacerScreen): 80%
+  0: 0.75,  // Settings: 75%
+  1: 0.75,  // Notes: 75%
+  2: 0.75,  // Renshu (TypeRacerScreen): 75%
+  3: 0.7875,  // Browser: 78.75% (75% * 1.05)
 };
 
 export default function PopView({
@@ -28,7 +31,17 @@ export default function PopView({
   onClose,
   orbPositionY,
 }: PopViewProps) {
-  const { height: screenHeight } = Dimensions.get('window');
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+  
+  const screenHeight = dimensions.height;
   
   // Get height percentage for current component, default to 0.7 (70%)
   const heightPercentage = selectedNeedle !== null 
@@ -47,8 +60,21 @@ export default function PopView({
   const isManuallyClosingRef = useRef(false);
   const isAnimatingRef = useRef(false);
   const hasMountedRef = useRef(false);
+  
+  // Track press state for quick tap detection
+  const pressStartTimeRef = useRef<number | null>(null);
+  const pressMovedRef = useRef<boolean>(false);
+  const pressStartPositionRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Use custom orientation detection hook - only active when browser is selected and visible
+  const isBrowser = selectedNeedle === 3;
+  const { orientation, rotationDeg, isLandscape } = useDeviceOrientation(isVisible && selectedNeedle === 3);
+  const rotationAnim = useRef(new Animated.Value(0)).current;
 
+  // Update rotation animation when orientation changes
+  useEffect(() => {
+    rotationAnim.setValue(rotationDeg);
+  }, [rotationDeg]);
 
   // Handle menu open animation
   useEffect(() => {
@@ -166,13 +192,62 @@ export default function PopView({
     });
   };
 
+  // Handle press start for quick tap detection
+  const handlePressIn = (event: any) => {
+    pressStartTimeRef.current = Date.now();
+    pressMovedRef.current = false;
+    const { pageX, pageY } = event.nativeEvent;
+    pressStartPositionRef.current = { x: pageX, y: pageY };
+  };
+
+  // Handle press end - only dismiss if it was a quick tap without movement
+  const handlePressOut = () => {
+    if (pressStartTimeRef.current === null) return;
+    
+    const pressDuration = Date.now() - pressStartTimeRef.current;
+    const MAX_TAP_DURATION = 200; // Maximum 200ms for a "quick tap"
+    const MAX_MOVE_DISTANCE = 10; // Maximum 10 pixels movement
+    
+    // Check if finger moved
+    let movedTooMuch = false;
+    if (pressStartPositionRef.current) {
+      // We can't get end position from onPressOut, so we rely on pressMovedRef
+      movedTooMuch = pressMovedRef.current;
+    }
+    
+    // Only dismiss if it was a quick tap and didn't move
+    if (pressDuration < MAX_TAP_DURATION && !movedTooMuch && !pressMovedRef.current) {
+      handleClose();
+    }
+    
+    // Reset press state
+    pressStartTimeRef.current = null;
+    pressMovedRef.current = false;
+    pressStartPositionRef.current = null;
+  };
+
+  // Handle touch move - mark as moved if finger moves
+  const handleTouchMove = (event: any) => {
+    if (pressStartPositionRef.current && pressStartTimeRef.current !== null) {
+      const { pageX, pageY } = event.nativeEvent;
+      const dx = Math.abs(pageX - pressStartPositionRef.current.x);
+      const dy = Math.abs(pageY - pressStartPositionRef.current.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Mark as moved if moved more than 10 pixels
+      if (distance > 10) {
+        pressMovedRef.current = true;
+      }
+    }
+  };
+
   if (selectedNeedle === null) {
     return null;
   }
 
   return (
     <>
-      {/* Transparent overlay to detect taps outside menu - only in top area above menu */}
+      {/* Transparent overlay to dismiss keyboard when tapping outside menu */}
       <Pressable
         style={{
           position: 'absolute',
@@ -184,9 +259,9 @@ export default function PopView({
           opacity: isVisible ? 1 : 0,
           pointerEvents: isVisible ? 'auto' : 'none',
         }}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleClose();
+        onPress={() => {
+          // Only dismiss keyboard, don't close popview
+          Keyboard.dismiss();
         }}
       />
       {/* Slide-up menu */}
@@ -222,8 +297,6 @@ export default function PopView({
           backgroundColor: '#000',
           borderTopLeftRadius: 35,
           borderTopRightRadius: 35,
-          borderWidth: 1,
-          borderColor: currentPixel,
           opacity: menuOpacity,
           shadowColor: currentPixel,
           shadowOffset: { width: 0, height: -4 },
@@ -232,56 +305,156 @@ export default function PopView({
           transform: [
             { translateY: menuSlideAnim },
           ],
+          overflow: 'hidden',
         }}
-        pointerEvents={isVisible ? "box-none" : "none"}
+        pointerEvents={isVisible ? "auto" : "none"}
       >
         <View
           style={{
             flex: 1,
-            paddingTop: 20, // Top margin to prevent overlap with border
-            paddingBottom: screenHeight * 0.12, // Reserve bottom 12% for black region
+            paddingBottom: screenHeight * 0.0693, // Reserve bottom ~6.93% for black region
           }}
           pointerEvents={isVisible ? "auto" : "none"}
         >
-          {selectedNeedle === 0 && <Settings />}
-          {selectedNeedle === 1 && <Notes />}
-          {selectedNeedle === 2 && <TypeRacerScreen isVisible={isVisible} />}
+          {/* Settings - always rendered, only visible when selected */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: screenHeight * 0.0693,
+              opacity: selectedNeedle === 0 && isVisible ? 1 : 0,
+              pointerEvents: selectedNeedle === 0 && isVisible ? "auto" : "none",
+            }}
+          >
+            <Settings />
+          </View>
+          
+          {/* Notes - always rendered, only visible when selected */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: screenHeight * 0.0693,
+              opacity: selectedNeedle === 1 && isVisible ? 1 : 0,
+              pointerEvents: selectedNeedle === 1 && isVisible ? "auto" : "none",
+            }}
+          >
+            <Notes />
+          </View>
+          
+          {/* TypeRacerScreen - always rendered, only visible when selected */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: screenHeight * 0.0693,
+              opacity: selectedNeedle === 2 && isVisible ? 1 : 0,
+              pointerEvents: selectedNeedle === 2 && isVisible ? "auto" : "none",
+            }}
+          >
+            <TypeRacerScreen isVisible={selectedNeedle === 2 && isVisible} />
+          </View>
+          
+          {/* Browser - always rendered, only visible when selected */}
+          {(() => {
+            // Calculate available container dimensions
+            const containerWidth = dimensions.width;
+            const containerHeight = menuHeight - (screenHeight * 0.0693);
+            
+            // When rotated, swap dimensions to fit
+            const browserWidth = isLandscape ? containerHeight : containerWidth;
+            const browserHeight = isLandscape ? containerWidth : containerHeight;
+            
+            return (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: screenHeight * 0.0693,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  opacity: selectedNeedle === 3 && isVisible ? 1 : 0,
+                  pointerEvents: selectedNeedle === 3 && isVisible ? "auto" : "none",
+                }}
+              >
+                <Animated.View
+                  style={{
+                    width: browserWidth,
+                    height: browserHeight,
+                    transform: [
+                      { rotate: rotationAnim.interpolate({
+                        inputRange: [-90, 0, 90],
+                        outputRange: ['-90deg', '0deg', '90deg'],
+                      })},
+                    ],
+                  }}
+                >
+                  <Browser isVisible={selectedNeedle === 3 && isVisible} isLandscape={isLandscape} orientation={orientation} />
+                </Animated.View>
+              </View>
+            );
+          })()}
         </View>
+        {/* Border overlay that always sits on top */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderTopLeftRadius: 35,
+            borderTopRightRadius: 35,
+            borderWidth: 1,
+            borderColor: currentPixel,
+            pointerEvents: 'none',
+            zIndex: 10000,
+          }}
+        />
       </Animated.View>
-      {/* Black region at bottom 12% */}
+      {/* Black region at bottom ~6.93% (6.6% * 1.05) */}
       <Animated.View
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: screenHeight * 0.12,
+          height: screenHeight * 0.0693,
           backgroundColor: '#000',
           opacity: menuOpacity,
           transform: [
             { translateY: menuSlideAnim },
           ],
           alignItems: 'center',
-          justifyContent: 'flex-start',
-          paddingTop: 16,
+          justifyContent: 'center',
           zIndex: 1000,
         }}
         pointerEvents={isVisible ? "box-none" : "none"}
       >
         <Pressable
           onPress={handleClose}
-          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          hitSlop={{ top: 21, bottom: 21, left: 21, right: 21 }}
           style={{
             alignItems: 'center',
             justifyContent: 'center',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            minWidth: 120,
-            minHeight: 44,
+            paddingHorizontal: 25.2,
+            paddingVertical: 12.6,
+            minWidth: 126,
+            minHeight: 46.2,
+            marginTop: -8.4,
             zIndex: 1001,
           }}
         >
-          <Text style={{ color: '#888', fontWeight: '500', fontSize: 15, textAlign: 'center' }}>Dismiss</Text>
+          <Text style={{ color: '#888', fontWeight: '500', fontSize: 15.75, textAlign: 'center' }}>Dismiss</Text>
         </Pressable>
       </Animated.View>
     </>

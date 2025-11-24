@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
-import { Dimensions, View, Text } from 'react-native';
+import { Dimensions, View, Text, Keyboard, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
@@ -61,8 +61,8 @@ export default function Main() {
   const [selectedNeedle, setSelectedNeedle] = useState<number | null>(null);
   // Track previous highlighted icon for haptic feedback
   const prevTargetNeedleIdxRef = useRef<number | null>(null);
-  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
-  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconScaleAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const iconOpacityAnim = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
   // Glass blob state - smooth animation toward target
   const [blobOffset, setBlobOffset] = useState<{x: number, y: number}>({ x: 0, y: 0 });
   // Slide-up menu state
@@ -79,6 +79,11 @@ export default function Main() {
     const now = Date.now();
     const { locationX, locationY } = event.nativeEvent;
     const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
+    
+    // Always dismiss keyboard when tapping on main view (outside popview)
+    if (showMenu) {
+      Keyboard.dismiss();
+    }
     
     if (now - lastTapRef.current < 350) {
       // Double-tap detected - enter selection mode
@@ -222,10 +227,11 @@ export default function Main() {
   // 8 angles: 0, 45, 90, 135, 180, 225, 270, 315 degrees
   const tickAngles = [0, 45, 90, 135, 180, 225, 270, 315];
   // Needles array with explicit angles
-  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | 'menu-book' | null }[] = [
+  const needles: { angle: number; Title: string | null; icon: 'description' | 'settings' | 'menu-book' | 'language' | null }[] = [
     { angle: 0, Title: null, icon: 'settings' },      // Left needle (0 degrees) - Settings
     { angle: 180, Title: null, icon: 'description' },    // Right needle (180 degrees) - Docs
-    { angle: 90, Title: null, icon: 'menu-book' },    // Bottom needle (270 degrees) - Practice
+    { angle: 90, Title: null, icon: 'menu-book' },    // Bottom needle (90 degrees) - Practice
+    { angle: 270, Title: null, icon: 'language' },    // Top needle (270 degrees) - Browser
   ];
   // Convert degrees to radians
   const degToRad = (deg: number) => deg * Math.PI / 180;
@@ -470,6 +476,11 @@ export default function Main() {
 
   // Determines if the main view should capture touch start events
   const shouldStartResponder = (evt: any): boolean => {
+    // Don't capture touches when menu is visible
+    if (showMenu) {
+      return false;
+    }
+    
     // Cancel selection if another touch starts during selection mode
     if (showLines) {
       handlePressOut();
@@ -483,6 +494,11 @@ export default function Main() {
 
   // Determines if the main view should capture touch move events
   const shouldMoveResponder = (evt: any): boolean => {
+    // Don't capture touches when menu is visible
+    if (showMenu) {
+      return false;
+    }
+    
     if (showLines) {
       const touches = evt.nativeEvent.touches || [];
       if (touches.length > 1) {
@@ -640,6 +656,22 @@ export default function Main() {
           </Animated.View>
         );
       })}
+      {/* Transparent overlay to dismiss keyboard when tapping outside popview */}
+      {showMenu && (
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 100,
+          }}
+          onPress={() => {
+            Keyboard.dismiss();
+          }}
+        />
+      )}
       {/* Popover view */}
       <PopView
         isVisible={showMenu}
