@@ -25,8 +25,8 @@ final class AudioModule {
   private var channels: Int = 1
   private var bufferSize: Int = 2048
 
-  // Circular buffer for queued samples
-  private var circular: [Float] = []
+  // Simple buffer - append writes, removeFirst reads
+  private var buffer: [Float] = []
   private let lock = NSLock()
 
   private var format: AVAudioFormat?
@@ -71,7 +71,7 @@ final class AudioModule {
 
   func playSamplesBatch(input: AudioSamplesInput) {
     lock.lock()
-    circular.append(contentsOf: input.samples)
+    buffer.append(contentsOf: input.samples)
     lock.unlock()
   }
 
@@ -104,26 +104,24 @@ final class AudioModule {
     }
   }
 
-  // Read and remove up to bufferSize samples from circular buffer
+  // Simple read: lock, copy chunk, remove it, unlock
   private func readChunk() -> [Float] {
-    lock.lock()
-    defer { lock.unlock() }
-
-    if circular.isEmpty { return [] }
-
-    let count = min(bufferSize, circular.count)
-    let out = Array(circular[0..<count])
-    circular.removeFirst(count)
-    return out
+    return lock.withLock {
+      if buffer.isEmpty { return [] }
+      
+      let count = min(bufferSize, buffer.count)
+      let chunk = Array(buffer[0..<count])
+      buffer.removeFirst(count)
+      return chunk
+    }
   }
 
   // MARK: - Query
 
   func getCurrentBufferLength() -> Int {
-    lock.lock()
-    let count = circular.count
-    lock.unlock()
-    return count
+    return lock.withLock {
+      buffer.count
+    }
   }
 
   // MARK: - Stop
@@ -141,7 +139,7 @@ final class AudioModule {
     self.engine = nil
 
     lock.lock()
-    circular.removeAll()
+    buffer.removeAll()
     lock.unlock()
   }
 }
@@ -166,4 +164,13 @@ func getCurrentBufferLength() -> Int {
 
 func stopAudio() {
   AudioModule.shared.stopAudio()
+}
+
+// Helper extension for cleaner lock usage
+extension NSLock {
+  func withLock<T>(_ body: () throws -> T) rethrows -> T {
+    lock()
+    defer { unlock() }
+    return try body()
+  }
 }
