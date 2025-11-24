@@ -117,8 +117,13 @@ export default function AudioTab() {
         clearInterval(bufferUpdateIntervalRef.current);
       }
       bufferUpdateIntervalRef.current = setInterval(() => {
-        setBufferLength(Sensorlib.getCurrentBufferLength());
-      }, 100);
+        try {
+          const length = Sensorlib.getCurrentBufferLength();
+          setBufferLength(length);
+        } catch (error) {
+          console.error('Error getting buffer length:', error);
+        }
+      }, 100) as unknown as number;
       
       // Generate constant volume samples (440Hz tone at 0.3 volume)
       const sampleRate = 44100;
@@ -131,6 +136,7 @@ export default function AudioTab() {
       // Stream single samples continuously, batching them
       const streamAudio = async () => {
         const sampleBuffer: number[] = [];
+        let samplesGenerated = 0;
         
         while (true) {
           // Check cancellation and break if stopped
@@ -145,11 +151,18 @@ export default function AudioTab() {
           
           // Add to buffer
           sampleBuffer.push(sample);
+          samplesGenerated++;
           
           // When buffer reaches batch size, send it
           if (sampleBuffer.length >= AUDIO_SAMPLE_BATCH_SIZE) {
             Sensorlib.playSamplesBatch({ samples: sampleBuffer });
             sampleBuffer.length = 0; // Clear the buffer
+          }
+          
+          // Yield to event loop periodically to prevent blocking
+          // Yield every ~1000 samples to allow UI updates and prevent crashes
+          if (samplesGenerated % 1000 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
           }
         }
         setIsAudioPlaying(false);
