@@ -1,11 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Button } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { playContinuousHaptic } from '../haptics';
+import { playContinuousHaptic } from '../utils/haptics';
+import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
 import Slider from '../../components/ui/slider';
-import { requireNativeModule } from 'expo-modules-core';
-
-const Sensorlib = requireNativeModule('Sensorlib');
 
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
@@ -19,9 +17,7 @@ export default function AudioTab() {
   // Audio test state
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
-  const audioCancelledRef = useRef(false);
-  const audioStreamingPromiseRef = useRef<Promise<void> | null>(null);
-  const bufferUpdateIntervalRef = useRef<number | null>(null);
+  const audioControllerRef = useRef<AudioController | null>(null);
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -101,106 +97,53 @@ export default function AudioTab() {
   // Initialize audio and start streaming constant volume samples
   const startTestAudio = async () => {
     // Don't start if already playing
-    if (isAudioPlaying || audioStreamingPromiseRef.current) {
+    if (isAudioPlaying || audioControllerRef.current) {
       return;
     }
     
     try {
-      // Always create a new audio object on every play
-      await Sensorlib.initializeAudio({ sampleRate: 44100, channelCount: 1 });
-      
-      audioCancelledRef.current = false;
       setIsAudioPlaying(true);
       
-      // Start updating buffer length display
-      if (bufferUpdateIntervalRef.current) {
-        clearInterval(bufferUpdateIntervalRef.current);
-      }
-      bufferUpdateIntervalRef.current = setInterval(() => {
-        try {
-          const length = Sensorlib.getCurrentBufferLength();
-          setBufferLength(length);
-        } catch (error) {
-          console.error('Error getting buffer length:', error);
-        }
-      }, 100) as unknown as number;
+      // Play pure sine wave at 440Hz (A4 note) with 0.3 volume
+      const controller = await playPureSine(
+        440, // frequency
+        0.3, // volume
+        (length) => setBufferLength(length) // buffer length update callback
+      );
       
-      // Generate constant volume samples (440Hz tone at 0.3 volume)
-      const sampleRate = 44100;
-      const frequency = 440; // A4 note
-      const volume = 0.3;
-      const phaseIncrement = (2 * Math.PI * frequency) / sampleRate;
-      let phase = 0;
-      const AUDIO_SAMPLE_BATCH_SIZE = 2048;
+      audioControllerRef.current = controller;
       
-      // Stream single samples continuously, batching them
-      const streamAudio = async () => {
-        const sampleBuffer: number[] = [];
-        let samplesGenerated = 0;
-        
-        while (true) {
-          // Check cancellation and break if stopped
-          if (audioCancelledRef.current) {
-            break;
-          }
-          
-          // Generate single sample
-          const sample = Math.sin(phase) * volume;
-          phase += phaseIncrement;
-          if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
-          
-          // Add to buffer
-          sampleBuffer.push(sample);
-          samplesGenerated++;
-          
-          // When buffer reaches batch size, send it
-          if (sampleBuffer.length >= AUDIO_SAMPLE_BATCH_SIZE) {
-            Sensorlib.playSamplesBatch({ samples: sampleBuffer });
-            sampleBuffer.length = 0; // Clear the buffer
-          }
-          
-          // Yield to event loop periodically to prevent blocking
-          // Yield every ~1000 samples to allow UI updates and prevent crashes
-          if (samplesGenerated % 1000 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 0));
-          }
-        }
+      // Wait for the promise to complete (or be cancelled)
+      controller.promise.finally(() => {
         setIsAudioPlaying(false);
-      };
-      
-      audioStreamingPromiseRef.current = streamAudio().catch((error) => {
-        console.error('Audio streaming error:', error);
-        setIsAudioPlaying(false);
+        audioControllerRef.current = null;
       });
     } catch (error) {
       console.error('Failed to start test audio:', error);
       setIsAudioPlaying(false);
+      audioControllerRef.current = null;
     }
   };
   
   const stopTestAudio = async () => {
-    audioCancelledRef.current = true;
     setIsAudioPlaying(false);
     
-    // Stop updating buffer length
-    if (bufferUpdateIntervalRef.current) {
-      clearInterval(bufferUpdateIntervalRef.current);
-      bufferUpdateIntervalRef.current = null;
-    }
-    
-    // Wait for streaming to stop
-    if (audioStreamingPromiseRef.current) {
+    // Cancel the audio controller
+    if (audioControllerRef.current) {
+      audioControllerRef.current.cancel();
+      
+      // Wait for streaming to stop
       try {
-        await audioStreamingPromiseRef.current;
+        await audioControllerRef.current.promise;
       } catch (error) {
         // Ignore errors from cancellation
       }
-      audioStreamingPromiseRef.current = null;
+      audioControllerRef.current = null;
     }
     
     // Stop audio engine
     try {
-      await Sensorlib.stopAudio();
+      await stopAudio();
       setBufferLength(0);
     } catch (error) {
       console.error('Failed to stop audio:', error);
@@ -218,11 +161,10 @@ export default function AudioTab() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (bufferUpdateIntervalRef.current) {
-        clearInterval(bufferUpdateIntervalRef.current);
+      if (audioControllerRef.current) {
+        audioControllerRef.current.cancel();
       }
-      audioCancelledRef.current = true;
-      Sensorlib.stopAudio().catch(() => {});
+      stopAudio().catch(() => {});
     };
   }, []);
 

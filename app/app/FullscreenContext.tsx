@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as ExpoStatusBar from 'expo-status-bar';
 import { Platform, View, StatusBar } from 'react-native';
-import { playChimeHaptic } from './haptics';
+import { playChimeHaptic } from './utils/haptics';
 
 interface FullscreenContextType {
   fullscreen: boolean;

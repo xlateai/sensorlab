@@ -3,7 +3,7 @@ import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-nativ
 import Settings from './widgets/settings';
 import Notes from './widgets/notes';
 import TypeRacerScreen from './subapps/renshu/typeracer';
-import { playChimeHaptic, playReverseChime } from './haptics';
+import { playChimeHaptic, playReverseChime } from './utils/haptics';
 
 interface PopViewProps {
   isVisible: boolean;

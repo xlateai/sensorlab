@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
 import PopView from './popview';
-import { playSimpleHaptic } from './haptics';
+import { playSimpleHaptic } from './utils/haptics';
 import { useRGBRange } from './RGBRangeContext';
 import { useBufferSize } from './BufferSizeContext';
 import { calculateColorFromMagnetometer } from './color-decoding';

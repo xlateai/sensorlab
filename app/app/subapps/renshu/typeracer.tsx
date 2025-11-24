@@ -13,7 +13,7 @@ import { FuriganaViewer } from './furigana-viewer';
 import textExamplesJSONData from './assets/data/japanese_text_examples.json';
 import { InputAccessoryView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { playSimpleHaptic } from '@/app/haptics';
+import { playSimpleHaptic } from '@/app/utils/haptics';
 
 
 function BlinkingCursor({ style, buffer }: { style?: any, buffer: string }) {
