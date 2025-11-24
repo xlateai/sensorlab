@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button } from 'react-native';
+import { View, Text, Button, TextInput, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
@@ -18,12 +18,13 @@ export default function AudioTab() {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
   const [frequency, setFrequency] = useState(440); // Default to A4 note
+  const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.3 });
   
   // Frequency range mapping (20-2000 Hz)
-  const MIN_FREQUENCY = 20;
-  const MAX_FREQUENCY = 2000;
+  const MIN_FREQUENCY = 10;
+  const MAX_FREQUENCY = 20000;
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -140,13 +141,37 @@ export default function AudioTab() {
   const handleFrequencyChange = (sliderValue: number) => {
     const freq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
     setFrequency(freq);
+    setFrequencyInput(freq.toFixed(1));
     audioParamsRef.current.frequency = freq;
+  };
+  
+  // Handle frequency input from text field
+  const handleFrequencyInputChange = (text: string) => {
+    setFrequencyInput(text);
+  };
+  
+  // Validate and apply frequency from text input
+  const handleFrequencyInputSubmit = () => {
+    Keyboard.dismiss();
+    const numValue = parseFloat(frequencyInput);
+    if (!isNaN(numValue) && numValue >= MIN_FREQUENCY && numValue <= MAX_FREQUENCY) {
+      setFrequency(numValue);
+      audioParamsRef.current.frequency = numValue;
+    } else {
+      // Invalid input, reset to current frequency
+      setFrequencyInput(frequency.toFixed(1));
+    }
   };
   
   // Convert frequency to slider value (0-1)
   const frequencyToSliderValue = (freq: number): number => {
     return (freq - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY);
   };
+  
+  // Update input text when frequency changes from slider
+  useEffect(() => {
+    setFrequencyInput(frequency.toFixed(1));
+  }, [frequency]);
   
   const stopTestAudio = async () => {
     setIsAudioPlaying(false);
@@ -218,9 +243,29 @@ export default function AudioTab() {
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
-        <Text style={{ color: '#fff', marginBottom: 8 }}>
-          Frequency: {frequency.toFixed(1)} Hz
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Frequency:</Text>
+          <TextInput
+            style={{
+              color: '#fff',
+              borderWidth: 1,
+              borderColor: '#39ff14',
+              borderRadius: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              minWidth: 80,
+              fontSize: 16,
+            }}
+            value={frequencyInput}
+            onChangeText={handleFrequencyInputChange}
+            onSubmitEditing={handleFrequencyInputSubmit}
+            onBlur={handleFrequencyInputSubmit}
+            keyboardType="numeric"
+            returnKeyType="done"
+            selectTextOnFocus
+          />
+          <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
+        </View>
         <Slider
           value={frequencyToSliderValue(frequency)}
           onValueChange={handleFrequencyChange}
