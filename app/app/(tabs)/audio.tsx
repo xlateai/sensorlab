@@ -17,7 +17,13 @@ export default function AudioTab() {
   // Audio test state
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
+  const [frequency, setFrequency] = useState(440); // Default to A4 note
   const audioControllerRef = useRef<AudioController | null>(null);
+  const audioParamsRef = useRef({ frequency: 440, volume: 0.3 });
+  
+  // Frequency range mapping (20-2000 Hz)
+  const MIN_FREQUENCY = 20;
+  const MAX_FREQUENCY = 2000;
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -104,11 +110,15 @@ export default function AudioTab() {
     try {
       setIsAudioPlaying(true);
       
-      // Play pure sine wave at 440Hz (A4 note) with 0.3 volume
+      // Update ref with current values
+      audioParamsRef.current = { frequency, volume: 0.3 };
+      
+      // Play pure sine wave with dynamic frequency and volume
+      // Using getter functions so we can update frequency/volume during playback
       const controller = await playPureSine(
-        440, // frequency
-        0.3, // volume
-        (length) => setBufferLength(length) // buffer length update callback
+        () => audioParamsRef.current.frequency, // getter for frequency
+        () => audioParamsRef.current.volume,    // getter for volume
+        (length) => setBufferLength(length)      // buffer length update callback
       );
       
       audioControllerRef.current = controller;
@@ -123,6 +133,19 @@ export default function AudioTab() {
       setIsAudioPlaying(false);
       audioControllerRef.current = null;
     }
+  };
+  
+  // Handle frequency change - update ref so it affects playback in real-time
+  // Slider value is 0-1, map it to frequency range
+  const handleFrequencyChange = (sliderValue: number) => {
+    const freq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    setFrequency(freq);
+    audioParamsRef.current.frequency = freq;
+  };
+  
+  // Convert frequency to slider value (0-1)
+  const frequencyToSliderValue = (freq: number): number => {
+    return (freq - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY);
   };
   
   const stopTestAudio = async () => {
@@ -195,6 +218,14 @@ export default function AudioTab() {
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
+        <Text style={{ color: '#fff', marginBottom: 8 }}>
+          Frequency: {frequency.toFixed(1)} Hz
+        </Text>
+        <Slider
+          value={frequencyToSliderValue(frequency)}
+          onValueChange={handleFrequencyChange}
+          trackColor="#39ff14"
+        />
         <Button
           title={isAudioPlaying ? 'Stop' : 'Start Test Audio'}
           color="#39ff14"

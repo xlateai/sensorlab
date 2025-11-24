@@ -15,13 +15,19 @@ export interface AudioController {
 }
 
 /**
- * Generates a pure sine wave sample generator
+ * Generates a pure sine wave sample generator with dynamic frequency support
  */
-function* generateSineWaveSamples(frequency: number, volume: number): Generator<number, void, unknown> {
-  const phaseIncrement = (2 * Math.PI * frequency) / SAMPLE_RATE;
+function* generateSineWaveSamples(
+  getFrequency: () => number,
+  getVolume: () => number
+): Generator<number, void, unknown> {
   let phase = 0;
   
   while (true) {
+    const frequency = getFrequency();
+    const volume = getVolume();
+    const phaseIncrement = (2 * Math.PI * frequency) / SAMPLE_RATE;
+    
     const sample = Math.sin(phase) * volume;
     phase += phaseIncrement;
     if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
@@ -32,10 +38,11 @@ function* generateSineWaveSamples(frequency: number, volume: number): Generator<
 /**
  * Plays a pure sine wave with the given frequency and volume.
  * Manages batch generation and limits buffering to prevent memory overload.
+ * Frequency and volume can be updated dynamically via getter functions.
  */
 export async function playPureSine(
-  frequency: number,
-  volume: number,
+  getFrequency: () => number,
+  getVolume: () => number,
   onBufferLengthUpdate?: (length: number) => void
 ): Promise<AudioController> {
   // Initialize audio
@@ -45,7 +52,7 @@ export async function playPureSine(
   });
   
   let cancelled = false;
-  const sampleGenerator = generateSineWaveSamples(frequency, volume);
+  const sampleGenerator = generateSineWaveSamples(getFrequency, getVolume);
   const sampleBuffer: number[] = [];
   let samplesGenerated = 0;
   
