@@ -126,9 +126,12 @@ export default function AudioTab() {
       const volume = 0.3;
       const phaseIncrement = (2 * Math.PI * frequency) / sampleRate;
       let phase = 0;
+      const AUDIO_SAMPLE_BATCH_SIZE = 2048;
       
-      // Stream single samples continuously
+      // Stream single samples continuously, batching them
       const streamAudio = async () => {
+        const sampleBuffer: number[] = [];
+        
         while (true) {
           // Check cancellation and break if stopped
           if (audioCancelledRef.current) {
@@ -140,8 +143,14 @@ export default function AudioTab() {
           phase += phaseIncrement;
           if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
           
-          // Send single sample
-          Sensorlib.playSamplesBatch({ samples: [sample] });
+          // Add to buffer
+          sampleBuffer.push(sample);
+          
+          // When buffer reaches batch size, send it
+          if (sampleBuffer.length >= AUDIO_SAMPLE_BATCH_SIZE) {
+            Sensorlib.playSamplesBatch({ samples: sampleBuffer });
+            sampleBuffer.length = 0; // Clear the buffer
+          }
         }
         setIsAudioPlaying(false);
       };
