@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, StyleSheet, Pressable, Keyboard } from 'react-native';
 
 export default function Notes() {
   const [text, setText] = useState('');
+  const inputRef = useRef<TextInput>(null);
+
+  const handleContainerPress = () => {
+    Keyboard.dismiss();
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
+  };
 
   return (
-    <View style={styles.container}>
+    <Pressable style={styles.container} onPress={handleContainerPress}>
       <TextInput
+        ref={inputRef}
         style={styles.textInput}
         value={text}
         onChangeText={setText}
@@ -15,7 +24,7 @@ export default function Notes() {
         multiline
         textAlignVertical="top"
       />
-    </View>
+    </Pressable>
   );
 }
 

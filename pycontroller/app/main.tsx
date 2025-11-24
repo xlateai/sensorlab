@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 // ...existing code...
-import { Dimensions, View, Text } from 'react-native';
+import { Dimensions, View, Text, Keyboard, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Magnetometer, DeviceMotion } from 'expo-sensors';
 // Removed all SVG imports; will use only View and styles
@@ -79,6 +79,11 @@ export default function Main() {
     const now = Date.now();
     const { locationX, locationY } = event.nativeEvent;
     const touchId = event.nativeEvent.identifier || event.nativeEvent.touches?.[0]?.identifier || null;
+    
+    // Always dismiss keyboard when tapping on main view (outside popview)
+    if (showMenu) {
+      Keyboard.dismiss();
+    }
     
     if (now - lastTapRef.current < 350) {
       // Double-tap detected - enter selection mode
@@ -651,6 +656,22 @@ export default function Main() {
           </Animated.View>
         );
       })}
+      {/* Transparent overlay to dismiss keyboard when tapping outside popview */}
+      {showMenu && (
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 100,
+          }}
+          onPress={() => {
+            Keyboard.dismiss();
+          }}
+        />
+      )}
       {/* Popover view */}
       <PopView
         isVisible={showMenu}

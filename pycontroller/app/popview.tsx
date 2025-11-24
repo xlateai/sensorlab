@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Animated, Easing, Dimensions, View, Pressable, Text } from 'react-native';
+import { Animated, Easing, Dimensions, View, Pressable, Text, Keyboard } from 'react-native';
 import Settings from './widgets/settings';
 import Notes from './widgets/notes';
 import TypeRacerScreen from './subapps/renshu/typeracer';
@@ -21,7 +21,7 @@ const HEIGHT_PERCENTAGES: { [key: number]: number } = {
   0: 0.75,  // Settings: 75%
   1: 0.75,  // Notes: 75%
   2: 0.75,  // Renshu (TypeRacerScreen): 75%
-  3: 0.75,  // Browser: 75%
+  3: 0.7875,  // Browser: 78.75% (75% * 1.05)
 };
 
 export default function PopView({
@@ -247,7 +247,7 @@ export default function PopView({
 
   return (
     <>
-      {/* Transparent overlay to detect taps outside menu - DISABLED: only dismiss button closes popview */}
+      {/* Transparent overlay to dismiss keyboard when tapping outside menu */}
       <Pressable
         style={{
           position: 'absolute',
@@ -257,7 +257,11 @@ export default function PopView({
           height: menuTop, // Top area above menu
           backgroundColor: 'transparent',
           opacity: isVisible ? 1 : 0,
-          pointerEvents: 'none', // Disabled - tap-to-dismiss no longer works
+          pointerEvents: isVisible ? 'auto' : 'none',
+        }}
+        onPress={() => {
+          // Only dismiss keyboard, don't close popview
+          Keyboard.dismiss();
         }}
       />
       {/* Slide-up menu */}
@@ -308,7 +312,7 @@ export default function PopView({
         <View
           style={{
             flex: 1,
-            paddingBottom: screenHeight * 0.066, // Reserve bottom ~6.6% for black region
+            paddingBottom: screenHeight * 0.0693, // Reserve bottom ~6.93% for black region
           }}
           pointerEvents={isVisible ? "auto" : "none"}
         >
@@ -319,7 +323,7 @@ export default function PopView({
               top: 0,
               left: 0,
               right: 0,
-              bottom: screenHeight * 0.066,
+              bottom: screenHeight * 0.0693,
               opacity: selectedNeedle === 0 && isVisible ? 1 : 0,
               pointerEvents: selectedNeedle === 0 && isVisible ? "auto" : "none",
             }}
@@ -334,7 +338,7 @@ export default function PopView({
               top: 0,
               left: 0,
               right: 0,
-              bottom: screenHeight * 0.066,
+              bottom: screenHeight * 0.0693,
               opacity: selectedNeedle === 1 && isVisible ? 1 : 0,
               pointerEvents: selectedNeedle === 1 && isVisible ? "auto" : "none",
             }}
@@ -349,7 +353,7 @@ export default function PopView({
               top: 0,
               left: 0,
               right: 0,
-              bottom: screenHeight * 0.066,
+              bottom: screenHeight * 0.0693,
               opacity: selectedNeedle === 2 && isVisible ? 1 : 0,
               pointerEvents: selectedNeedle === 2 && isVisible ? "auto" : "none",
             }}
@@ -361,7 +365,7 @@ export default function PopView({
           {(() => {
             // Calculate available container dimensions
             const containerWidth = dimensions.width;
-            const containerHeight = menuHeight - (screenHeight * 0.066);
+            const containerHeight = menuHeight - (screenHeight * 0.0693);
             
             // When rotated, swap dimensions to fit
             const browserWidth = isLandscape ? containerHeight : containerWidth;
@@ -374,7 +378,7 @@ export default function PopView({
                   top: 0,
                   left: 0,
                   right: 0,
-                  bottom: screenHeight * 0.066,
+                  bottom: screenHeight * 0.0693,
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
@@ -417,14 +421,14 @@ export default function PopView({
           }}
         />
       </Animated.View>
-      {/* Black region at bottom ~6.6% */}
+      {/* Black region at bottom ~6.93% (6.6% * 1.05) */}
       <Animated.View
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: screenHeight * 0.066,
+          height: screenHeight * 0.0693,
           backgroundColor: '#000',
           opacity: menuOpacity,
           transform: [
@@ -437,22 +441,20 @@ export default function PopView({
         pointerEvents={isVisible ? "box-none" : "none"}
       >
         <Pressable
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onTouchMove={handleTouchMove}
-          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          onPress={handleClose}
+          hitSlop={{ top: 21, bottom: 21, left: 21, right: 21 }}
           style={{
             alignItems: 'center',
             justifyContent: 'center',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            minWidth: 120,
-            minHeight: 44,
-            marginTop: -8,
+            paddingHorizontal: 25.2,
+            paddingVertical: 12.6,
+            minWidth: 126,
+            minHeight: 46.2,
+            marginTop: -8.4,
             zIndex: 1001,
           }}
         >
-          <Text style={{ color: '#888', fontWeight: '500', fontSize: 15, textAlign: 'center' }}>Dismiss</Text>
+          <Text style={{ color: '#888', fontWeight: '500', fontSize: 15.75, textAlign: 'center' }}>Dismiss</Text>
         </Pressable>
       </Animated.View>
     </>
