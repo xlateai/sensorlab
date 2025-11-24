@@ -37,10 +37,6 @@ public class SensorlibModule: Module {
       playSamplesBatch(input: input)
     }
 
-    Function("getCurrentBufferLength") {
-      return getCurrentBufferLength()
-    }
-
     AsyncFunction("stopAudio") {
       stopAudio()
     }

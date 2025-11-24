@@ -89,11 +89,12 @@ export default function AudioTab() {
       audioCancelledRef.current = false;
       setIsAudioPlaying(true);
       
-      // Start updating buffer length display
+      // Start updating buffer length display (always update, not just when playing)
+      if (bufferUpdateIntervalRef.current) {
+        clearInterval(bufferUpdateIntervalRef.current);
+      }
       bufferUpdateIntervalRef.current = setInterval(() => {
-        if (!audioCancelledRef.current) {
-          setBufferLength(Sensorlib.getCurrentBufferLength());
-        }
+        setBufferLength(Sensorlib.getCurrentBufferLength());
       }, 100);
       
       // Generate constant volume samples (440Hz tone at 0.3 volume)
@@ -119,8 +120,14 @@ export default function AudioTab() {
       // Stream batches continuously
       const streamAudio = async () => {
         while (!audioCancelledRef.current) {
+          // Check cancellation before generating batch
+          if (audioCancelledRef.current) break;
+          
           const batch = generateBatch();
           Sensorlib.playSamplesBatch({ samples: Array.from(batch) });
+          
+          // Check cancellation again before throttling
+          if (audioCancelledRef.current) break;
           
           // Check buffer length and throttle if needed (keep buffer between 8192-16384 samples)
           const bufferLength = Sensorlib.getCurrentBufferLength();
@@ -151,17 +158,13 @@ export default function AudioTab() {
     audioCancelledRef.current = true;
     setIsAudioPlaying(false);
     
-    // Stop buffer length updates
-    if (bufferUpdateIntervalRef.current) {
-      clearInterval(bufferUpdateIntervalRef.current);
-      bufferUpdateIntervalRef.current = null;
-    }
+    // Keep buffer length updates running to show current state
+    // Don't clear the interval here - let it continue showing buffer length
     
     // Clear buffer but keep engine running for quick restart
     Sensorlib.stopAudio().catch((error: unknown) => {
       console.error('Failed to stop audio:', error);
     });
-    setBufferLength(0);
   };
   
   const handleTestAudioToggle = () => {
@@ -211,15 +214,13 @@ export default function AudioTab() {
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
         <Button
-          title={isAudioPlaying ? 'Stop Test Audio' : 'Play Test Audio'}
+          title={isAudioPlaying ? 'Pause' : 'Play Test Audio'}
           color="#39ff14"
           onPress={handleTestAudioToggle}
         />
-        {isAudioPlaying && (
-          <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
-            Buffer: {bufferLength} samples
-          </Text>
-        )}
+        <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
+          Buffer: {bufferLength} samples
+        </Text>
       </View>
     </SafeAreaView>
   );
