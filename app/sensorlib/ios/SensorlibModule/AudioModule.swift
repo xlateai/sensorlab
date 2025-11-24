@@ -2,169 +2,168 @@ import Foundation
 import ExpoModulesCore
 import AVFoundation
 
-enum AudioError: Error {
-    case engineNotInitialized
-    case invalidSampleRate
-    case invalidChannelCount
-}
+// MARK: - Inputs passed from JS
 
 struct AudioInitInput: Record {
-    @Field var sampleRate: Double
-    @Field var channelCount: Int?
+  @Field var sampleRate: Double
+  @Field var channelCount: Int?
 }
 
 struct AudioSamplesInput: Record {
-    @Field var samples: [Float]
+  @Field var samples: [Float]
 }
 
-class AudioEngineManager {
-    static let shared = AudioEngineManager()
-    
-    private var engine: AVAudioEngine?
-    private var sourceNode: AVAudioSourceNode?
-    private var audioFormat: AVAudioFormat?
-    private var channelCount: Int = 1
-    
-    // Simple buffer - append writes, removeFirst reads (cleanup when large)
-    private var sampleBuffer: [Float] = []
-    private let bufferQueue = DispatchQueue(label: "com.sensorlib.audio.buffer", attributes: .concurrent)
-    
-    private init() {}
-    
-    func initialize(sampleRate: Double, channelCount: Int = 1) throws {
-        guard sampleRate > 0 && sampleRate <= 192000 else {
-            throw AudioError.invalidSampleRate
+// MARK: - Audio Module
+
+final class AudioModule {
+  static let shared = AudioModule()
+  
+  private var engine: AVAudioEngine?
+  private var player: AVAudioPlayerNode?
+
+  private var sampleRate: Double = 44100
+  private var channels: Int = 1
+  private var bufferSize: Int = 2048
+
+  // Circular buffer for queued samples
+  private var circular: [Float] = []
+  private let lock = NSLock()
+
+  private var format: AVAudioFormat?
+
+  private init() {}
+
+  // MARK: - Initialization
+
+  func initialize(sampleRate: Double, channelCount: Int, bufferSize: Int = 2048) throws {
+    stopAudio()
+
+    self.sampleRate = sampleRate
+    self.channels = channelCount
+    self.bufferSize = bufferSize
+
+    // Create engine & player
+    let engine = AVAudioEngine()
+    let player = AVAudioPlayerNode()
+
+    let format = AVAudioFormat(
+      commonFormat: .pcmFormatFloat32,
+      sampleRate: sampleRate,
+      channels: AVAudioChannelCount(channels),
+      interleaved: false
+    )!
+
+    self.engine = engine
+    self.player = player
+    self.format = format
+
+    engine.attach(player)
+    engine.connect(player, to: engine.mainMixerNode, format: format)
+
+    try engine.start()
+    player.play()
+
+    // Background scheduling loop
+    startSchedulingLoop()
+  }
+
+  // MARK: - Push Samples
+
+  func playSamplesBatch(input: AudioSamplesInput) {
+    lock.lock()
+    circular.append(contentsOf: input.samples)
+    lock.unlock()
+  }
+
+  // MARK: - Scheduling Loop
+
+  private func startSchedulingLoop() {
+    guard let player = player, let format = format else { return }
+
+    DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+      guard let self = self else { return }
+
+      while self.engine != nil && player.isPlaying {
+        let chunk = self.readChunk()
+
+        if chunk.count == 0 {
+          // Avoid burning CPU when empty
+          usleep(500)
+          continue
         }
-        guard channelCount >= 1 && channelCount <= 2 else {
-            throw AudioError.invalidChannelCount
-        }
-        
-        if let engine = engine {
-            engine.stop()
-        }
-        
-        bufferQueue.sync(flags: .barrier) {
-            self.channelCount = channelCount
-            self.sampleBuffer = []
-        }
-        
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: AVAudioChannelCount(channelCount)) else {
-            throw AudioError.invalidSampleRate
-        }
-        
-        bufferQueue.sync(flags: .barrier) {
-            self.audioFormat = format
-        }
-        
-        let newEngine = AVAudioEngine()
-        let channelCountCapture = channelCount
-        let newSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
-            guard let self = self else { return noErr }
-            
-            let bufferList = UnsafeMutableAudioBufferListPointer(audioBufferList)
-            let framesRequested = Int(frameCount)
-            let samplesNeeded = framesRequested * channelCountCapture
-            
-            let count = self.bufferQueue.sync {
-                let available = self.sampleBuffer.count
-                let toRead = min(samplesNeeded, available)
-                
-                if toRead > 0 {
-                    if channelCountCapture == 1, let channelData = bufferList[0].mData {
-                        let output = channelData.assumingMemoryBound(to: Float.self)
-                        self.sampleBuffer.withUnsafeBufferPointer {
-                            output.initialize(from: $0.baseAddress!, count: toRead)
-                        }
-                    } else if let leftData = bufferList[0].mData, let rightData = bufferList[1].mData {
-                        let leftOutput = leftData.assumingMemoryBound(to: Float.self)
-                        let rightOutput = rightData.assumingMemoryBound(to: Float.self)
-                        let framesRead = toRead / 2
-                        self.sampleBuffer.withUnsafeBufferPointer { source in
-                            for i in 0..<framesRead {
-                                leftOutput[i] = source[i * 2]
-                                rightOutput[i] = source[i * 2 + 1]
-                            }
-                        }
-                    }
-                    
-                    self.sampleBuffer.removeFirst(toRead)
-                    
-                    // Cleanup: if buffer is huge, trim it down
-                    if self.sampleBuffer.count > 100000 {
-                        self.sampleBuffer.removeFirst(self.sampleBuffer.count - 50000)
-                    }
-                }
-                
-                return toRead
-            }
-            
-            // Zero out remaining if underrun
-            if count < samplesNeeded {
-                let remaining = samplesNeeded - count
-                if channelCountCapture == 1, let channelData = bufferList[0].mData {
-                    channelData.assumingMemoryBound(to: Float.self).advanced(by: count).initialize(repeating: 0, count: remaining)
-                } else if let leftData = bufferList[0].mData, let rightData = bufferList[1].mData {
-                    let framesRemaining = remaining / 2
-                    leftData.assumingMemoryBound(to: Float.self).advanced(by: count / 2).initialize(repeating: 0, count: framesRemaining)
-                    rightData.assumingMemoryBound(to: Float.self).advanced(by: count / 2).initialize(repeating: 0, count: framesRemaining)
-                }
-            }
-            
-            return noErr
-        }
-        
-        newEngine.attach(newSourceNode)
-        newEngine.connect(newSourceNode, to: newEngine.mainMixerNode, format: format)
-        try newEngine.start()
-        
-        bufferQueue.sync(flags: .barrier) {
-            self.engine = newEngine
-            self.sourceNode = newSourceNode
-        }
+
+        let frameCount = AVAudioFrameCount(chunk.count / self.channels)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { continue }
+        buffer.frameLength = frameCount
+
+        let dst = buffer.floatChannelData![0]
+        memcpy(dst, chunk, chunk.count * MemoryLayout<Float>.size)
+
+        player.scheduleBuffer(buffer, completionHandler: nil)
+      }
     }
-    
-    func playSamplesBatch(_ samples: [Float]) {
-        bufferQueue.async(flags: .barrier) {
-            self.sampleBuffer.append(contentsOf: samples)
-        }
+  }
+
+  // Read and remove up to bufferSize samples from circular buffer
+  private func readChunk() -> [Float] {
+    lock.lock()
+    defer { lock.unlock() }
+
+    if circular.isEmpty { return [] }
+
+    let count = min(bufferSize, circular.count)
+    let out = Array(circular[0..<count])
+    circular.removeFirst(count)
+    return out
+  }
+
+  // MARK: - Query
+
+  func getCurrentBufferLength() -> Int {
+    lock.lock()
+    let count = circular.count
+    lock.unlock()
+    return count
+  }
+
+  // MARK: - Stop
+
+  func stopAudio() {
+    if let player = player {
+      player.stop()
     }
-    
-    func getCurrentBufferLength() -> Int {
-        return bufferQueue.sync { sampleBuffer.count }
+    if let engine = engine {
+      engine.stop()
+      engine.reset()
     }
-    
-    func stop() {
-        bufferQueue.sync(flags: .barrier) {
-            sampleBuffer = []
-        }
-    }
-    
-    func stopEngine() {
-        bufferQueue.sync(flags: .barrier) {
-            engine?.stop()
-            sampleBuffer = []
-            engine = nil
-            sourceNode = nil
-        }
-    }
+
+    self.player = nil
+    self.engine = nil
+
+    lock.lock()
+    circular.removeAll()
+    lock.unlock()
+  }
 }
+
+// MARK: - Top-level wrapper functions for SensorlibModule
 
 func initializeAudio(input: AudioInitInput) throws {
-    try AudioEngineManager.shared.initialize(sampleRate: input.sampleRate, channelCount: input.channelCount ?? 1)
+  try AudioModule.shared.initialize(
+    sampleRate: input.sampleRate,
+    channelCount: input.channelCount ?? 1,
+    bufferSize: 2048
+  )
 }
 
 func playSamplesBatch(input: AudioSamplesInput) {
-    AudioEngineManager.shared.playSamplesBatch(input.samples)
+  AudioModule.shared.playSamplesBatch(input: input)
 }
 
 func getCurrentBufferLength() -> Int {
-    return AudioEngineManager.shared.getCurrentBufferLength()
+  return AudioModule.shared.getCurrentBufferLength()
 }
 
 func stopAudio() {
-    AudioEngineManager.shared.stop()
-}
-
-func stopAudioEngine() {
-    AudioEngineManager.shared.stopEngine()
+  AudioModule.shared.stopAudio()
 }
