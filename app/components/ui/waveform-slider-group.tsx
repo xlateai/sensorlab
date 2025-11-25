@@ -40,11 +40,13 @@ interface WaveformSliderGroupProps {
   precisionOffset: number;
   frequencySign: boolean;
   frequencyInput: string;
+  volume: number; // 0-100 percentage
   onBaseFrequencyChange: (freq: number) => void;
   onPrecisionChange: (offset: number) => void;
   onFrequencySignChange: (sign: boolean) => void;
   onFrequencyInputChange: (text: string) => void;
   onFrequencyInputSubmit: () => void;
+  onVolumeChange: (volume: number) => void;
 }
 
 export default function WaveformSliderGroup({
@@ -52,11 +54,13 @@ export default function WaveformSliderGroup({
   precisionOffset,
   frequencySign,
   frequencyInput,
+  volume,
   onBaseFrequencyChange,
   onPrecisionChange,
   onFrequencySignChange,
   onFrequencyInputChange,
   onFrequencyInputSubmit,
+  onVolumeChange,
 }: WaveformSliderGroupProps) {
   const previousBaseFrequencyRef = useRef(baseFrequency);
   
@@ -134,6 +138,23 @@ export default function WaveformSliderGroup({
     onPrecisionChange(offset);
   };
 
+  // Handle volume change from volume slider
+  const handleVolumeChange = (sliderValue: number) => {
+    // Map 0-1 to 0-100 percentage, round to nearest integer
+    const volumePercent = Math.round(sliderValue * 100);
+    
+    // Only update if the volume actually changed (avoid unnecessary updates)
+    if (volumePercent === volume) {
+      return;
+    }
+    
+    onVolumeChange(volumePercent);
+  };
+
+  // Calculate volume slider knob color - fade from gray (0%) to green (100%)
+  const volumeSliderValue = volume / 100;
+  const volumeSliderKnobColor = interpolateColor('#888888', '#39ff14', volumeSliderValue);
+
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -188,6 +209,15 @@ export default function WaveformSliderGroup({
         trackColor={mainSliderKnobColor}
         precision={5}
       />
+      <View style={{ marginTop: 16 }}>
+        <Text style={{ color: '#fff', marginBottom: 8 }}>Volume: {volume}%</Text>
+        <ZoomSlider
+          value={volumeSliderValue}
+          onValueChange={handleVolumeChange}
+          trackColor={volumeSliderKnobColor}
+          precision={2}
+        />
+      </View>
     </>
   );
 }

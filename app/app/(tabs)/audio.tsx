@@ -22,8 +22,9 @@ export default function AudioTab() {
   const [precisionOffset, setPrecisionOffset] = useState(0); // Precision offset in Hz (-1000 to +1000)
   const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
+  const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
   const audioControllerRef = useRef<AudioController | null>(null);
-  const audioParamsRef = useRef({ frequency: 440, volume: 0.3 });
+  const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
   
   // Use refs to ensure we always have latest values in handlers
   const baseFrequencyRef = useRef(440);
@@ -127,7 +128,7 @@ export default function AudioTab() {
       
       // Update ref with current values (apply sign)
       const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
-      audioParamsRef.current = { frequency: absFreq * (frequencySign ? 1 : -1), volume: 0.3 };
+      audioParamsRef.current = { frequency: absFreq * (frequencySign ? 1 : -1), volume: volume / 100 };
       
       // Play pure sine wave with dynamic frequency and volume
       // Using getter functions so we can update frequency/volume during playback
@@ -198,6 +199,13 @@ export default function AudioTab() {
   const handleFrequencySignChange = (sign: boolean) => {
     setFrequencySign(sign);
   };
+
+  // Handle volume change
+  const handleVolumeChange = (volumePercent: number) => {
+    setVolume(volumePercent);
+    // Update audio volume in real-time (0-100% maps to 0.0-1.0)
+    audioParamsRef.current.volume = volumePercent / 100;
+  };
   
   // Update input text when absolute frequency changes from slider
   useEffect(() => {
@@ -209,6 +217,11 @@ export default function AudioTab() {
   useEffect(() => {
     audioParamsRef.current.frequency = frequency;
   }, [frequencySign, frequency]);
+
+  // Update audio volume when volume changes
+  useEffect(() => {
+    audioParamsRef.current.volume = volume / 100;
+  }, [volume]);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -294,11 +307,13 @@ export default function AudioTab() {
           precisionOffset={precisionOffset}
           frequencySign={frequencySign}
           frequencyInput={frequencyInput}
+          volume={volume}
           onBaseFrequencyChange={handleBaseFrequencyChange}
           onPrecisionChange={handlePrecisionChange}
           onFrequencySignChange={handleFrequencySignChange}
           onFrequencyInputChange={handleFrequencyInputChange}
           onFrequencyInputSubmit={handleFrequencyInputSubmit}
+          onVolumeChange={handleVolumeChange}
         />
         <Button
           title={isAudioPlaying ? 'Stop' : 'Start Test Audio'}
