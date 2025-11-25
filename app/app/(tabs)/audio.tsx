@@ -33,8 +33,8 @@ export default function AudioTab() {
   
   // Frequency range mapping
   const MIN_FREQUENCY = 0;
-  const [maxFrequency, setMaxFrequency] = useState(20000);
-  const [maxFrequencyInput, setMaxFrequencyInput] = useState('20000');
+  const [maxFrequency, setMaxFrequency] = useState(2000);
+  const [maxFrequencyInput, setMaxFrequencyInput] = useState('2000');
   // Precision range is 10% of max frequency
   const PRECISION_RANGE = maxFrequency * 0.1;
   
