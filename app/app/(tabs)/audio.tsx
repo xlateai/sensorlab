@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
 import Slider from '../../components/ui/slider';
+import ZoomSlider from '../../components/ui/zoom-slider';
 
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
@@ -17,14 +18,23 @@ export default function AudioTab() {
   // Audio test state
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
-  const [frequency, setFrequency] = useState(440); // Default to A4 note
+  const [baseFrequency, setBaseFrequency] = useState(440); // Base frequency from main slider
+  const [precisionOffset, setPrecisionOffset] = useState(0); // Precision offset in Hz (-1000 to +1000)
   const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.3 });
   
+  // Use refs to ensure we always have latest values in handlers
+  const baseFrequencyRef = useRef(440);
+  const precisionOffsetRef = useRef(0);
+  
+  // Calculate actual frequency from base + precision offset
+  const frequency = baseFrequency + precisionOffset;
+  
   // Frequency range mapping (20-2000 Hz)
   const MIN_FREQUENCY = 10;
   const MAX_FREQUENCY = 20000;
+  const PRECISION_RANGE = 1000; // ±1000 Hz
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -112,7 +122,7 @@ export default function AudioTab() {
       setIsAudioPlaying(true);
       
       // Update ref with current values
-      audioParamsRef.current = { frequency, volume: 0.3 };
+      audioParamsRef.current = { frequency: baseFrequencyRef.current + precisionOffsetRef.current, volume: 0.3 };
       
       // Play pure sine wave with dynamic frequency and volume
       // Using getter functions so we can update frequency/volume during playback
@@ -136,13 +146,28 @@ export default function AudioTab() {
     }
   };
   
-  // Handle frequency change - update ref so it affects playback in real-time
+  // Handle base frequency change from main slider - update ref so it affects playback in real-time
   // Slider value is 0-1, map it to frequency range
-  const handleFrequencyChange = (sliderValue: number) => {
-    const freq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
-    setFrequency(freq);
-    setFrequencyInput(freq.toFixed(1));
-    audioParamsRef.current.frequency = freq;
+  const handleBaseFrequencyChange = (sliderValue: number) => {
+    const baseFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    setBaseFrequency(baseFreq);
+    baseFrequencyRef.current = baseFreq;
+    const actualFreq = baseFreq + precisionOffsetRef.current;
+    setFrequencyInput(actualFreq.toFixed(1));
+    audioParamsRef.current.frequency = actualFreq;
+  };
+  
+  // Handle precision offset change from precision slider
+  // Slider value is 0-1, map it to -PRECISION_RANGE to +PRECISION_RANGE
+  const handlePrecisionChange = (sliderValue: number) => {
+    // Map 0-1 to -PRECISION_RANGE to +PRECISION_RANGE
+    // 0.5 (center) = 0 offset
+    const offset = (sliderValue - 0.5) * 2 * PRECISION_RANGE;
+    setPrecisionOffset(offset);
+    precisionOffsetRef.current = offset;
+    const actualFreq = baseFrequencyRef.current + offset;
+    setFrequencyInput(actualFreq.toFixed(1));
+    audioParamsRef.current.frequency = actualFreq;
   };
   
   // Handle frequency input from text field
@@ -155,7 +180,11 @@ export default function AudioTab() {
     Keyboard.dismiss();
     const numValue = parseFloat(frequencyInput);
     if (!isNaN(numValue) && numValue >= MIN_FREQUENCY && numValue <= MAX_FREQUENCY) {
-      setFrequency(numValue);
+      // Update base frequency and reset precision offset
+      setBaseFrequency(numValue);
+      setPrecisionOffset(0);
+      baseFrequencyRef.current = numValue;
+      precisionOffsetRef.current = 0;
       audioParamsRef.current.frequency = numValue;
     } else {
       // Invalid input, reset to current frequency
@@ -171,7 +200,17 @@ export default function AudioTab() {
   // Update input text when frequency changes from slider
   useEffect(() => {
     setFrequencyInput(frequency.toFixed(1));
+    audioParamsRef.current.frequency = frequency;
   }, [frequency]);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    baseFrequencyRef.current = baseFrequency;
+  }, [baseFrequency]);
+  
+  useEffect(() => {
+    precisionOffsetRef.current = precisionOffset;
+  }, [precisionOffset]);
   
   const stopTestAudio = async () => {
     setIsAudioPlaying(false);
@@ -265,10 +304,17 @@ export default function AudioTab() {
             selectTextOnFocus
           />
           <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
+          <View style={{ flex: 1, marginLeft: 16, height: 32 }}>
+            <ZoomSlider
+              value={0.5 + precisionOffset / (2 * PRECISION_RANGE)} // Map -1000 to +1000 to 0 to 1, centered at 0.5
+              onValueChange={handlePrecisionChange}
+              trackColor="#39ff14"
+            />
+          </View>
         </View>
-        <Slider
-          value={frequencyToSliderValue(frequency)}
-          onValueChange={handleFrequencyChange}
+        <ZoomSlider
+          value={frequencyToSliderValue(baseFrequency)}
+          onValueChange={handleBaseFrequencyChange}
           trackColor="#39ff14"
         />
         <Button
