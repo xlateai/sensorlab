@@ -358,7 +358,7 @@ export default function AudioTab() {
             style={{
               width: 32,
               height: 32,
-              backgroundColor: frequencySign ? '#39ff14' : '#888',
+              backgroundColor: frequencySign ? '#39ff14' : '#ff0000',
               borderRadius: 4,
               justifyContent: 'center',
               alignItems: 'center',
@@ -373,7 +373,7 @@ export default function AudioTab() {
             style={{
               color: '#fff',
               borderWidth: 1,
-              borderColor: '#39ff14',
+              borderColor: frequencySign ? '#39ff14' : '#ff0000',
               borderRadius: 4,
               paddingHorizontal: 8,
               paddingVertical: 4,
