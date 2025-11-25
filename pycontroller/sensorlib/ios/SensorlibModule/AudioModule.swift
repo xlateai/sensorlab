@@ -34,6 +34,25 @@ final class AudioModule {
     self.sampleRate = sampleRate
     self.channels = channelCount
 
+    // Configure audio session to play through built-in speakers
+    let audioSession = AVAudioSession.sharedInstance()
+    do {
+      // Try to deactivate first to ensure clean state
+      try? audioSession.setActive(false)
+      // Set category with defaultToSpeaker option to route to built-in speakers
+      try audioSession.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+      try audioSession.setActive(true)
+    } catch {
+      // Fallback: try without defaultToSpeaker option if it fails
+      do {
+        try audioSession.setCategory(.playback, mode: .default)
+        try audioSession.setActive(true)
+      } catch {
+        // If that also fails, just try to activate (might already be configured)
+        try? audioSession.setActive(true)
+      }
+    }
+
     let engine = AVAudioEngine()
     let player = AVAudioPlayerNode()
 
@@ -99,6 +118,12 @@ final class AudioModule {
     player = nil
     queue.async {
       self.scheduledFrameCount = 0
+    }
+    // Deactivate audio session
+    do {
+      try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    } catch {
+      // Ignore errors when deactivating
     }
   }
 }
