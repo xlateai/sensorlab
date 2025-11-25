@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, Keyboard } from 'react-native';
+import { View, Text, Button, Keyboard, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
@@ -315,11 +315,20 @@ export default function AudioTab() {
           onFrequencyInputSubmit={handleFrequencyInputSubmit}
           onVolumeChange={handleVolumeChange}
         />
-        <Button
-          title={isAudioPlaying ? 'Stop' : 'Start Test Audio'}
-          color="#39ff14"
+        <Pressable
           onPress={handleTestAudioToggle}
-        />
+          style={{
+            backgroundColor: '#39ff14',
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 8,
+          }}
+          android_ripple={null}
+        >
+          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+            {isAudioPlaying ? 'Stop' : 'Start Test Audio'}
+          </Text>
+        </Pressable>
         <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
           Buffer: {bufferLength} samples
         </Text>
