@@ -148,13 +148,15 @@ export default function AudioTab() {
   
   // Handle base frequency change from main slider - update ref so it affects playback in real-time
   // Slider value is 0-1, map it to frequency range
+  // When main slider moves, set base frequency to the new total and reset precision offset
   const handleBaseFrequencyChange = (sliderValue: number) => {
-    const baseFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
-    setBaseFrequency(baseFreq);
-    baseFrequencyRef.current = baseFreq;
-    const actualFreq = baseFreq + precisionOffsetRef.current;
-    setFrequencyInput(actualFreq.toFixed(1));
-    audioParamsRef.current.frequency = actualFreq;
+    const totalFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    setBaseFrequency(totalFreq);
+    setPrecisionOffset(0);
+    baseFrequencyRef.current = totalFreq;
+    precisionOffsetRef.current = 0;
+    setFrequencyInput(totalFreq.toFixed(1));
+    audioParamsRef.current.frequency = totalFreq;
   };
   
   // Handle precision offset change from precision slider
@@ -313,7 +315,7 @@ export default function AudioTab() {
           </View>
         </View>
         <ZoomSlider
-          value={frequencyToSliderValue(baseFrequency)}
+          value={frequencyToSliderValue(frequency)}
           onValueChange={handleBaseFrequencyChange}
           trackColor="#39ff14"
         />
