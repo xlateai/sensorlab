@@ -40,12 +40,15 @@ interface WaveformSliderGroupProps {
   frequencyInput: string;
   volume: number; // 0-100 percentage
   maxFrequency: number;
+  maxFrequencyInput: string;
   precisionRange: number;
   onBaseFrequencyChange: (freq: number) => void;
   onPrecisionChange: (offset: number) => void;
   onFrequencySignChange: (sign: boolean) => void;
   onFrequencyInputChange: (text: string) => void;
   onFrequencyInputSubmit: () => void;
+  onMaxFrequencyInputChange: (text: string) => void;
+  onMaxFrequencyInputSubmit: () => void;
   onVolumeChange: (volume: number) => void;
 }
 
@@ -56,12 +59,15 @@ export default function WaveformSliderGroup({
   frequencyInput,
   volume,
   maxFrequency,
+  maxFrequencyInput,
   precisionRange,
   onBaseFrequencyChange,
   onPrecisionChange,
   onFrequencySignChange,
   onFrequencyInputChange,
   onFrequencyInputSubmit,
+  onMaxFrequencyInputChange,
+  onMaxFrequencyInputSubmit,
   onVolumeChange,
 }: WaveformSliderGroupProps) {
   const previousBaseFrequencyRef = useRef(baseFrequency);
@@ -205,20 +211,47 @@ export default function WaveformSliderGroup({
           />
         </View>
       </View>
-      <ZoomSlider
-        value={frequencyToSliderValue(absoluteFrequency, maxFrequency)}
-        onValueChange={handleBaseFrequencyChange}
-        trackColor={mainSliderKnobColor}
-        precision={5}
-      />
-      <View style={{ marginTop: 16 }}>
-        <Text style={{ color: '#fff', marginBottom: 8 }}>Volume: {volume}%</Text>
-        <ZoomSlider
-          value={volumeSliderValue}
-          onValueChange={handleVolumeChange}
-          trackColor={volumeSliderKnobColor}
-          precision={2}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+        <View style={{ flex: 1, marginRight: 16 }}>
+          <ZoomSlider
+            value={frequencyToSliderValue(absoluteFrequency, maxFrequency)}
+            onValueChange={handleBaseFrequencyChange}
+            trackColor={mainSliderKnobColor}
+            precision={5}
+          />
+        </View>
+        <Text style={{ color: '#fff', marginRight: 8 }}>Max:</Text>
+        <TextInput
+          style={{
+            color: '#fff',
+            borderWidth: 1,
+            borderColor: '#39ff14',
+            borderRadius: 4,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            minWidth: 80,
+            fontSize: 16,
+          }}
+          value={maxFrequencyInput}
+          onChangeText={onMaxFrequencyInputChange}
+          onSubmitEditing={onMaxFrequencyInputSubmit}
+          onBlur={onMaxFrequencyInputSubmit}
+          keyboardType="numeric"
+          returnKeyType="done"
+          selectTextOnFocus
         />
+        <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16 }}>
+        <View style={{ flex: 1, marginRight: 16 }}>
+          <ZoomSlider
+            value={volumeSliderValue}
+            onValueChange={handleVolumeChange}
+            trackColor={volumeSliderKnobColor}
+            precision={2}
+          />
+        </View>
+        <Text style={{ color: '#fff' }}>{volume}% volume</Text>
       </View>
     </>
   );

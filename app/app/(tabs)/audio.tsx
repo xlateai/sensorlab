@@ -335,29 +335,6 @@ export default function AudioTab() {
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Max Frequency:</Text>
-          <TextInput
-            style={{
-              color: '#fff',
-              borderWidth: 1,
-              borderColor: '#39ff14',
-              borderRadius: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              minWidth: 100,
-              fontSize: 16,
-            }}
-            value={maxFrequencyInput}
-            onChangeText={handleMaxFrequencyInputChange}
-            onSubmitEditing={handleMaxFrequencyInputSubmit}
-            onBlur={handleMaxFrequencyInputSubmit}
-            keyboardType="numeric"
-            returnKeyType="done"
-            selectTextOnFocus
-          />
-          <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
-        </View>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
           precisionOffset={precisionOffset}
@@ -365,12 +342,15 @@ export default function AudioTab() {
           frequencyInput={frequencyInput}
           volume={volume}
           maxFrequency={maxFrequency}
+          maxFrequencyInput={maxFrequencyInput}
           precisionRange={PRECISION_RANGE}
           onBaseFrequencyChange={handleBaseFrequencyChange}
           onPrecisionChange={handlePrecisionChange}
           onFrequencySignChange={handleFrequencySignChange}
           onFrequencyInputChange={handleFrequencyInputChange}
           onFrequencyInputSubmit={handleFrequencyInputSubmit}
+          onMaxFrequencyInputChange={handleMaxFrequencyInputChange}
+          onMaxFrequencyInputSubmit={handleMaxFrequencyInputSubmit}
           onVolumeChange={handleVolumeChange}
         />
         <Pressable
