@@ -30,19 +30,59 @@ export default function AudioTab() {
   const precisionOffsetRef = useRef(0);
   const previousBaseFrequencyRef = useRef(440); // Track previous value to detect 0 transition
   
+  // Frequency range mapping (20-2000 Hz)
+  const MIN_FREQUENCY = 0;
+  const MAX_FREQUENCY = 20000;
+  const PRECISION_RANGE = 1000; // ±1000 Hz
+  
+  // Helper function to interpolate between two colors
+  const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
+  
+  // Helper function to interpolate between two hex colors
+  const interpolateColor = (color1: string, color2: string, t: number): string => {
+    // Parse hex colors to RGB
+    const hex1 = color1.replace('#', '');
+    const hex2 = color2.replace('#', '');
+    const r1 = parseInt(hex1.substring(0, 2), 16);
+    const g1 = parseInt(hex1.substring(2, 4), 16);
+    const b1 = parseInt(hex1.substring(4, 6), 16);
+    const r2 = parseInt(hex2.substring(0, 2), 16);
+    const g2 = parseInt(hex2.substring(2, 4), 16);
+    const b2 = parseInt(hex2.substring(4, 6), 16);
+    
+    const r = lerp(r1, r2, t);
+    const g = lerp(g1, g2, t);
+    const b = lerp(b1, b2, t);
+    
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  };
+  
   // Calculate absolute frequency (for display and slider)
   const absoluteFrequency = baseFrequency + precisionOffset;
   // Calculate actual frequency with sign (for audio)
   const frequency = absoluteFrequency * (frequencySign ? 1 : -1);
   
-  // Determine knob colors: red when negative, green when positive, gray when zero
-  const mainSliderKnobColor = frequency === 0 ? '#888' : (frequency < 0 ? '#ff0000' : '#39ff14');
-  const precisionSliderKnobColor = precisionOffset === 0 ? '#888' : (precisionOffset < 0 ? '#ff0000' : '#39ff14');
+  // Calculate precision slider knob color based on position
+  // Precision slider value: 0 = max negative, 0.5 = center (0), 1 = max positive
+  const precisionSliderValue = Math.max(0, Math.min(1, 0.5 + precisionOffset / (2 * PRECISION_RANGE))); // Map -1000 to +1000 to 0 to 1, centered at 0.5
+  let precisionSliderKnobColor: string;
+  if (precisionSliderValue < 0.5) {
+    // Fade from red (at 0) to gray (at 0.5)
+    const t = precisionSliderValue / 0.5; // 0 to 1 as we go from 0 to 0.5
+    precisionSliderKnobColor = interpolateColor('#ff0000', '#888888', t);
+  } else {
+    // Fade from gray (at 0.5) to green (at 1)
+    const t = (precisionSliderValue - 0.5) / 0.5; // 0 to 1 as we go from 0.5 to 1
+    precisionSliderKnobColor = interpolateColor('#888888', '#39ff14', t);
+  }
   
-  // Frequency range mapping (20-2000 Hz)
-  const MIN_FREQUENCY = 0;
-  const MAX_FREQUENCY = 20000;
-  const PRECISION_RANGE = 1000; // ±1000 Hz
+  // Calculate main slider knob color based on position and sign
+  // Main slider value: 0 = min (0 Hz), 1 = max (20000 Hz)
+  const mainSliderValue = Math.max(0, Math.min(1, (absoluteFrequency - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY)));
+  // If frequency is negative, fade from gray to red; if positive, fade from gray to green
+  const mainSliderKnobColor = frequencySign 
+    ? interpolateColor('#888888', '#39ff14', mainSliderValue)
+    : interpolateColor('#888888', '#ff0000', mainSliderValue);
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
