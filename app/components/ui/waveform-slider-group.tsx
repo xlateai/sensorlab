@@ -91,8 +91,17 @@ export default function WaveformSliderGroup({
 
   // Handle base frequency change from main slider
   const handleBaseFrequencyChange = (sliderValue: number) => {
-    const totalFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    // Calculate frequency from slider value
+    const rawFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    // Round to nearest integer (1 Hz increment)
+    const totalFreq = Math.round(rawFreq);
+    
     const previousFreq = previousBaseFrequencyRef.current;
+    
+    // Only update if the frequency actually changed (avoid unnecessary updates)
+    if (totalFreq === previousFreq) {
+      return;
+    }
     
     // Check if transitioning from >0 to exactly 0, then flip the sign
     let newSign = frequencySign;
@@ -112,7 +121,16 @@ export default function WaveformSliderGroup({
   const handlePrecisionChange = (sliderValue: number) => {
     // Map 0-1 to -PRECISION_RANGE to +PRECISION_RANGE
     // 0.5 (center) = 0 offset
-    const offset = (sliderValue - 0.5) * 2 * PRECISION_RANGE;
+    // Calculate raw offset
+    const rawOffset = (sliderValue - 0.5) * 2 * PRECISION_RANGE;
+    // Round to nearest integer (1 Hz increment)
+    const offset = Math.round(rawOffset);
+    
+    // Only update if the offset actually changed (avoid unnecessary updates)
+    if (offset === precisionOffset) {
+      return;
+    }
+    
     onPrecisionChange(offset);
   };
 
@@ -160,6 +178,7 @@ export default function WaveformSliderGroup({
             value={0.5 + precisionOffset / (2 * PRECISION_RANGE)}
             onValueChange={handlePrecisionChange}
             trackColor={precisionSliderKnobColor}
+            precision={5}
           />
         </View>
       </View>
@@ -167,6 +186,7 @@ export default function WaveformSliderGroup({
         value={frequencyToSliderValue(absoluteFrequency)}
         onValueChange={handleBaseFrequencyChange}
         trackColor={mainSliderKnobColor}
+        precision={5}
       />
     </>
   );

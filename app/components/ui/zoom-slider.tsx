@@ -5,12 +5,14 @@ export default function ZoomSlider({
   value, 
   onValueChange, 
   trackColor, 
-  orientation = 'horizontal' 
+  orientation = 'horizontal',
+  precision = 2
 }: { 
   value: number; 
   onValueChange: (v: number) => void; 
   trackColor: string;
   orientation?: 'horizontal' | 'vertical';
+  precision?: number;
 }) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
@@ -45,7 +47,7 @@ export default function ZoomSlider({
         const zoomedValue = zoomMin + sliderPercent * (zoomMax - zoomMin);
         onValueChange(Number(zoomedValue.toFixed(4))); // Higher precision when zoomed
       } else {
-        onValueChange(Number(sliderPercent.toFixed(2)));
+        onValueChange(Number(sliderPercent.toFixed(precision)));
       }
     } else {
       if (containerWidth === 0) return;
@@ -58,7 +60,7 @@ export default function ZoomSlider({
         const zoomedValue = zoomMin + sliderPercent * (zoomMax - zoomMin);
         onValueChange(Number(zoomedValue.toFixed(4))); // Higher precision when zoomed
       } else {
-        onValueChange(Number(sliderPercent.toFixed(2)));
+        onValueChange(Number(sliderPercent.toFixed(precision)));
       }
     }
   };
