@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, TextInput, Keyboard } from 'react-native';
+import { View, Text, Button, TextInput, Keyboard, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
@@ -21,19 +21,23 @@ export default function AudioTab() {
   const [baseFrequency, setBaseFrequency] = useState(440); // Base frequency from main slider
   const [precisionOffset, setPrecisionOffset] = useState(0); // Precision offset in Hz (-1000 to +1000)
   const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
+  const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.3 });
   
   // Use refs to ensure we always have latest values in handlers
   const baseFrequencyRef = useRef(440);
   const precisionOffsetRef = useRef(0);
+  const previousBaseFrequencyRef = useRef(440); // Track previous value to detect 0 transition
   
-  // Calculate actual frequency from base + precision offset
-  const frequency = baseFrequency + precisionOffset;
+  // Calculate absolute frequency (for display and slider)
+  const absoluteFrequency = baseFrequency + precisionOffset;
+  // Calculate actual frequency with sign (for audio)
+  const frequency = absoluteFrequency * (frequencySign ? 1 : -1);
   
-  // Determine knob colors: gray when frequency/offset is zero
-  const mainSliderKnobColor = frequency === 0 ? '#888' : '#39ff14';
-  const precisionSliderKnobColor = precisionOffset === 0 ? '#888' : '#39ff14';
+  // Determine knob colors: red when negative, green when positive, gray when zero
+  const mainSliderKnobColor = frequency === 0 ? '#888' : (frequency < 0 ? '#ff0000' : '#39ff14');
+  const precisionSliderKnobColor = precisionOffset === 0 ? '#888' : (precisionOffset < 0 ? '#ff0000' : '#39ff14');
   
   // Frequency range mapping (20-2000 Hz)
   const MIN_FREQUENCY = 0;
@@ -125,8 +129,9 @@ export default function AudioTab() {
     try {
       setIsAudioPlaying(true);
       
-      // Update ref with current values
-      audioParamsRef.current = { frequency: baseFrequencyRef.current + precisionOffsetRef.current, volume: 0.3 };
+      // Update ref with current values (apply sign)
+      const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
+      audioParamsRef.current = { frequency: absFreq * (frequencySign ? 1 : -1), volume: 0.3 };
       
       // Play pure sine wave with dynamic frequency and volume
       // Using getter functions so we can update frequency/volume during playback
@@ -155,12 +160,24 @@ export default function AudioTab() {
   // When main slider moves, set base frequency to the new total and reset precision offset
   const handleBaseFrequencyChange = (sliderValue: number) => {
     const totalFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    const previousFreq = previousBaseFrequencyRef.current;
+    
+    // Check if transitioning from >0 to exactly 0, then flip the sign
+    let newSign = frequencySign;
+    if (previousFreq > 0 && totalFreq === 0) {
+      newSign = !frequencySign;
+      setFrequencySign(newSign);
+    }
+    
+    // Update previous value before setting new value
+    previousBaseFrequencyRef.current = totalFreq;
+    
     setBaseFrequency(totalFreq);
     setPrecisionOffset(0);
     baseFrequencyRef.current = totalFreq;
     precisionOffsetRef.current = 0;
     setFrequencyInput(totalFreq.toFixed(1));
-    audioParamsRef.current.frequency = totalFreq;
+    audioParamsRef.current.frequency = totalFreq * (newSign ? 1 : -1);
   };
   
   // Handle precision offset change from precision slider
@@ -173,7 +190,7 @@ export default function AudioTab() {
     precisionOffsetRef.current = offset;
     const actualFreq = baseFrequencyRef.current + offset;
     setFrequencyInput(actualFreq.toFixed(1));
-    audioParamsRef.current.frequency = actualFreq;
+    audioParamsRef.current.frequency = actualFreq * (frequencySign ? 1 : -1);
   };
   
   // Handle frequency input from text field
@@ -187,27 +204,34 @@ export default function AudioTab() {
     const numValue = parseFloat(frequencyInput);
     if (!isNaN(numValue) && numValue >= MIN_FREQUENCY && numValue <= MAX_FREQUENCY) {
       // Update base frequency and reset precision offset
+      previousBaseFrequencyRef.current = baseFrequencyRef.current; // Update previous before changing
       setBaseFrequency(numValue);
       setPrecisionOffset(0);
       baseFrequencyRef.current = numValue;
       precisionOffsetRef.current = 0;
-      audioParamsRef.current.frequency = numValue;
+      audioParamsRef.current.frequency = numValue * (frequencySign ? 1 : -1);
     } else {
-      // Invalid input, reset to current frequency
-      setFrequencyInput(frequency.toFixed(1));
+      // Invalid input, reset to current absolute frequency
+      setFrequencyInput(absoluteFrequency.toFixed(1));
     }
   };
   
-  // Convert frequency to slider value (0-1)
+  // Convert frequency to slider value (0-1) - use absolute value for slider position
   const frequencyToSliderValue = (freq: number): number => {
-    return (freq - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY);
+    const absFreq = Math.abs(freq);
+    return (absFreq - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY);
   };
   
-  // Update input text when frequency changes from slider
+  // Update input text when absolute frequency changes from slider
   useEffect(() => {
-    setFrequencyInput(frequency.toFixed(1));
+    setFrequencyInput(absoluteFrequency.toFixed(1));
     audioParamsRef.current.frequency = frequency;
-  }, [frequency]);
+  }, [absoluteFrequency, frequency]);
+  
+  // Update audio frequency when sign changes
+  useEffect(() => {
+    audioParamsRef.current.frequency = frequency;
+  }, [frequencySign, frequency]);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -289,7 +313,22 @@ export default function AudioTab() {
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Frequency:</Text>
+          <TouchableOpacity
+            onPress={() => setFrequencySign(!frequencySign)}
+            style={{
+              width: 32,
+              height: 32,
+              backgroundColor: frequencySign ? '#39ff14' : '#888',
+              borderRadius: 4,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ color: '#000', fontSize: 18, fontWeight: 'bold' }}>
+              {frequencySign ? '+' : '-'}
+            </Text>
+          </TouchableOpacity>
           <TextInput
             style={{
               color: '#fff',
@@ -319,7 +358,7 @@ export default function AudioTab() {
           </View>
         </View>
         <ZoomSlider
-          value={frequencyToSliderValue(frequency)}
+          value={frequencyToSliderValue(absoluteFrequency)}
           onValueChange={handleBaseFrequencyChange}
           trackColor={mainSliderKnobColor}
         />
