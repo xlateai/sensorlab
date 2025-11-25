@@ -31,8 +31,12 @@ export default function AudioTab() {
   // Calculate actual frequency from base + precision offset
   const frequency = baseFrequency + precisionOffset;
   
+  // Determine knob colors: gray when frequency/offset is zero
+  const mainSliderKnobColor = frequency === 0 ? '#888' : '#39ff14';
+  const precisionSliderKnobColor = precisionOffset === 0 ? '#888' : '#39ff14';
+  
   // Frequency range mapping (20-2000 Hz)
-  const MIN_FREQUENCY = 10;
+  const MIN_FREQUENCY = 0;
   const MAX_FREQUENCY = 20000;
   const PRECISION_RANGE = 1000; // ±1000 Hz
 
@@ -310,14 +314,14 @@ export default function AudioTab() {
             <ZoomSlider
               value={0.5 + precisionOffset / (2 * PRECISION_RANGE)} // Map -1000 to +1000 to 0 to 1, centered at 0.5
               onValueChange={handlePrecisionChange}
-              trackColor="#39ff14"
+              trackColor={precisionSliderKnobColor}
             />
           </View>
         </View>
         <ZoomSlider
           value={frequencyToSliderValue(frequency)}
           onValueChange={handleBaseFrequencyChange}
-          trackColor="#39ff14"
+          trackColor={mainSliderKnobColor}
         />
         <Button
           title={isAudioPlaying ? 'Stop' : 'Start Test Audio'}
