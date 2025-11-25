@@ -4,8 +4,6 @@ import ZoomSlider from './zoom-slider';
 
 // Frequency range mapping
 const MIN_FREQUENCY = 0;
-const MAX_FREQUENCY = 20000;
-const PRECISION_RANGE = 1000; // ±1000 Hz
 
 // Helper function to interpolate between two colors
 const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
@@ -30,9 +28,9 @@ const interpolateColor = (color1: string, color2: string, t: number): string => 
 };
 
 // Convert frequency to slider value (0-1) - use absolute value for slider position
-const frequencyToSliderValue = (freq: number): number => {
+const frequencyToSliderValue = (freq: number, maxFreq: number): number => {
   const absFreq = Math.abs(freq);
-  return (absFreq - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY);
+  return (absFreq - MIN_FREQUENCY) / (maxFreq - MIN_FREQUENCY);
 };
 
 interface WaveformSliderGroupProps {
@@ -41,6 +39,8 @@ interface WaveformSliderGroupProps {
   frequencySign: boolean;
   frequencyInput: string;
   volume: number; // 0-100 percentage
+  maxFrequency: number;
+  precisionRange: number;
   onBaseFrequencyChange: (freq: number) => void;
   onPrecisionChange: (offset: number) => void;
   onFrequencySignChange: (sign: boolean) => void;
@@ -55,6 +55,8 @@ export default function WaveformSliderGroup({
   frequencySign,
   frequencyInput,
   volume,
+  maxFrequency,
+  precisionRange,
   onBaseFrequencyChange,
   onPrecisionChange,
   onFrequencySignChange,
@@ -74,7 +76,7 @@ export default function WaveformSliderGroup({
 
   // Calculate precision slider knob color based on position
   // Precision slider value: 0 = max negative, 0.5 = center (0), 1 = max positive
-  const precisionSliderValue = Math.max(0, Math.min(1, 0.5 + precisionOffset / (2 * PRECISION_RANGE)));
+  const precisionSliderValue = Math.max(0, Math.min(1, 0.5 + precisionOffset / (2 * precisionRange)));
   let precisionSliderKnobColor: string;
   if (precisionSliderValue < 0.5) {
     // Fade from red (at 0) to gray (at 0.5)
@@ -87,7 +89,7 @@ export default function WaveformSliderGroup({
   }
 
   // Calculate main slider knob color based on position and sign
-  const mainSliderValue = Math.max(0, Math.min(1, (absoluteFrequency - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY)));
+  const mainSliderValue = Math.max(0, Math.min(1, (absoluteFrequency - MIN_FREQUENCY) / (maxFrequency - MIN_FREQUENCY)));
   // If frequency is negative, fade from gray to red; if positive, fade from gray to green
   const mainSliderKnobColor = frequencySign 
     ? interpolateColor('#888888', '#39ff14', mainSliderValue)
@@ -96,7 +98,7 @@ export default function WaveformSliderGroup({
   // Handle base frequency change from main slider
   const handleBaseFrequencyChange = (sliderValue: number) => {
     // Calculate frequency from slider value
-    const rawFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
+    const rawFreq = MIN_FREQUENCY + sliderValue * (maxFrequency - MIN_FREQUENCY);
     // Round to nearest integer (1 Hz increment)
     const totalFreq = Math.round(rawFreq);
     
@@ -123,10 +125,10 @@ export default function WaveformSliderGroup({
 
   // Handle precision offset change from precision slider
   const handlePrecisionChange = (sliderValue: number) => {
-    // Map 0-1 to -PRECISION_RANGE to +PRECISION_RANGE
+    // Map 0-1 to -precisionRange to +precisionRange
     // 0.5 (center) = 0 offset
     // Calculate raw offset
-    const rawOffset = (sliderValue - 0.5) * 2 * PRECISION_RANGE;
+    const rawOffset = (sliderValue - 0.5) * 2 * precisionRange;
     // Round to nearest integer (1 Hz increment)
     const offset = Math.round(rawOffset);
     
@@ -196,7 +198,7 @@ export default function WaveformSliderGroup({
         <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
         <View style={{ flex: 1, marginLeft: 16, height: 32 }}>
           <ZoomSlider
-            value={0.5 + precisionOffset / (2 * PRECISION_RANGE)}
+            value={0.5 + precisionOffset / (2 * precisionRange)}
             onValueChange={handlePrecisionChange}
             trackColor={precisionSliderKnobColor}
             precision={5}
@@ -204,7 +206,7 @@ export default function WaveformSliderGroup({
         </View>
       </View>
       <ZoomSlider
-        value={frequencyToSliderValue(absoluteFrequency)}
+        value={frequencyToSliderValue(absoluteFrequency, maxFrequency)}
         onValueChange={handleBaseFrequencyChange}
         trackColor={mainSliderKnobColor}
         precision={5}

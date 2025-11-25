@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, Keyboard, Pressable } from 'react-native';
+import { View, Text, Button, Keyboard, Pressable, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
@@ -31,10 +31,12 @@ export default function AudioTab() {
   const precisionOffsetRef = useRef(0);
   const previousBaseFrequencyRef = useRef(440); // Track previous value to detect 0 transition
   
-  // Frequency range mapping (20-2000 Hz)
+  // Frequency range mapping
   const MIN_FREQUENCY = 0;
-  const MAX_FREQUENCY = 20000;
-  const PRECISION_RANGE = 1000; // ±1000 Hz
+  const [maxFrequency, setMaxFrequency] = useState(20000);
+  const [maxFrequencyInput, setMaxFrequencyInput] = useState('20000');
+  // Precision range is 10% of max frequency
+  const PRECISION_RANGE = maxFrequency * 0.1;
   
   // Calculate absolute frequency (for display and slider)
   const absoluteFrequency = baseFrequency + precisionOffset;
@@ -181,7 +183,7 @@ export default function AudioTab() {
   const handleFrequencyInputSubmit = () => {
     Keyboard.dismiss();
     const numValue = parseFloat(frequencyInput);
-    if (!isNaN(numValue) && numValue >= MIN_FREQUENCY && numValue <= MAX_FREQUENCY) {
+    if (!isNaN(numValue) && numValue >= MIN_FREQUENCY && numValue <= maxFrequency) {
       // Update base frequency and reset precision offset
       previousBaseFrequencyRef.current = baseFrequencyRef.current; // Update previous before changing
       setBaseFrequency(numValue);
@@ -192,6 +194,37 @@ export default function AudioTab() {
     } else {
       // Invalid input, reset to current absolute frequency
       setFrequencyInput(absoluteFrequency.toFixed(1));
+    }
+  };
+
+  // Handle max frequency input change
+  const handleMaxFrequencyInputChange = (text: string) => {
+    setMaxFrequencyInput(text);
+  };
+
+  // Validate and apply max frequency from text input
+  const handleMaxFrequencyInputSubmit = () => {
+    Keyboard.dismiss();
+    const numValue = parseFloat(maxFrequencyInput);
+    if (!isNaN(numValue) && numValue > 0) {
+      setMaxFrequency(numValue);
+      // If current frequency exceeds new max, clamp it
+      if (baseFrequency > numValue) {
+        setBaseFrequency(numValue);
+        baseFrequencyRef.current = numValue;
+        setFrequencyInput(numValue.toFixed(1));
+        audioParamsRef.current.frequency = numValue * (frequencySign ? 1 : -1);
+      }
+      // If precision offset exceeds new range, clamp it
+      const newPrecisionRange = numValue * 0.1;
+      if (Math.abs(precisionOffset) > newPrecisionRange) {
+        const clampedOffset = Math.sign(precisionOffset) * newPrecisionRange;
+        setPrecisionOffset(clampedOffset);
+        precisionOffsetRef.current = clampedOffset;
+      }
+    } else {
+      // Invalid input, reset to current max frequency
+      setMaxFrequencyInput(maxFrequency.toString());
     }
   };
   
@@ -302,12 +335,37 @@ export default function AudioTab() {
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Max Frequency:</Text>
+          <TextInput
+            style={{
+              color: '#fff',
+              borderWidth: 1,
+              borderColor: '#39ff14',
+              borderRadius: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              minWidth: 100,
+              fontSize: 16,
+            }}
+            value={maxFrequencyInput}
+            onChangeText={handleMaxFrequencyInputChange}
+            onSubmitEditing={handleMaxFrequencyInputSubmit}
+            onBlur={handleMaxFrequencyInputSubmit}
+            keyboardType="numeric"
+            returnKeyType="done"
+            selectTextOnFocus
+          />
+          <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
+        </View>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
           precisionOffset={precisionOffset}
           frequencySign={frequencySign}
           frequencyInput={frequencyInput}
           volume={volume}
+          maxFrequency={maxFrequency}
+          precisionRange={PRECISION_RANGE}
           onBaseFrequencyChange={handleBaseFrequencyChange}
           onPrecisionChange={handlePrecisionChange}
           onFrequencySignChange={handleFrequencySignChange}
@@ -322,6 +380,7 @@ export default function AudioTab() {
             paddingVertical: 12,
             paddingHorizontal: 24,
             borderRadius: 8,
+            marginTop: 16,
           }}
           android_ripple={null}
         >
