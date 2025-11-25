@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, TextInput, Keyboard, TouchableOpacity } from 'react-native';
+import { View, Text, Button, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
 import Slider from '../../components/ui/slider';
-import ZoomSlider from '../../components/ui/zoom-slider';
+import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
@@ -35,54 +35,10 @@ export default function AudioTab() {
   const MAX_FREQUENCY = 20000;
   const PRECISION_RANGE = 1000; // ±1000 Hz
   
-  // Helper function to interpolate between two colors
-  const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
-  
-  // Helper function to interpolate between two hex colors
-  const interpolateColor = (color1: string, color2: string, t: number): string => {
-    // Parse hex colors to RGB
-    const hex1 = color1.replace('#', '');
-    const hex2 = color2.replace('#', '');
-    const r1 = parseInt(hex1.substring(0, 2), 16);
-    const g1 = parseInt(hex1.substring(2, 4), 16);
-    const b1 = parseInt(hex1.substring(4, 6), 16);
-    const r2 = parseInt(hex2.substring(0, 2), 16);
-    const g2 = parseInt(hex2.substring(2, 4), 16);
-    const b2 = parseInt(hex2.substring(4, 6), 16);
-    
-    const r = lerp(r1, r2, t);
-    const g = lerp(g1, g2, t);
-    const b = lerp(b1, b2, t);
-    
-    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-  };
-  
   // Calculate absolute frequency (for display and slider)
   const absoluteFrequency = baseFrequency + precisionOffset;
   // Calculate actual frequency with sign (for audio)
   const frequency = absoluteFrequency * (frequencySign ? 1 : -1);
-  
-  // Calculate precision slider knob color based on position
-  // Precision slider value: 0 = max negative, 0.5 = center (0), 1 = max positive
-  const precisionSliderValue = Math.max(0, Math.min(1, 0.5 + precisionOffset / (2 * PRECISION_RANGE))); // Map -1000 to +1000 to 0 to 1, centered at 0.5
-  let precisionSliderKnobColor: string;
-  if (precisionSliderValue < 0.5) {
-    // Fade from red (at 0) to gray (at 0.5)
-    const t = precisionSliderValue / 0.5; // 0 to 1 as we go from 0 to 0.5
-    precisionSliderKnobColor = interpolateColor('#ff0000', '#888888', t);
-  } else {
-    // Fade from gray (at 0.5) to green (at 1)
-    const t = (precisionSliderValue - 0.5) / 0.5; // 0 to 1 as we go from 0.5 to 1
-    precisionSliderKnobColor = interpolateColor('#888888', '#39ff14', t);
-  }
-  
-  // Calculate main slider knob color based on position and sign
-  // Main slider value: 0 = min (0 Hz), 1 = max (20000 Hz)
-  const mainSliderValue = Math.max(0, Math.min(1, (absoluteFrequency - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY)));
-  // If frequency is negative, fade from gray to red; if positive, fade from gray to green
-  const mainSliderKnobColor = frequencySign 
-    ? interpolateColor('#888888', '#39ff14', mainSliderValue)
-    : interpolateColor('#888888', '#ff0000', mainSliderValue);
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -196,36 +152,18 @@ export default function AudioTab() {
   };
   
   // Handle base frequency change from main slider - update ref so it affects playback in real-time
-  // Slider value is 0-1, map it to frequency range
   // When main slider moves, set base frequency to the new total and reset precision offset
-  const handleBaseFrequencyChange = (sliderValue: number) => {
-    const totalFreq = MIN_FREQUENCY + sliderValue * (MAX_FREQUENCY - MIN_FREQUENCY);
-    const previousFreq = previousBaseFrequencyRef.current;
-    
-    // Check if transitioning from >0 to exactly 0, then flip the sign
-    let newSign = frequencySign;
-    if (previousFreq > 0 && totalFreq === 0) {
-      newSign = !frequencySign;
-      setFrequencySign(newSign);
-    }
-    
-    // Update previous value before setting new value
-    previousBaseFrequencyRef.current = totalFreq;
-    
+  const handleBaseFrequencyChange = (totalFreq: number) => {
     setBaseFrequency(totalFreq);
     setPrecisionOffset(0);
     baseFrequencyRef.current = totalFreq;
     precisionOffsetRef.current = 0;
     setFrequencyInput(totalFreq.toFixed(1));
-    audioParamsRef.current.frequency = totalFreq * (newSign ? 1 : -1);
+    audioParamsRef.current.frequency = totalFreq * (frequencySign ? 1 : -1);
   };
   
   // Handle precision offset change from precision slider
-  // Slider value is 0-1, map it to -PRECISION_RANGE to +PRECISION_RANGE
-  const handlePrecisionChange = (sliderValue: number) => {
-    // Map 0-1 to -PRECISION_RANGE to +PRECISION_RANGE
-    // 0.5 (center) = 0 offset
-    const offset = (sliderValue - 0.5) * 2 * PRECISION_RANGE;
+  const handlePrecisionChange = (offset: number) => {
     setPrecisionOffset(offset);
     precisionOffsetRef.current = offset;
     const actualFreq = baseFrequencyRef.current + offset;
@@ -256,10 +194,9 @@ export default function AudioTab() {
     }
   };
   
-  // Convert frequency to slider value (0-1) - use absolute value for slider position
-  const frequencyToSliderValue = (freq: number): number => {
-    const absFreq = Math.abs(freq);
-    return (absFreq - MIN_FREQUENCY) / (MAX_FREQUENCY - MIN_FREQUENCY);
+  // Handle frequency sign change
+  const handleFrequencySignChange = (sign: boolean) => {
+    setFrequencySign(sign);
   };
   
   // Update input text when absolute frequency changes from slider
@@ -352,55 +289,16 @@ export default function AudioTab() {
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <TouchableOpacity
-            onPress={() => setFrequencySign(!frequencySign)}
-            style={{
-              width: 32,
-              height: 32,
-              backgroundColor: frequencySign ? '#39ff14' : '#ff0000',
-              borderRadius: 4,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 8,
-            }}
-          >
-            <Text style={{ color: '#000', fontSize: 18, fontWeight: 'bold' }}>
-              {frequencySign ? '+' : '-'}
-            </Text>
-          </TouchableOpacity>
-          <TextInput
-            style={{
-              color: '#fff',
-              borderWidth: 1,
-              borderColor: frequencySign ? '#39ff14' : '#ff0000',
-              borderRadius: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              minWidth: 80,
-              fontSize: 16,
-            }}
-            value={frequencyInput}
-            onChangeText={handleFrequencyInputChange}
-            onSubmitEditing={handleFrequencyInputSubmit}
-            onBlur={handleFrequencyInputSubmit}
-            keyboardType="numeric"
-            returnKeyType="done"
-            selectTextOnFocus
-          />
-          <Text style={{ color: '#fff', marginLeft: 8 }}>Hz</Text>
-          <View style={{ flex: 1, marginLeft: 16, height: 32 }}>
-            <ZoomSlider
-              value={0.5 + precisionOffset / (2 * PRECISION_RANGE)} // Map -1000 to +1000 to 0 to 1, centered at 0.5
-              onValueChange={handlePrecisionChange}
-              trackColor={precisionSliderKnobColor}
-            />
-          </View>
-        </View>
-        <ZoomSlider
-          value={frequencyToSliderValue(absoluteFrequency)}
-          onValueChange={handleBaseFrequencyChange}
-          trackColor={mainSliderKnobColor}
+        <WaveformSliderGroup
+          baseFrequency={baseFrequency}
+          precisionOffset={precisionOffset}
+          frequencySign={frequencySign}
+          frequencyInput={frequencyInput}
+          onBaseFrequencyChange={handleBaseFrequencyChange}
+          onPrecisionChange={handlePrecisionChange}
+          onFrequencySignChange={handleFrequencySignChange}
+          onFrequencyInputChange={handleFrequencyInputChange}
+          onFrequencyInputSubmit={handleFrequencyInputSubmit}
         />
         <Button
           title={isAudioPlaying ? 'Stop' : 'Start Test Audio'}
