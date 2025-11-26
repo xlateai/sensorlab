@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
-import { playPureSine, playSawtooth, stopAudio, AudioController } from '../utils/audio-utils';
+import { playWaveform, stopAudio, AudioController } from '../utils/audio-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
@@ -26,6 +26,7 @@ export default function AudioTab() {
   const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sine');
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
+  const waveformShapeRef = useRef<'sine' | 'sawtooth'>('sine'); // Ref for live shape access
   
   // Use refs to ensure we always have latest values in handlers
   const baseFrequencyRef = useRef(440);
@@ -133,19 +134,14 @@ export default function AudioTab() {
       const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
       audioParamsRef.current = { frequency: absFreq * (frequencySign ? 1 : -1), volume: volume / 100 };
       
-      // Play waveform with dynamic frequency and volume based on selected shape
-      // Using getter functions so we can update frequency/volume during playback
-      const controller = waveformShape === 'sine'
-        ? await playPureSine(
-            () => audioParamsRef.current.frequency, // getter for frequency
-            () => audioParamsRef.current.volume,    // getter for volume
-            (length) => setBufferLength(length)      // buffer length update callback
-          )
-        : await playSawtooth(
-            () => audioParamsRef.current.frequency, // getter for frequency
-            () => audioParamsRef.current.volume,    // getter for volume
-            (length) => setBufferLength(length)      // buffer length update callback
-          );
+      // Play waveform with dynamic frequency, volume, and shape
+      // Using getter functions so we can update frequency/volume/shape during playback
+      const controller = await playWaveform(
+        () => audioParamsRef.current.frequency, // getter for frequency
+        () => audioParamsRef.current.volume,     // getter for volume
+        () => waveformShapeRef.current,          // getter for shape
+        (length) => setBufferLength(length)       // buffer length update callback
+      );
       
       audioControllerRef.current = controller;
       
@@ -262,6 +258,11 @@ export default function AudioTab() {
   useEffect(() => {
     audioParamsRef.current.volume = volume / 100;
   }, [volume]);
+
+  // Update waveform shape ref when shape changes (for live updates)
+  useEffect(() => {
+    waveformShapeRef.current = waveformShape;
+  }, [waveformShape]);
   
   // Keep refs in sync with state
   useEffect(() => {
