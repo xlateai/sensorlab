@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, Keyboard, Pressable, TextInput } from 'react-native';
+import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playContinuousHaptic } from '../utils/haptics';
-import { playPureSine, stopAudio, AudioController } from '../utils/audio-utils';
+import { playPureSine, playSawtooth, stopAudio, AudioController } from '../utils/audio-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
@@ -23,6 +23,7 @@ export default function AudioTab() {
   const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
+  const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sine');
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
   
@@ -132,13 +133,19 @@ export default function AudioTab() {
       const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
       audioParamsRef.current = { frequency: absFreq * (frequencySign ? 1 : -1), volume: volume / 100 };
       
-      // Play pure sine wave with dynamic frequency and volume
+      // Play waveform with dynamic frequency and volume based on selected shape
       // Using getter functions so we can update frequency/volume during playback
-      const controller = await playPureSine(
-        () => audioParamsRef.current.frequency, // getter for frequency
-        () => audioParamsRef.current.volume,    // getter for volume
-        (length) => setBufferLength(length)      // buffer length update callback
-      );
+      const controller = waveformShape === 'sine'
+        ? await playPureSine(
+            () => audioParamsRef.current.frequency, // getter for frequency
+            () => audioParamsRef.current.volume,    // getter for volume
+            (length) => setBufferLength(length)      // buffer length update callback
+          )
+        : await playSawtooth(
+            () => audioParamsRef.current.frequency, // getter for frequency
+            () => audioParamsRef.current.volume,    // getter for volume
+            (length) => setBufferLength(length)      // buffer length update callback
+          );
       
       audioControllerRef.current = controller;
       
@@ -344,6 +351,7 @@ export default function AudioTab() {
           maxFrequency={maxFrequency}
           maxFrequencyInput={maxFrequencyInput}
           precisionRange={PRECISION_RANGE}
+          waveformShape={waveformShape}
           onBaseFrequencyChange={handleBaseFrequencyChange}
           onPrecisionChange={handlePrecisionChange}
           onFrequencySignChange={handleFrequencySignChange}
@@ -352,6 +360,7 @@ export default function AudioTab() {
           onMaxFrequencyInputChange={handleMaxFrequencyInputChange}
           onMaxFrequencyInputSubmit={handleMaxFrequencyInputSubmit}
           onVolumeChange={handleVolumeChange}
+          onWaveformShapeChange={setWaveformShape}
         />
         <Pressable
           onPress={handleTestAudioToggle}

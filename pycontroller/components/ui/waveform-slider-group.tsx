@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, TextInput, Keyboard, TouchableOpacity } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, TextInput, Keyboard, TouchableOpacity, Pressable, Modal, ScrollView } from 'react-native';
 import ZoomSlider from './zoom-slider';
 
 // Frequency range mapping
@@ -42,6 +42,7 @@ interface WaveformSliderGroupProps {
   maxFrequency: number;
   maxFrequencyInput: string;
   precisionRange: number;
+  waveformShape: 'sine' | 'sawtooth';
   onBaseFrequencyChange: (freq: number) => void;
   onPrecisionChange: (offset: number) => void;
   onFrequencySignChange: (sign: boolean) => void;
@@ -50,6 +51,7 @@ interface WaveformSliderGroupProps {
   onMaxFrequencyInputChange: (text: string) => void;
   onMaxFrequencyInputSubmit: () => void;
   onVolumeChange: (volume: number) => void;
+  onWaveformShapeChange: (shape: 'sine' | 'sawtooth') => void;
 }
 
 export default function WaveformSliderGroup({
@@ -61,6 +63,7 @@ export default function WaveformSliderGroup({
   maxFrequency,
   maxFrequencyInput,
   precisionRange,
+  waveformShape,
   onBaseFrequencyChange,
   onPrecisionChange,
   onFrequencySignChange,
@@ -69,6 +72,7 @@ export default function WaveformSliderGroup({
   onMaxFrequencyInputChange,
   onMaxFrequencyInputSubmit,
   onVolumeChange,
+  onWaveformShapeChange,
 }: WaveformSliderGroupProps) {
   const previousBaseFrequencyRef = useRef(baseFrequency);
   
@@ -163,6 +167,14 @@ export default function WaveformSliderGroup({
   const volumeSliderValue = volume / 100;
   const volumeSliderKnobColor = interpolateColor('#888888', '#39ff14', volumeSliderValue);
 
+  const [showShapePicker, setShowShapePicker] = useState(false);
+  const waveformShapes: Array<'sine' | 'sawtooth'> = ['sine', 'sawtooth'];
+
+  const handleShapeSelect = (shape: 'sine' | 'sawtooth') => {
+    onWaveformShapeChange(shape);
+    setShowShapePicker(false);
+  };
+
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -251,8 +263,98 @@ export default function WaveformSliderGroup({
             precision={2}
           />
         </View>
-        <Text style={{ color: '#fff' }}>{volume}% volume</Text>
+        <Text style={{ color: '#fff', marginRight: 12 }}>{volume}% volume</Text>
+        <Pressable
+          onPress={() => setShowShapePicker(true)}
+          style={{
+            backgroundColor: '#39ff14',
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            borderRadius: 8,
+          }}
+          android_ripple={null}
+        >
+          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+            {waveformShape === 'sine' ? 'Sine' : 'Sawtooth'}
+          </Text>
+        </Pressable>
       </View>
+      <Modal
+        visible={showShapePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowShapePicker(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+          onPress={() => setShowShapePicker(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: 12,
+              padding: 20,
+              width: '80%',
+              maxHeight: '60%',
+              borderWidth: 1,
+              borderColor: '#39ff14',
+            }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>
+              Select Waveform
+            </Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {waveformShapes.map((shape) => (
+                <Pressable
+                  key={shape}
+                  onPress={() => handleShapeSelect(shape)}
+                  style={{
+                    backgroundColor: waveformShape === shape ? '#39ff14' : '#333',
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    borderRadius: 8,
+                    marginBottom: 8,
+                  }}
+                  android_ripple={null}
+                >
+                  <Text
+                    style={{
+                      color: waveformShape === shape ? '#000' : '#fff',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      fontSize: 16,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {shape}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setShowShapePicker(false)}
+              style={{
+                backgroundColor: '#333',
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 8,
+                marginTop: 16,
+              }}
+              android_ripple={null}
+            >
+              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                Cancel
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
