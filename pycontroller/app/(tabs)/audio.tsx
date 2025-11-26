@@ -1,10 +1,124 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DeviceMotion } from 'expo-sensors';
+import { useFocusEffect } from '@react-navigation/native';
 import { playContinuousHaptic } from '../utils/haptics';
 import { playWaveform, stopAudio, AudioController } from '../utils/audio-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
+
+// Control Selector Component
+function ControlSelector({
+  controlMode,
+  onControlModeChange,
+}: {
+  controlMode: 'pitch' | 'none';
+  onControlModeChange: (mode: 'pitch' | 'none') => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const controlModes: Array<'pitch' | 'none'> = ['pitch', 'none'];
+
+  const handleModeSelect = (mode: 'pitch' | 'none') => {
+    onControlModeChange(mode);
+    setShowPicker(false);
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setShowPicker(true)}
+        style={{
+          backgroundColor: '#39ff14',
+          paddingVertical: 12,
+          paddingHorizontal: 20,
+          borderRadius: 8,
+        }}
+        android_ripple={null}
+      >
+        <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+          {controlMode === 'pitch' ? 'Pitch' : 'None'}
+        </Text>
+      </Pressable>
+      <Modal
+        visible={showPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPicker(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+          onPress={() => setShowPicker(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: 12,
+              padding: 20,
+              width: '80%',
+              maxHeight: '60%',
+              borderWidth: 1,
+              borderColor: '#39ff14',
+            }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>
+              Select Control
+            </Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {controlModes.map((mode) => (
+                <Pressable
+                  key={mode}
+                  onPress={() => handleModeSelect(mode)}
+                  style={{
+                    backgroundColor: controlMode === mode ? '#39ff14' : '#333',
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    borderRadius: 8,
+                    marginBottom: 8,
+                  }}
+                  android_ripple={null}
+                >
+                  <Text
+                    style={{
+                      color: controlMode === mode ? '#000' : '#fff',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      fontSize: 16,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {mode}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setShowPicker(false)}
+              style={{
+                backgroundColor: '#333',
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 8,
+                marginTop: 16,
+              }}
+              android_ripple={null}
+            >
+              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                Cancel
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
 
 export default function AudioTab() {
   const [intensity, setIntensity] = useState(1.0);
@@ -24,9 +138,19 @@ export default function AudioTab() {
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
   const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sine');
+  const [controlMode, setControlMode] = useState<'pitch' | 'none'>('pitch');
+  const [pitchRotation, setPitchRotation] = useState(0); // Current pitch rotation in radians (beta)
+  const [rollRotation, setRollRotation] = useState(0); // Current roll rotation in radians (gamma)
+  const baselinePitchRef = useRef<number | null>(null); // Baseline pitch captured when audio starts
+  const baselineRollRef = useRef<number | null>(null); // Baseline roll captured when audio starts
+  const startingFrequencyRef = useRef<number | null>(null); // Starting frequency when audio begins
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
   const waveformShapeRef = useRef<'sine' | 'sawtooth'>('sine'); // Ref for live shape access
+  const controlModeRef = useRef<'pitch' | 'none'>('pitch'); // Ref for live control mode access
+  const pitchRotationRef = useRef(0); // Ref for live pitch rotation access
+  const rollRotationRef = useRef(0); // Ref for live roll rotation access
+  const frequencySignRef = useRef(true); // Ref for live frequency sign access
   
   // Use refs to ensure we always have latest values in handlers
   const baseFrequencyRef = useRef(440);
@@ -42,8 +166,9 @@ export default function AudioTab() {
   
   // Calculate absolute frequency (for display and slider)
   const absoluteFrequency = baseFrequency + precisionOffset;
-  // Calculate actual frequency with sign (for audio)
-  const frequency = absoluteFrequency * (frequencySign ? 1 : -1);
+  
+  // Note: Frequency calculation with pitch modulation is done dynamically in the audio getter function
+  // for live updates during playback
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -130,14 +255,51 @@ export default function AudioTab() {
     try {
       setIsAudioPlaying(true);
       
-      // Update ref with current values (apply sign)
+      // Capture baseline sensor readings when starting
+      baselinePitchRef.current = pitchRotationRef.current;
+      baselineRollRef.current = rollRotationRef.current;
+      
+      // Capture starting frequency
       const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
-      audioParamsRef.current = { frequency: absFreq * (frequencySign ? 1 : -1), volume: volume / 100 };
+      startingFrequencyRef.current = absFreq * (frequencySignRef.current ? 1 : -1);
+      
+      // Update ref with current values
+      audioParamsRef.current = { frequency: startingFrequencyRef.current, volume: volume / 100 };
       
       // Play waveform with dynamic frequency, volume, and shape
       // Using getter functions so we can update frequency/volume/shape during playback
       const controller = await playWaveform(
-        () => audioParamsRef.current.frequency, // getter for frequency
+        () => {
+          // Calculate base frequency
+          const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
+          const baseFreq = absFreq * (frequencySignRef.current ? 1 : -1);
+          
+          // Apply pitch/roll modulation if control mode is 'pitch'
+          if (controlModeRef.current === 'pitch' && baselinePitchRef.current !== null && baselineRollRef.current !== null) {
+            // Calculate angular distance from baseline for pitch
+            const pitchDiff = Math.abs(pitchRotationRef.current - baselinePitchRef.current);
+            // Normalize: 180 degrees (π radians) = 1.0
+            const normalizedPitchDist = Math.min(pitchDiff / Math.PI, 1.0);
+            
+            // Calculate angular distance from baseline for roll
+            const rollDiff = Math.abs(rollRotationRef.current - baselineRollRef.current);
+            // Normalize: 180 degrees (π radians) = 1.0
+            const normalizedRollDist = Math.min(rollDiff / Math.PI, 1.0);
+            
+            // Average the two normalized distances
+            const avgDistance = (normalizedPitchDist + normalizedRollDist) / 2;
+            
+            // Apply sine to get smooth curve
+            const sinedDistance = Math.sin(avgDistance * Math.PI / 2);
+            
+            // Map to multiplier: 1.0x (baseline) to 3.0x (300% = max)
+            // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * 2.0) = 1.0 to 3.0
+            const frequencyMultiplier = 1.0 + (sinedDistance * 2.0);
+            
+            return baseFreq * frequencyMultiplier;
+          }
+          return baseFreq;
+        },
         () => audioParamsRef.current.volume,     // getter for volume
         () => waveformShapeRef.current,          // getter for shape
         (length) => setBufferLength(length)       // buffer length update callback
@@ -165,7 +327,7 @@ export default function AudioTab() {
     baseFrequencyRef.current = totalFreq;
     precisionOffsetRef.current = 0;
     setFrequencyInput(totalFreq.toFixed(1));
-    audioParamsRef.current.frequency = totalFreq * (frequencySign ? 1 : -1);
+    // Note: Frequency is now calculated dynamically in the audio getter function
   };
   
   // Handle precision offset change from precision slider
@@ -174,7 +336,7 @@ export default function AudioTab() {
     precisionOffsetRef.current = offset;
     const actualFreq = baseFrequencyRef.current + offset;
     setFrequencyInput(actualFreq.toFixed(1));
-    audioParamsRef.current.frequency = actualFreq * (frequencySign ? 1 : -1);
+    // Note: Frequency is now calculated dynamically in the audio getter function
   };
   
   // Handle frequency input from text field
@@ -193,7 +355,7 @@ export default function AudioTab() {
       setPrecisionOffset(0);
       baseFrequencyRef.current = numValue;
       precisionOffsetRef.current = 0;
-      audioParamsRef.current.frequency = numValue * (frequencySign ? 1 : -1);
+      // Note: Frequency is now calculated dynamically in the audio getter function
     } else {
       // Invalid input, reset to current absolute frequency
       setFrequencyInput(absoluteFrequency.toFixed(1));
@@ -216,7 +378,7 @@ export default function AudioTab() {
         setBaseFrequency(numValue);
         baseFrequencyRef.current = numValue;
         setFrequencyInput(numValue.toFixed(1));
-        audioParamsRef.current.frequency = numValue * (frequencySign ? 1 : -1);
+        // Note: Frequency is now calculated dynamically in the audio getter function
       }
       // If precision offset exceeds new range, clamp it
       const newPrecisionRange = numValue * 0.1;
@@ -234,6 +396,7 @@ export default function AudioTab() {
   // Handle frequency sign change
   const handleFrequencySignChange = (sign: boolean) => {
     setFrequencySign(sign);
+    frequencySignRef.current = sign;
   };
 
   // Handle volume change
@@ -246,13 +409,8 @@ export default function AudioTab() {
   // Update input text when absolute frequency changes from slider
   useEffect(() => {
     setFrequencyInput(absoluteFrequency.toFixed(1));
-    audioParamsRef.current.frequency = frequency;
-  }, [absoluteFrequency, frequency]);
-  
-  // Update audio frequency when sign changes
-  useEffect(() => {
-    audioParamsRef.current.frequency = frequency;
-  }, [frequencySign, frequency]);
+    // Note: Frequency is now calculated dynamically in the audio getter function
+  }, [absoluteFrequency]);
 
   // Update audio volume when volume changes
   useEffect(() => {
@@ -263,6 +421,38 @@ export default function AudioTab() {
   useEffect(() => {
     waveformShapeRef.current = waveformShape;
   }, [waveformShape]);
+
+  // Update control mode ref when mode changes (for live updates)
+  useEffect(() => {
+    controlModeRef.current = controlMode;
+  }, [controlMode]);
+
+  // Update frequency sign ref when sign changes (for live updates)
+  useEffect(() => {
+    frequencySignRef.current = frequencySign;
+  }, [frequencySign]);
+
+  // Subscribe to DeviceMotion for pitch and roll rotation
+  useFocusEffect(
+    React.useCallback(() => {
+      const subscription = DeviceMotion.addListener((data) => {
+        if (data?.rotation?.beta !== undefined) {
+          const beta = data.rotation.beta; // Pitch rotation in radians
+          setPitchRotation(beta);
+          pitchRotationRef.current = beta;
+        }
+        if (data?.rotation?.gamma !== undefined) {
+          const gamma = data.rotation.gamma; // Roll rotation in radians
+          setRollRotation(gamma);
+          rollRotationRef.current = gamma;
+        }
+      });
+      DeviceMotion.setUpdateInterval(16); // ~60Hz updates
+      return () => {
+        subscription && subscription.remove();
+      };
+    }, [])
+  );
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -288,6 +478,11 @@ export default function AudioTab() {
       }
       audioControllerRef.current = null;
     }
+    
+    // Reset baseline values when stopping
+    baselinePitchRef.current = null;
+    baselineRollRef.current = null;
+    startingFrequencyRef.current = null;
     
     // Stop audio engine
     try {
@@ -363,21 +558,27 @@ export default function AudioTab() {
           onVolumeChange={handleVolumeChange}
           onWaveformShapeChange={setWaveformShape}
         />
-        <Pressable
-          onPress={handleTestAudioToggle}
-          style={{
-            backgroundColor: '#39ff14',
-            paddingVertical: 12,
-            paddingHorizontal: 24,
-            borderRadius: 8,
-            marginTop: 16,
-          }}
-          android_ripple={null}
-        >
-          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
-            {isAudioPlaying ? 'Stop' : 'Start Test Audio'}
-          </Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 12 }}>
+          <Pressable
+            onPress={handleTestAudioToggle}
+            style={{
+              backgroundColor: '#39ff14',
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 8,
+              flex: 1,
+            }}
+            android_ripple={null}
+          >
+            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+              {isAudioPlaying ? 'Stop' : 'Start Test Audio'}
+            </Text>
+          </Pressable>
+          <ControlSelector
+            controlMode={controlMode}
+            onControlModeChange={setControlMode}
+          />
+        </View>
         <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
           Buffer: {bufferLength} samples
         </Text>
