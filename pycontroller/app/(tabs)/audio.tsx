@@ -583,31 +583,8 @@ export default function AudioTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000', padding: 24 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
       <View style={{ marginBottom: 32 }}>
-        <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
-        <Slider
-          value={intensity}
-          onValueChange={handleIntensityChange}
-          trackColor="#39ff14"
-        />
-        <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
-        <Slider
-          value={sharpness}
-          onValueChange={handleSharpnessChange}
-          trackColor="#39ff14"
-        />
-        <View style={{ marginTop: 24 }}>
-          <Button
-            title={isPlaying ? 'Pause' : 'Play Haptic'}
-            color="#39ff14"
-            onPress={handlePlayPause}
-          />
-        </View>
-      </View>
-      
-      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
           precisionOffset={precisionOffset}
@@ -652,6 +629,29 @@ export default function AudioTab() {
         <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
           Buffer: {bufferLength} samples
         </Text>
+      </View>
+      
+      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
+        <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
+        <Slider
+          value={intensity}
+          onValueChange={handleIntensityChange}
+          trackColor="#39ff14"
+        />
+        <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
+        <Slider
+          value={sharpness}
+          onValueChange={handleSharpnessChange}
+          trackColor="#39ff14"
+        />
+        <View style={{ marginTop: 24 }}>
+          <Button
+            title={isPlaying ? 'Pause' : 'Play Haptic'}
+            color="#39ff14"
+            onPress={handlePlayPause}
+          />
+        </View>
       </View>
     </SafeAreaView>
   );
