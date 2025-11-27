@@ -200,7 +200,7 @@ export interface AmbientControllerState {
 }
 
 const MAX_ROTATION_THRESHOLD = 0.5; // radians
-const AMBIENT_FREQUENCY_MULTIPLIER = 8;
+const AMBIENT_FREQUENCY_MULTIPLIER = 6;
 
 /**
  * Creates a frequency getter for rotation control mode
