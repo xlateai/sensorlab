@@ -20,6 +20,7 @@ import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 // Default frequency constant
 const DEFAULT_FREQUENCY = 744;
 const DEFAULT_SHAPE: 'sine' | 'sawtooth' = 'sine';
+const DEFAULT_CONTROL_MODE: ControlMode = 'ambient';
 
 // Control Selector Component
 function ControlSelector({
@@ -151,7 +152,7 @@ export default function AudioTab() {
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
   const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>(DEFAULT_SHAPE);
-  const [controlMode, setControlMode] = useState<ControlMode>('rotation');
+  const [controlMode, setControlMode] = useState<ControlMode>(DEFAULT_CONTROL_MODE);
   const [pitchRotation, setPitchRotation] = useState(0); // Current pitch rotation in radians (beta)
   const [rollRotation, setRollRotation] = useState(0); // Current roll rotation in radians (gamma)
   const baselinePitchRef = useRef<number | null>(null); // Baseline pitch (rolling average)
@@ -163,7 +164,7 @@ export default function AudioTab() {
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: DEFAULT_FREQUENCY, volume: 0.5 }); // 0.5 = 50%
   const waveformShapeRef = useRef<'sine' | 'sawtooth'>(DEFAULT_SHAPE); // Ref for live shape access
-  const controlModeRef = useRef<ControlMode>('rotation'); // Ref for live control mode access
+  const controlModeRef = useRef<ControlMode>(DEFAULT_CONTROL_MODE); // Ref for live control mode access
   const pitchRotationRef = useRef(0); // Ref for live pitch rotation access
   const rollRotationRef = useRef(0); // Ref for live roll rotation access
   const frequencySignRef = useRef(true); // Ref for live frequency sign access
