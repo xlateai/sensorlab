@@ -17,6 +17,9 @@ import { MagnetometerData } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
+// Default frequency constant
+const DEFAULT_FREQUENCY = 744;
+
 // Control Selector Component
 function ControlSelector({
   controlMode,
@@ -141,9 +144,9 @@ export default function AudioTab() {
   // Audio test state
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
-  const [baseFrequency, setBaseFrequency] = useState(440); // Base frequency from main slider
+  const [baseFrequency, setBaseFrequency] = useState(DEFAULT_FREQUENCY); // Base frequency from main slider
   const [precisionOffset, setPrecisionOffset] = useState(0); // Precision offset in Hz (-1000 to +1000)
-  const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
+  const [frequencyInput, setFrequencyInput] = useState(DEFAULT_FREQUENCY.toString()); // For text input
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
   const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sawtooth');
@@ -157,7 +160,7 @@ export default function AudioTab() {
   const BASELINE_HISTORY_SIZE = 64; // Number of measurements to average for baseline
   const startingFrequencyRef = useRef<number | null>(null); // Starting frequency when audio begins
   const audioControllerRef = useRef<AudioController | null>(null);
-  const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
+  const audioParamsRef = useRef({ frequency: DEFAULT_FREQUENCY, volume: 0.5 }); // 0.5 = 50%
   const waveformShapeRef = useRef<'sine' | 'sawtooth'>('sawtooth'); // Ref for live shape access
   const controlModeRef = useRef<ControlMode>('rotation'); // Ref for live control mode access
   const pitchRotationRef = useRef(0); // Ref for live pitch rotation access
@@ -170,9 +173,9 @@ export default function AudioTab() {
   const MAGNETOMETER_BUFFER_SIZE = 64;
   
   // Use refs to ensure we always have latest values in handlers
-  const baseFrequencyRef = useRef(440);
+  const baseFrequencyRef = useRef(DEFAULT_FREQUENCY);
   const precisionOffsetRef = useRef(0);
-  const previousBaseFrequencyRef = useRef(440); // Track previous value to detect 0 transition
+  const previousBaseFrequencyRef = useRef(DEFAULT_FREQUENCY); // Track previous value to detect 0 transition
   
   // Frequency range mapping
   const MIN_FREQUENCY = 0;
