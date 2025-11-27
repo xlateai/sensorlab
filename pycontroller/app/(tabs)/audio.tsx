@@ -137,16 +137,19 @@ export default function AudioTab() {
   const [frequencyInput, setFrequencyInput] = useState('440'); // For text input
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
-  const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sine');
+  const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sawtooth');
   const [controlMode, setControlMode] = useState<'pitch' | 'none'>('pitch');
   const [pitchRotation, setPitchRotation] = useState(0); // Current pitch rotation in radians (beta)
   const [rollRotation, setRollRotation] = useState(0); // Current roll rotation in radians (gamma)
-  const baselinePitchRef = useRef<number | null>(null); // Baseline pitch captured when audio starts
-  const baselineRollRef = useRef<number | null>(null); // Baseline roll captured when audio starts
+  const baselinePitchRef = useRef<number | null>(null); // Baseline pitch (rolling average)
+  const baselineRollRef = useRef<number | null>(null); // Baseline roll (rolling average)
+  const pitchHistoryRef = useRef<number[]>([]); // Last 64 pitch measurements
+  const rollHistoryRef = useRef<number[]>([]); // Last 64 roll measurements
+  const BASELINE_HISTORY_SIZE = 64; // Number of measurements to average for baseline
   const startingFrequencyRef = useRef<number | null>(null); // Starting frequency when audio begins
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
-  const waveformShapeRef = useRef<'sine' | 'sawtooth'>('sine'); // Ref for live shape access
+  const waveformShapeRef = useRef<'sine' | 'sawtooth'>('sawtooth'); // Ref for live shape access
   const controlModeRef = useRef<'pitch' | 'none'>('pitch'); // Ref for live control mode access
   const pitchRotationRef = useRef(0); // Ref for live pitch rotation access
   const rollRotationRef = useRef(0); // Ref for live roll rotation access
@@ -163,6 +166,9 @@ export default function AudioTab() {
   const [maxFrequencyInput, setMaxFrequencyInput] = useState('2000');
   // Precision range is 10% of max frequency
   const PRECISION_RANGE = maxFrequency * 0.1;
+  
+  // Rotation threshold for maximum frequency multiplier
+  const MAX_ROTATION_THRESHOLD = 0.5; // radians
   
   // Calculate absolute frequency (for display and slider)
   const absoluteFrequency = baseFrequency + precisionOffset;
@@ -255,9 +261,7 @@ export default function AudioTab() {
     try {
       setIsAudioPlaying(true);
       
-      // Capture baseline sensor readings when starting
-      baselinePitchRef.current = pitchRotationRef.current;
-      baselineRollRef.current = rollRotationRef.current;
+      // Baseline is now continuously updated via rolling average, no need to capture here
       
       // Capture starting frequency
       const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
@@ -278,13 +282,13 @@ export default function AudioTab() {
           if (controlModeRef.current === 'pitch' && baselinePitchRef.current !== null && baselineRollRef.current !== null) {
             // Calculate angular distance from baseline for pitch
             const pitchDiff = Math.abs(pitchRotationRef.current - baselinePitchRef.current);
-            // Normalize: 180 degrees (π radians) = 1.0
-            const normalizedPitchDist = Math.min(pitchDiff / Math.PI, 1.0);
+            // Normalize: MAX_ROTATION_THRESHOLD radians = 1.0
+            const normalizedPitchDist = Math.min(pitchDiff / MAX_ROTATION_THRESHOLD, 1.0);
             
             // Calculate angular distance from baseline for roll
             const rollDiff = Math.abs(rollRotationRef.current - baselineRollRef.current);
-            // Normalize: 180 degrees (π radians) = 1.0
-            const normalizedRollDist = Math.min(rollDiff / Math.PI, 1.0);
+            // Normalize: MAX_ROTATION_THRESHOLD radians = 1.0
+            const normalizedRollDist = Math.min(rollDiff / MAX_ROTATION_THRESHOLD, 1.0);
             
             // Average the two normalized distances
             const avgDistance = (normalizedPitchDist + normalizedRollDist) / 2;
@@ -292,9 +296,9 @@ export default function AudioTab() {
             // Apply sine to get smooth curve
             const sinedDistance = Math.sin(avgDistance * Math.PI / 2);
             
-            // Map to multiplier: 1.0x (baseline) to 3.0x (300% = max)
-            // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * 2.0) = 1.0 to 3.0
-            const frequencyMultiplier = 1.0 + (sinedDistance * 2.0);
+            // Map to multiplier: 1.0x (baseline) to 10x (max)
+            // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * 9.0) = 1.0 to 10.0
+            const frequencyMultiplier = 1.0 + (sinedDistance * 9.0);
             
             return baseFreq * frequencyMultiplier;
           }
@@ -432,19 +436,51 @@ export default function AudioTab() {
     frequencySignRef.current = frequencySign;
   }, [frequencySign]);
 
+  // Update rolling average baseline
+  const updateBaseline = (pitch: number, roll: number) => {
+    // Add new measurements to history
+    pitchHistoryRef.current.push(pitch);
+    rollHistoryRef.current.push(roll);
+    
+    // Keep only the last BASELINE_HISTORY_SIZE measurements
+    if (pitchHistoryRef.current.length > BASELINE_HISTORY_SIZE) {
+      pitchHistoryRef.current.shift();
+    }
+    if (rollHistoryRef.current.length > BASELINE_HISTORY_SIZE) {
+      rollHistoryRef.current.shift();
+    }
+    
+    // Calculate average of all measurements in history (works even with just 1 measurement)
+    const pitchSum = pitchHistoryRef.current.reduce((sum, val) => sum + val, 0);
+    baselinePitchRef.current = pitchSum / pitchHistoryRef.current.length;
+    
+    const rollSum = rollHistoryRef.current.reduce((sum, val) => sum + val, 0);
+    baselineRollRef.current = rollSum / rollHistoryRef.current.length;
+  };
+
   // Subscribe to DeviceMotion for pitch and roll rotation
   useFocusEffect(
     React.useCallback(() => {
       const subscription = DeviceMotion.addListener((data) => {
+        let pitch: number | undefined;
+        let roll: number | undefined;
+        
         if (data?.rotation?.beta !== undefined) {
           const beta = data.rotation.beta; // Pitch rotation in radians
           setPitchRotation(beta);
           pitchRotationRef.current = beta;
+          pitch = beta;
         }
         if (data?.rotation?.gamma !== undefined) {
           const gamma = data.rotation.gamma; // Roll rotation in radians
           setRollRotation(gamma);
           rollRotationRef.current = gamma;
+          roll = gamma;
+        }
+        
+        // Update rolling average baseline when we have both values
+        if (pitch !== undefined && roll !== undefined) {
+          updateBaseline(pitch, roll);
         }
       });
       DeviceMotion.setUpdateInterval(16); // ~60Hz updates
@@ -479,9 +515,7 @@ export default function AudioTab() {
       audioControllerRef.current = null;
     }
     
-    // Reset baseline values when stopping
-    baselinePitchRef.current = null;
-    baselineRollRef.current = null;
+    // Baseline continues updating via rolling average, no need to reset
     startingFrequencyRef.current = null;
     
     // Stop audio engine
