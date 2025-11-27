@@ -38,10 +38,39 @@ export function calculateMinMax(buffer: MagnetometerData[]): {
 }
 
 /**
- * Normalizes the sum of magnetometer values (x + y + z) to [0, 1] range
- * based on the min/max values in the buffer
+ * Calculates the average of magnetometer sum (x + y + z) over the buffer
  */
-export function normalizeMagnetometerSum(
+export function calculateAverageMagnetometerSum(buffer: MagnetometerData[]): number {
+  if (buffer.length === 0) {
+    return 0;
+  }
+  
+  // Calculate sum for each reading and average them
+  const sums = buffer.map(v => v.x + v.y + v.z);
+  const total = sums.reduce((acc, sum) => acc + sum, 0);
+  
+  return total / buffer.length;
+}
+
+/**
+ * Calculates the standard deviation of magnetometer sums in the buffer
+ */
+function calculateStandardDeviation(buffer: MagnetometerData[], average: number): number {
+  if (buffer.length === 0) {
+    return 1; // Default to avoid division by zero
+  }
+  
+  const sums = buffer.map(v => v.x + v.y + v.z);
+  const variance = sums.reduce((acc, sum) => acc + Math.pow(sum - average, 2), 0) / buffer.length;
+  
+  return Math.sqrt(variance);
+}
+
+/**
+ * Gets the normalized value based on delta (difference) from buffer average
+ * Returns a value that can be used for frequency control (0-1 range)
+ */
+export function getMagnetometerAverageNormalized(
   buffer: MagnetometerData[],
   currentValue: MagnetometerData | null
 ): number {
@@ -50,7 +79,27 @@ export function normalizeMagnetometerSum(
   }
   
   const currentSum = currentValue.x + currentValue.y + currentValue.z;
-  const { min, max } = calculateMinMax(buffer);
+  const average = calculateAverageMagnetometerSum(buffer);
   
-  return normalizeValue(currentSum, min, max);
+  // Calculate delta (difference from average)
+  const delta = currentSum - average;
+  
+  // Calculate standard deviation to normalize the delta
+  const stdDev = calculateStandardDeviation(buffer, average);
+  
+  if (stdDev === 0) {
+    return 0.5; // If no variation, return middle value
+  }
+  
+  // Normalize delta by standard deviation (using 2 std devs as the range)
+  // This maps: -2*stdDev -> 0, 0 -> 0.5, +2*stdDev -> 1.0
+  const normalizedDelta = delta / (2 * stdDev);
+  
+  // Map to 0-1 range using sigmoid-like function (tanh scaled and shifted)
+  // tanh maps -inf to -1, 0 to 0, +inf to +1
+  // We want: -2*stdDev -> 0, 0 -> 0.5, +2*stdDev -> 1.0
+  // So: normalized = (tanh(normalizedDelta) + 1) / 2
+  const normalized = (Math.tanh(normalizedDelta) + 1) / 2;
+  
+  return normalized;
 }

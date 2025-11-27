@@ -1,5 +1,5 @@
 import { requireNativeModule } from 'expo-modules-core';
-import { normalizeMagnetometerSum, MagnetometerData } from './sensor-utils';
+import { getMagnetometerAverageNormalized, MagnetometerData } from './sensor-utils';
 
 const Sensorlib = requireNativeModule('Sensorlib');
 
@@ -200,7 +200,7 @@ export interface AmbientControllerState {
 }
 
 const MAX_ROTATION_THRESHOLD = 0.5; // radians
-const AMBIENT_FREQUENCY_MULTIPLIER = 2;
+const AMBIENT_FREQUENCY_MULTIPLIER = 8;
 
 /**
  * Creates a frequency getter for rotation control mode
@@ -255,8 +255,8 @@ export function createAmbientFrequencyGetter(
       return baseFrequency();
     }
     
-    // Normalize magnetometer sum to 0-1 range
-    const normalized = normalizeMagnetometerSum(state.magnetometerBuffer, state.currentMagnetometer);
+    // Get normalized value based on current sum relative to buffer average
+    const normalized = getMagnetometerAverageNormalized(state.magnetometerBuffer, state.currentMagnetometer);
     
     // Apply 128x multiplier based on starting frequency
     // normalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * 128
