@@ -1,4 +1,5 @@
 import { requireNativeModule } from 'expo-modules-core';
+import { normalizeMagnetometerSum, MagnetometerData } from './sensor-utils';
 
 const Sensorlib = requireNativeModule('Sensorlib');
 
@@ -180,4 +181,111 @@ export async function stopAudio(): Promise<void> {
   } catch (error) {
     console.error('Failed to stop audio:', error);
   }
+}
+
+// Sensor controller types
+export type ControlMode = 'rotation' | 'ambient' | 'none';
+
+export interface RotationControllerState {
+  pitchRotation: number;
+  rollRotation: number;
+  baselinePitch: number | null;
+  baselineRoll: number | null;
+}
+
+export interface AmbientControllerState {
+  magnetometerBuffer: MagnetometerData[];
+  currentMagnetometer: MagnetometerData | null;
+  startingFrequency: number | null;
+}
+
+const MAX_ROTATION_THRESHOLD = 0.5; // radians
+const AMBIENT_FREQUENCY_MULTIPLIER = 1000;
+
+/**
+ * Creates a frequency getter for rotation control mode
+ */
+export function createRotationFrequencyGetter(
+  baseFrequency: () => number,
+  rotationState: () => RotationControllerState
+): () => number {
+  return () => {
+    const baseFreq = baseFrequency();
+    const state = rotationState();
+    
+    if (state.baselinePitch === null || state.baselineRoll === null) {
+      return baseFreq;
+    }
+    
+    // Calculate angular distance from baseline for pitch
+    const pitchDiff = Math.abs(state.pitchRotation - state.baselinePitch);
+    // Normalize: MAX_ROTATION_THRESHOLD radians = 1.0
+    const normalizedPitchDist = Math.min(pitchDiff / MAX_ROTATION_THRESHOLD, 1.0);
+    
+    // Calculate angular distance from baseline for roll
+    const rollDiff = Math.abs(state.rollRotation - state.baselineRoll);
+    // Normalize: MAX_ROTATION_THRESHOLD radians = 1.0
+    const normalizedRollDist = Math.min(rollDiff / MAX_ROTATION_THRESHOLD, 1.0);
+    
+    // Average the two normalized distances
+    const avgDistance = (normalizedPitchDist + normalizedRollDist) / 2;
+    
+    // Apply sine to get smooth curve
+    const sinedDistance = Math.sin(avgDistance * Math.PI / 2);
+    
+    // Map to multiplier: 1.0x (baseline) to 10x (max)
+    // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * 9.0) = 1.0 to 10.0
+    const frequencyMultiplier = 1.0 + (sinedDistance * 9.0);
+    
+    return baseFreq * frequencyMultiplier;
+  };
+}
+
+/**
+ * Creates a frequency getter for ambient control mode (magnetometer)
+ */
+export function createAmbientFrequencyGetter(
+  baseFrequency: () => number,
+  ambientState: () => AmbientControllerState
+): () => number {
+  return () => {
+    const state = ambientState();
+    
+    if (state.startingFrequency === null || state.magnetometerBuffer.length === 0 || state.currentMagnetometer === null) {
+      return baseFrequency();
+    }
+    
+    // Normalize magnetometer sum to 0-1 range
+    const normalized = normalizeMagnetometerSum(state.magnetometerBuffer, state.currentMagnetometer);
+    
+    // Apply 1000x multiplier based on starting frequency
+    // normalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * 1000
+    const frequencyOffset = normalized * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
+    
+    return state.startingFrequency + frequencyOffset;
+  };
+}
+
+/**
+ * Creates a frequency getter based on control mode
+ */
+export function createFrequencyGetter(
+  controlMode: () => ControlMode,
+  baseFrequency: () => number,
+  rotationState: () => RotationControllerState,
+  ambientState: () => AmbientControllerState
+): () => number {
+  return () => {
+    const mode = controlMode();
+    
+    switch (mode) {
+      case 'rotation':
+        return createRotationFrequencyGetter(baseFrequency, rotationState)();
+      case 'ambient':
+        return createAmbientFrequencyGetter(baseFrequency, ambientState)();
+      case 'none':
+      default:
+        return baseFrequency();
+    }
+  };
 }

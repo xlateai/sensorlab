@@ -1,10 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DeviceMotion } from 'expo-sensors';
+import { DeviceMotion, Magnetometer } from 'expo-sensors';
 import { useFocusEffect } from '@react-navigation/native';
 import { playContinuousHaptic } from '../utils/haptics';
-import { playWaveform, stopAudio, AudioController } from '../utils/audio-utils';
+import { 
+  playWaveform, 
+  stopAudio, 
+  AudioController,
+  ControlMode,
+  createFrequencyGetter,
+  RotationControllerState,
+  AmbientControllerState
+} from '../utils/audio-utils';
+import { MagnetometerData } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
@@ -13,13 +22,13 @@ function ControlSelector({
   controlMode,
   onControlModeChange,
 }: {
-  controlMode: 'pitch' | 'none';
-  onControlModeChange: (mode: 'pitch' | 'none') => void;
+  controlMode: ControlMode;
+  onControlModeChange: (mode: ControlMode) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
-  const controlModes: Array<'pitch' | 'none'> = ['pitch', 'none'];
+  const controlModes: Array<ControlMode> = ['rotation', 'ambient', 'none'];
 
-  const handleModeSelect = (mode: 'pitch' | 'none') => {
+  const handleModeSelect = (mode: ControlMode) => {
     onControlModeChange(mode);
     setShowPicker(false);
   };
@@ -37,7 +46,7 @@ function ControlSelector({
         android_ripple={null}
       >
         <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
-          {controlMode === 'pitch' ? 'Pitch' : 'None'}
+          {controlMode === 'rotation' ? 'Rotation' : controlMode === 'ambient' ? 'Ambient' : 'None'}
         </Text>
       </Pressable>
       <Modal
@@ -138,7 +147,7 @@ export default function AudioTab() {
   const [frequencySign, setFrequencySign] = useState(true); // true for positive, false for negative
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
   const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>('sawtooth');
-  const [controlMode, setControlMode] = useState<'pitch' | 'none'>('pitch');
+  const [controlMode, setControlMode] = useState<ControlMode>('rotation');
   const [pitchRotation, setPitchRotation] = useState(0); // Current pitch rotation in radians (beta)
   const [rollRotation, setRollRotation] = useState(0); // Current roll rotation in radians (gamma)
   const baselinePitchRef = useRef<number | null>(null); // Baseline pitch (rolling average)
@@ -150,10 +159,15 @@ export default function AudioTab() {
   const audioControllerRef = useRef<AudioController | null>(null);
   const audioParamsRef = useRef({ frequency: 440, volume: 0.5 }); // 0.5 = 50%
   const waveformShapeRef = useRef<'sine' | 'sawtooth'>('sawtooth'); // Ref for live shape access
-  const controlModeRef = useRef<'pitch' | 'none'>('pitch'); // Ref for live control mode access
+  const controlModeRef = useRef<ControlMode>('rotation'); // Ref for live control mode access
   const pitchRotationRef = useRef(0); // Ref for live pitch rotation access
   const rollRotationRef = useRef(0); // Ref for live roll rotation access
   const frequencySignRef = useRef(true); // Ref for live frequency sign access
+  
+  // Magnetometer state for ambient control
+  const magnetometerBufferRef = useRef<MagnetometerData[]>([]);
+  const currentMagnetometerRef = useRef<MagnetometerData | null>(null);
+  const MAGNETOMETER_BUFFER_SIZE = 64;
   
   // Use refs to ensure we always have latest values in handlers
   const baseFrequencyRef = useRef(440);
@@ -167,14 +181,8 @@ export default function AudioTab() {
   // Precision range is 10% of max frequency
   const PRECISION_RANGE = maxFrequency * 0.1;
   
-  // Rotation threshold for maximum frequency multiplier
-  const MAX_ROTATION_THRESHOLD = 0.5; // radians
-  
   // Calculate absolute frequency (for display and slider)
   const absoluteFrequency = baseFrequency + precisionOffset;
-  
-  // Note: Frequency calculation with pitch modulation is done dynamically in the audio getter function
-  // for live updates during playback
 
   // Stream generator for continuous haptic
   async function* hapticStream() {
@@ -270,40 +278,37 @@ export default function AudioTab() {
       // Update ref with current values
       audioParamsRef.current = { frequency: startingFrequencyRef.current, volume: volume / 100 };
       
+      // Create state getters for sensor controllers
+      const getRotationState = (): RotationControllerState => ({
+        pitchRotation: pitchRotationRef.current,
+        rollRotation: rollRotationRef.current,
+        baselinePitch: baselinePitchRef.current,
+        baselineRoll: baselineRollRef.current,
+      });
+      
+      const getAmbientState = (): AmbientControllerState => ({
+        magnetometerBuffer: [...magnetometerBufferRef.current],
+        currentMagnetometer: currentMagnetometerRef.current,
+        startingFrequency: startingFrequencyRef.current,
+      });
+      
+      const getBaseFrequency = (): number => {
+        const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
+        return absFreq * (frequencySignRef.current ? 1 : -1);
+      };
+      
+      // Create frequency getter using sensor controller logic
+      const getFrequency = createFrequencyGetter(
+        () => controlModeRef.current,
+        getBaseFrequency,
+        getRotationState,
+        getAmbientState
+      );
+      
       // Play waveform with dynamic frequency, volume, and shape
       // Using getter functions so we can update frequency/volume/shape during playback
       const controller = await playWaveform(
-        () => {
-          // Calculate base frequency
-          const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
-          const baseFreq = absFreq * (frequencySignRef.current ? 1 : -1);
-          
-          // Apply pitch/roll modulation if control mode is 'pitch'
-          if (controlModeRef.current === 'pitch' && baselinePitchRef.current !== null && baselineRollRef.current !== null) {
-            // Calculate angular distance from baseline for pitch
-            const pitchDiff = Math.abs(pitchRotationRef.current - baselinePitchRef.current);
-            // Normalize: MAX_ROTATION_THRESHOLD radians = 1.0
-            const normalizedPitchDist = Math.min(pitchDiff / MAX_ROTATION_THRESHOLD, 1.0);
-            
-            // Calculate angular distance from baseline for roll
-            const rollDiff = Math.abs(rollRotationRef.current - baselineRollRef.current);
-            // Normalize: MAX_ROTATION_THRESHOLD radians = 1.0
-            const normalizedRollDist = Math.min(rollDiff / MAX_ROTATION_THRESHOLD, 1.0);
-            
-            // Average the two normalized distances
-            const avgDistance = (normalizedPitchDist + normalizedRollDist) / 2;
-            
-            // Apply sine to get smooth curve
-            const sinedDistance = Math.sin(avgDistance * Math.PI / 2);
-            
-            // Map to multiplier: 1.0x (baseline) to 10x (max)
-            // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * 9.0) = 1.0 to 10.0
-            const frequencyMultiplier = 1.0 + (sinedDistance * 9.0);
-            
-            return baseFreq * frequencyMultiplier;
-          }
-          return baseFreq;
-        },
+        getFrequency,
         () => audioParamsRef.current.volume,     // getter for volume
         () => waveformShapeRef.current,          // getter for shape
         (length) => setBufferLength(length)       // buffer length update callback
@@ -484,6 +489,32 @@ export default function AudioTab() {
         }
       });
       DeviceMotion.setUpdateInterval(16); // ~60Hz updates
+      return () => {
+        subscription && subscription.remove();
+      };
+    }, [])
+  );
+  
+  // Subscribe to Magnetometer for ambient control
+  useFocusEffect(
+    React.useCallback(() => {
+      const subscription = Magnetometer.addListener((data) => {
+        const magnetometerData: MagnetometerData = {
+          x: data.x || 0,
+          y: data.y || 0,
+          z: data.z || 0,
+        };
+        
+        // Add to buffer
+        magnetometerBufferRef.current.push(magnetometerData);
+        if (magnetometerBufferRef.current.length > MAGNETOMETER_BUFFER_SIZE) {
+          magnetometerBufferRef.current.shift();
+        }
+        
+        // Update current value
+        currentMagnetometerRef.current = magnetometerData;
+      });
+      Magnetometer.setUpdateInterval(24); // ~42Hz updates
       return () => {
         subscription && subscription.remove();
       };
