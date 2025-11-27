@@ -23,21 +23,28 @@ func generateWaveformSample(
   shape: WaveformShape
 ) -> (sample: Float, newPhase: Double) {
   let phaseIncrement = (2.0 * Double.pi * frequency) / sampleRate
-  let newPhase = phase + phaseIncrement
-  let normalizedPhase = newPhase > (2.0 * Double.pi) ? newPhase - (2.0 * Double.pi) : newPhase
+  var newPhase = phase + phaseIncrement
+  
+  // Wrap phase to keep it in 0 to 2π range (handles both positive and negative frequencies)
+  while newPhase < 0 {
+    newPhase += 2.0 * Double.pi
+  }
+  while newPhase >= 2.0 * Double.pi {
+    newPhase -= 2.0 * Double.pi
+  }
   
   let sample: Double
   switch shape {
   case .sine:
-    sample = sin(normalizedPhase) * volume
+    sample = sin(newPhase) * volume
   case .sawtooth:
     // Sawtooth: linear ramp from -1 to 1, then reset
     // Normalize phase to 0-1 range, then map to -1 to 1
-    let normalized = normalizedPhase / (2.0 * Double.pi)
+    let normalized = newPhase / (2.0 * Double.pi)
     sample = (2.0 * normalized - 1.0) * volume
   }
   
-  return (Float(sample), normalizedPhase)
+  return (Float(sample), newPhase)
 }
 
 /// Generates a batch of waveform samples

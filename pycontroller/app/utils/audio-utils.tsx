@@ -37,7 +37,11 @@ function* generateWaveformSamples(
     } else if (shape === 'sawtooth') {
       // Sawtooth: linear ramp from -1 to 1, then reset
       // Normalize phase to 0-1 range, then map to -1 to 1
-      const normalizedPhase = phase / (2 * Math.PI);
+      // Handle negative phase by wrapping it to positive range
+      let wrappedPhase = phase;
+      while (wrappedPhase < 0) wrappedPhase += 2 * Math.PI;
+      while (wrappedPhase >= 2 * Math.PI) wrappedPhase -= 2 * Math.PI;
+      const normalizedPhase = wrappedPhase / (2 * Math.PI);
       sample = (2 * normalizedPhase - 1) * volume;
     } else {
       // Fallback to sine if unknown shape
@@ -45,7 +49,9 @@ function* generateWaveformSamples(
     }
     
     phase += phaseIncrement;
-    if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
+    // Wrap phase to keep it in reasonable range (prevents overflow/underflow)
+    while (phase > 2 * Math.PI) phase -= 2 * Math.PI;
+    while (phase < -2 * Math.PI) phase += 2 * Math.PI;
     yield sample;
   }
 }
