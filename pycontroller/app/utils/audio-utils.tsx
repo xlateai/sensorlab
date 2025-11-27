@@ -200,7 +200,7 @@ export interface AmbientControllerState {
 }
 
 const MAX_ROTATION_THRESHOLD = 0.5; // radians
-const AMBIENT_FREQUENCY_MULTIPLIER = 1000;
+const AMBIENT_FREQUENCY_MULTIPLIER = 2;
 
 /**
  * Creates a frequency getter for rotation control mode
@@ -258,8 +258,8 @@ export function createAmbientFrequencyGetter(
     // Normalize magnetometer sum to 0-1 range
     const normalized = normalizeMagnetometerSum(state.magnetometerBuffer, state.currentMagnetometer);
     
-    // Apply 1000x multiplier based on starting frequency
-    // normalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * 1000
+    // Apply 128x multiplier based on starting frequency
+    // normalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * 128
     const frequencyOffset = normalized * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
     
     return state.startingFrequency + frequencyOffset;
