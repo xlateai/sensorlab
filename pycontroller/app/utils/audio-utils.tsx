@@ -61,6 +61,7 @@ function* generateWaveformSamples(
  * Plays a waveform with the given frequency, volume, and shape.
  * Manages batch generation and limits buffering to prevent memory overload.
  * Frequency, volume, and shape can be updated dynamically via getter functions.
+ * Includes volume ramping on start (0 to target over 1s) and stop (target to 0 over 1s).
  */
 export async function playWaveform(
   getFrequency: () => number,
@@ -75,7 +76,40 @@ export async function playWaveform(
   });
   
   let cancelled = false;
-  const sampleGenerator = generateWaveformSamples(getFrequency, getVolume, getShape);
+  let stopRequested = false;
+  const startTime = Date.now();
+  const RAMP_DURATION = 1000; // 1 second in milliseconds
+  
+  // Track stop time and volume at stop for fade out
+  let stopTime: number | null = null;
+  let volumeAtStop: number = 0;
+  
+  // Create a ramped volume getter that handles both fade in and fade out
+  const getRampedVolume = (): number => {
+    const elapsed = Date.now() - startTime;
+    const targetVolume = getVolume();
+    
+    if (stopTime !== null) {
+      // Ramp down: from volume at stop to 0 over 1 second
+      const stopElapsed = Date.now() - stopTime;
+      if (stopElapsed >= RAMP_DURATION) {
+        return 0; // Fully faded out
+      }
+      const rampProgress = stopElapsed / RAMP_DURATION;
+      return volumeAtStop * (1 - rampProgress);
+    }
+    
+    if (elapsed < RAMP_DURATION) {
+      // Ramp up: from 0 to target volume over 1 second
+      const rampProgress = elapsed / RAMP_DURATION;
+      return targetVolume * rampProgress;
+    }
+    
+    // After ramp up, return target volume
+    return targetVolume;
+  };
+  
+  const sampleGenerator = generateWaveformSamples(getFrequency, getRampedVolume, getShape);
   const sampleBuffer: number[] = [];
   let samplesGenerated = 0;
   
@@ -142,7 +176,19 @@ export async function playWaveform(
   
   return {
     cancel: () => {
-      cancelled = true;
+      if (!stopRequested) {
+        stopRequested = true;
+        stopTime = Date.now();
+        // Capture current ramped volume at stop time for fade out
+        // This ensures we fade from the actual current volume, even if still fading in
+        volumeAtStop = getRampedVolume();
+        // Continue generating samples for fade out, then cancel
+        setTimeout(() => {
+          cancelled = true;
+        }, RAMP_DURATION);
+      } else {
+        cancelled = true;
+      }
     },
     promise
   };
