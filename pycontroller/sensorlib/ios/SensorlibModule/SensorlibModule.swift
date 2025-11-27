@@ -45,6 +45,15 @@ public class SensorlibModule: Module {
       stopAudio()
     }
 
+    // Audio relay functions - streams microphone input to speakers
+    AsyncFunction("playAudioRelay") {
+      try playAudioRelay()
+    }
+
+    AsyncFunction("stopAudioRelay") {
+      stopAudioRelay()
+    }
+
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
     // view definition: Prop, Events.
     View(SensorlibView.self) {

@@ -13,6 +13,7 @@ import {
   RotationControllerState,
   AmbientControllerState
 } from '../utils/audio-utils';
+import Sensorlib from '../../sensorlib/src/SensorlibModule';
 import { MagnetometerData } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
@@ -581,9 +582,42 @@ export default function AudioTab() {
     };
   }, []);
 
+  // Audio relay state
+  const [isAudioRelayPlaying, setIsAudioRelayPlaying] = useState(false);
+
+  const handleAudioRelayToggle = async () => {
+    if (isAudioRelayPlaying) {
+      try {
+        await Sensorlib.stopAudioRelay();
+        setIsAudioRelayPlaying(false);
+      } catch (error) {
+        console.error('Failed to stop audio relay:', error);
+        setIsAudioRelayPlaying(false);
+      }
+    } else {
+      try {
+        await Sensorlib.playAudioRelay();
+        setIsAudioRelayPlaying(true);
+      } catch (error) {
+        console.error('Failed to start audio relay:', error);
+        setIsAudioRelayPlaying(false);
+      }
+    }
+  };
+
+  // Cleanup audio relay on unmount
+  useEffect(() => {
+    return () => {
+      if (isAudioRelayPlaying) {
+        Sensorlib.stopAudioRelay().catch(() => {});
+      }
+    };
+  }, [isAudioRelayPlaying]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000', padding: 24 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
       <View style={{ marginBottom: 32 }}>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
@@ -632,6 +666,27 @@ export default function AudioTab() {
       </View>
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Relay</Text>
+        <Text style={{ color: '#888', marginBottom: 16, fontSize: 14 }}>
+          Stream microphone input to speakers in real-time
+        </Text>
+        <Pressable
+          onPress={handleAudioRelayToggle}
+          style={{
+            backgroundColor: isAudioRelayPlaying ? '#ff4444' : '#39ff14',
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 8,
+          }}
+          android_ripple={null}
+        >
+          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+            {isAudioRelayPlaying ? 'Stop Audio Relay' : 'Start Audio Relay'}
+          </Text>
+        </Pressable>
+      </View>
+      
+      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
         <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
         <Slider
@@ -653,6 +708,7 @@ export default function AudioTab() {
           />
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

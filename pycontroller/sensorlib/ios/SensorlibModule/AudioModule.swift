@@ -80,14 +80,18 @@ final class AudioModule {
   }
 
   func playSamplesBatch(input: AudioSamplesInput) {
+    playSamplesBatch(samples: input.samples)
+  }
+  
+  func playSamplesBatch(samples: [Float]) {
     guard let format = format, let player = player else { return }
 
-    let frameCount = AVAudioFrameCount(input.samples.count / channels)
+    let frameCount = AVAudioFrameCount(samples.count / channels)
     guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
     buffer.frameLength = frameCount
 
     let dst = buffer.floatChannelData![0]
-    input.samples.withUnsafeBufferPointer { src in
+    samples.withUnsafeBufferPointer { src in
       dst.initialize(from: src.baseAddress!, count: src.count)
     }
 
@@ -139,6 +143,11 @@ func initializeAudio(input: AudioInitInput) throws {
 
 func playSamplesBatch(input: AudioSamplesInput) {
   AudioModule.shared.playSamplesBatch(input: input)
+}
+
+// Helper function to play samples from an array (for internal use)
+func playSamplesBatch(samples: [Float]) {
+  AudioModule.shared.playSamplesBatch(samples: samples)
 }
 
 func stopAudio() {
