@@ -4,6 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeviceMotion, Magnetometer } from 'expo-sensors';
 import { useFocusEffect } from '@react-navigation/native';
 import { Audio } from 'expo-av';
+
+// Check if Audio module is available
+const isAudioAvailable = () => {
+  try {
+    return Audio && Audio.Recording && typeof Audio.Recording === 'function';
+  } catch {
+    return false;
+  }
+};
 import { playContinuousHaptic } from '../utils/haptics';
 import { 
   playWaveform, 
@@ -593,59 +602,84 @@ export default function AudioTab() {
   // This implementation processes audio data periodically from the recording file.
   const startMicrophoneRecording = async () => {
     try {
+      console.log('Starting microphone recording...');
+      
+      // Check if Audio is available
+      if (!Audio || !Audio.Recording) {
+        throw new Error('expo-av Audio module not available. Please install expo-av.');
+      }
+
       // Request permissions
+      console.log('Requesting permissions...');
       const { status } = await Audio.requestPermissionsAsync();
+      console.log('Permission status:', status);
+      
       if (status !== 'granted') {
-        console.error('Microphone permission not granted');
         Alert.alert('Permission Required', 'Microphone permission is required for recording');
         return;
       }
 
       // Stop any existing audio playback to avoid conflicts
       if (isAudioPlaying) {
+        console.log('Stopping audio playback...');
         await stopTestAudio();
+        // Wait longer for audio to fully stop and release resources
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Also ensure the native audio module is stopped
+      try {
+        await stopAudio();
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (e) {
+        console.log('stopAudio error (may be expected):', e);
       }
 
       // Configure audio mode for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-      });
+      console.log('Setting audio mode...');
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+        });
+        console.log('Audio mode set successfully');
+      } catch (modeError) {
+        console.error('Error setting audio mode:', modeError);
+        throw modeError;
+      }
 
-      // Create recording instance first
+      // Create recording instance using the simplest API
+      console.log('Creating recording instance...');
       const recording = new Audio.Recording();
       
-      // Set up recording options
-      await recording.prepareToRecordAsync({
-        android: {
-          extension: '.m4a',
-          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-          audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: MICROPHONE_SAMPLE_RATE,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.m4a',
-          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-          audioQuality: Audio.IOSAudioQuality.HIGH,
-          sampleRate: MICROPHONE_SAMPLE_RATE,
-          numberOfChannels: 1,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
-        },
-        isMeteringEnabled: true,
-      });
+      // Use the simplest preset configuration
+      console.log('Preparing to record...');
+      try {
+        await recording.prepareToRecordAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY
+        );
+        console.log('Prepare successful');
+      } catch (prepareError) {
+        console.error('Prepare error:', prepareError);
+        throw prepareError;
+      }
 
       // Start recording
-      await recording.startAsync();
+      console.log('Starting recording...');
+      try {
+        await recording.startAsync();
+        console.log('Recording started successfully');
+      } catch (startError) {
+        console.error('Start error:', startError);
+        // Try to cleanup
+        try {
+          await recording.stopAndUnloadAsync();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        throw startError;
+      }
 
       recordingRef.current = recording;
       setIsRecording(true);
@@ -654,6 +688,7 @@ export default function AudioTab() {
       setAudioWaveformData([]);
 
       // Start periodic processing to get metering data and update waveform
+      console.log('Starting audio processing interval...');
       audioProcessingIntervalRef.current = setInterval(async () => {
         if (!recordingRef.current) return;
         try {
@@ -691,14 +726,16 @@ export default function AudioTab() {
       }, AVERAGING_WINDOW_MS); // Update every 10ms (100Hz)
 
     } catch (error) {
-      console.error('Failed to start recording:', error);
-      Alert.alert('Recording Error', `Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to start recording - full error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      Alert.alert('Recording Error', `Failed to start recording: ${errorMessage}`);
       setIsRecording(false);
       if (recordingRef.current) {
         try {
           await recordingRef.current.stopAndUnloadAsync();
         } catch (e) {
-          // Ignore cleanup errors
+          console.error('Error during cleanup:', e);
         }
         recordingRef.current = null;
       }
@@ -728,11 +765,27 @@ export default function AudioTab() {
     }
   };
 
-  const handleMicrophoneToggle = () => {
-    if (isRecording) {
-      stopMicrophoneRecording();
-    } else {
-      startMicrophoneRecording();
+  const handleMicrophoneToggle = async () => {
+    try {
+      // Check if Audio is available before proceeding
+      if (!isAudioAvailable()) {
+        Alert.alert(
+          'Audio Module Not Available', 
+          'expo-av is not properly installed. Please run: npx expo install expo-av'
+        );
+        return;
+      }
+      
+      if (isRecording) {
+        await stopMicrophoneRecording();
+      } else {
+        await startMicrophoneRecording();
+      }
+    } catch (error) {
+      console.error('Error in handleMicrophoneToggle:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Alert.alert('Error', `An error occurred: ${errorMessage}`);
+      setIsRecording(false);
     }
   };
   
