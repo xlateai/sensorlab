@@ -243,6 +243,10 @@ export interface AmbientControllerState {
   magnetometerBuffer: MagnetometerData[];
   currentMagnetometer: MagnetometerData | null;
   startingFrequency: number | null;
+  previousNormalized: number;
+  currentNormalized: number;
+  lastUpdateTime: number;
+  updateInterval: number;
 }
 
 const MAX_ROTATION_THRESHOLD = 0.5; // radians
@@ -289,6 +293,9 @@ export function createRotationFrequencyGetter(
 
 /**
  * Creates a frequency getter for ambient control mode (magnetometer)
+ * Uses interpolation to smoothly transition between magnetometer readings
+ * This ensures smooth frequency changes at audio sample rate (44.1kHz) even though
+ * magnetometer only updates at ~42Hz
  */
 export function createAmbientFrequencyGetter(
   baseFrequency: () => number,
@@ -301,12 +308,20 @@ export function createAmbientFrequencyGetter(
       return baseFrequency();
     }
     
-    // Get normalized value based on current sum relative to buffer average
-    const normalized = getMagnetometerAverageNormalized(state.magnetometerBuffer, state.currentMagnetometer);
+    // Interpolate between previous and current normalized values
+    // based on time elapsed since last magnetometer update
+    const now = Date.now();
+    const timeSinceUpdate = now - state.lastUpdateTime;
+    const interpolationProgress = Math.min(timeSinceUpdate / state.updateInterval, 1.0); // Clamp to 0-1
     
-    // Apply 128x multiplier based on starting frequency
-    // normalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * 128
-    const frequencyOffset = normalized * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
+    // Linear interpolation: previous + (current - previous) * progress
+    // This smoothly transitions from previousNormalized to currentNormalized over the update interval
+    // previousNormalized and currentNormalized are stored when magnetometer updates (every ~24ms)
+    const interpolatedNormalized = state.previousNormalized + (state.currentNormalized - state.previousNormalized) * interpolationProgress;
+    
+    // Apply multiplier based on starting frequency
+    // interpolatedNormalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * multiplier
+    const frequencyOffset = interpolatedNormalized * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
     
     return state.startingFrequency + frequencyOffset;
   };

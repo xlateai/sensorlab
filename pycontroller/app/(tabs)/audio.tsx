@@ -13,7 +13,7 @@ import {
   RotationControllerState,
   AmbientControllerState
 } from '../utils/audio-utils';
-import { MagnetometerData } from '../utils/sensor-utils';
+import { MagnetometerData, getMagnetometerAverageNormalized } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
@@ -174,6 +174,12 @@ export default function AudioTab() {
   const currentMagnetometerRef = useRef<MagnetometerData | null>(null);
   const MAGNETOMETER_BUFFER_SIZE = 64;
   
+  // Interpolation state for smooth frequency transitions
+  const previousNormalizedRef = useRef<number>(0.5); // Previous normalized value (0-1)
+  const currentNormalizedRef = useRef<number>(0.5); // Current normalized value (0-1)
+  const lastMagnetometerUpdateTimeRef = useRef<number>(Date.now()); // Timestamp of last magnetometer update
+  const MAGNETOMETER_UPDATE_INTERVAL = 24; // ms (matches setUpdateInterval)
+  
   // Use refs to ensure we always have latest values in handlers
   const baseFrequencyRef = useRef(DEFAULT_FREQUENCY);
   const precisionOffsetRef = useRef(0);
@@ -280,6 +286,18 @@ export default function AudioTab() {
       const absFreq = baseFrequencyRef.current + precisionOffsetRef.current;
       startingFrequencyRef.current = absFreq * (frequencySignRef.current ? 1 : -1);
       
+      // Initialize normalized values for ambient mode interpolation
+      // Calculate initial normalized value if we have magnetometer data
+      if (magnetometerBufferRef.current.length > 0 && currentMagnetometerRef.current) {
+        const initialNormalized = getMagnetometerAverageNormalized(
+          magnetometerBufferRef.current,
+          currentMagnetometerRef.current
+        );
+        previousNormalizedRef.current = initialNormalized;
+        currentNormalizedRef.current = initialNormalized;
+        lastMagnetometerUpdateTimeRef.current = Date.now();
+      }
+      
       // Update ref with current values
       audioParamsRef.current = { frequency: startingFrequencyRef.current, volume: volume / 100 };
       
@@ -295,6 +313,10 @@ export default function AudioTab() {
         magnetometerBuffer: [...magnetometerBufferRef.current],
         currentMagnetometer: currentMagnetometerRef.current,
         startingFrequency: startingFrequencyRef.current,
+        previousNormalized: previousNormalizedRef.current,
+        currentNormalized: currentNormalizedRef.current,
+        lastUpdateTime: lastMagnetometerUpdateTimeRef.current,
+        updateInterval: MAGNETOMETER_UPDATE_INTERVAL,
       });
       
       const getBaseFrequency = (): number => {
@@ -518,6 +540,20 @@ export default function AudioTab() {
         
         // Update current value
         currentMagnetometerRef.current = magnetometerData;
+        
+        // Update interpolation state: move current to previous, calculate new current
+        previousNormalizedRef.current = currentNormalizedRef.current;
+        
+        // Calculate new normalized value from current magnetometer reading
+        if (magnetometerBufferRef.current.length > 0) {
+          currentNormalizedRef.current = getMagnetometerAverageNormalized(
+            magnetometerBufferRef.current,
+            magnetometerData
+          );
+        }
+        
+        // Store timestamp for interpolation
+        lastMagnetometerUpdateTimeRef.current = Date.now();
       });
       Magnetometer.setUpdateInterval(24); // ~42Hz updates
       return () => {
