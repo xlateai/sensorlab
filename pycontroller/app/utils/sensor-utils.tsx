@@ -105,36 +105,9 @@ export function getMagnetometerAverageNormalized(
 }
 
 /**
- * Calculates the average of a specific magnetometer axis over the buffer
- */
-function calculateAverageMagnetometerAxis(buffer: MagnetometerData[], axis: 'x' | 'y' | 'z'): number {
-  if (buffer.length === 0) {
-    return 0;
-  }
-  
-  const values = buffer.map(v => v[axis]);
-  const total = values.reduce((acc, val) => acc + val, 0);
-  
-  return total / buffer.length;
-}
-
-/**
- * Calculates the standard deviation of a specific magnetometer axis in the buffer
- */
-function calculateStandardDeviationAxis(buffer: MagnetometerData[], axis: 'x' | 'y' | 'z', average: number): number {
-  if (buffer.length === 0) {
-    return 1; // Default to avoid division by zero
-  }
-  
-  const values = buffer.map(v => v[axis]);
-  const variance = values.reduce((acc, val) => acc + Math.pow(val - average, 2), 0) / buffer.length;
-  
-  return Math.sqrt(variance);
-}
-
-/**
- * Gets the normalized value for a specific magnetometer axis based on delta from buffer average
+ * Gets the normalized value for a specific magnetometer axis using simple min/max normalization
  * Returns a value that can be used for frequency control (0-1 range)
+ * No averaging or deltas - just direct normalization of the raw value
  */
 export function getMagnetometerAxisNormalized(
   buffer: MagnetometerData[],
@@ -146,23 +119,25 @@ export function getMagnetometerAxisNormalized(
   }
   
   const currentAxisValue = currentValue[axis];
-  const average = calculateAverageMagnetometerAxis(buffer, axis);
   
-  // Calculate delta (difference from average)
-  const delta = currentAxisValue - average;
+  // Find min and max of this axis in the buffer
+  const values = buffer.map(v => v[axis]);
+  let min = values[0];
+  let max = values[0];
   
-  // Calculate standard deviation to normalize the delta
-  const stdDev = calculateStandardDeviationAxis(buffer, axis, average);
-  
-  if (stdDev === 0) {
-    return 0.5; // If no variation, return middle value
+  for (const val of values) {
+    if (val < min) min = val;
+    if (val > max) max = val;
   }
   
-  // Normalize delta by standard deviation (using 2 std devs as the range)
-  const normalizedDelta = delta / (2 * stdDev);
+  // If no variation, return middle value
+  if (max === min) {
+    return 0.5;
+  }
   
-  // Map to 0-1 range using sigmoid-like function (tanh scaled and shifted)
-  const normalized = (Math.tanh(normalizedDelta) + 1) / 2;
+  // Simple linear normalization: map current value from [min, max] to [0, 1]
+  const normalized = (currentAxisValue - min) / (max - min);
   
-  return normalized;
+  // Clamp to [0, 1] range
+  return Math.max(0, Math.min(1, normalized));
 }
