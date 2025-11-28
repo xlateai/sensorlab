@@ -28,21 +28,34 @@ public class SensorlibModule: Module {
       try playHaptic(input: input)
     }
 
-    // Audio streaming functions - delegates to AudioModule
-    AsyncFunction("initializeAudio") { (input: AudioInitInput) in
-      try initializeAudio(input: input)
+    // Speaker functions - delegates to AudioModule
+    AsyncFunction("initializeSpeakers") { (input: AudioInitInput) in
+      try initializeSpeakers(input: input)
     }
 
-    AsyncFunction("playSamplesBatch") { (input: AudioSamplesInput) in
-      playSamplesBatch(input: input)
+    AsyncFunction("playSpeakersBatch") { (input: AudioSamplesInput) in
+      playSpeakersBatch(input: input)
     }
 
-    Function("getCurrentBufferLength") {
-      return getCurrentBufferLength()
+    Function("getCurrentSpeakerBufferLength") {
+      return getCurrentSpeakerBufferLength()
     }
 
-    AsyncFunction("stopAudio") {
-      stopAudio()
+    AsyncFunction("stopSpeakers") {
+      stopSpeakers()
+    }
+
+    // Microphone functions - delegates to AudioModule
+    AsyncFunction("initializeMicrophone") { (input: AudioInitInput) in
+      try initializeMicrophone(input: input)
+    }
+
+    Function("readSamplesBatch") {
+      return readSamplesBatch()
+    }
+
+    AsyncFunction("stopListening") {
+      stopListening()
     }
 
     // Enables the module to be used as a native view. Definition components that are accepted as part of the

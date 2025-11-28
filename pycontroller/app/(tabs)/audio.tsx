@@ -11,7 +11,8 @@ import {
   ControlMode,
   createFrequencyGetter,
   RotationControllerState,
-  AmbientControllerState
+  AmbientControllerState,
+  relayMicrophoneToSpeakers
 } from '../utils/audio-utils';
 import { MagnetometerData, getMagnetometerAverageNormalized, getMagnetometerAxisNormalized } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
@@ -146,6 +147,8 @@ export default function AudioTab() {
   // Audio test state
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [bufferLength, setBufferLength] = useState(0);
+  const [isMicrophoneRelaying, setIsMicrophoneRelaying] = useState(false);
+  const microphoneRelayControllerRef = useRef<AudioController | null>(null);
   const [baseFrequency, setBaseFrequency] = useState(DEFAULT_FREQUENCY); // Base frequency from main slider
   const [precisionOffset, setPrecisionOffset] = useState(0); // Precision offset in Hz (-1000 to +1000)
   const [frequencyInput, setFrequencyInput] = useState(DEFAULT_FREQUENCY.toString()); // For text input
@@ -666,11 +669,48 @@ export default function AudioTab() {
     }
   };
   
+  // Handle microphone relay toggle
+  const handleMicrophoneRelayToggle = async () => {
+    if (isMicrophoneRelaying) {
+      // Stop relay
+      setIsMicrophoneRelaying(false);
+      if (microphoneRelayControllerRef.current) {
+        microphoneRelayControllerRef.current.cancel();
+        try {
+          await microphoneRelayControllerRef.current.promise;
+        } catch (error) {
+          // Ignore errors from cancellation
+        }
+        microphoneRelayControllerRef.current = null;
+      }
+    } else {
+      // Start relay
+      try {
+        setIsMicrophoneRelaying(true);
+        const controller = await relayMicrophoneToSpeakers();
+        microphoneRelayControllerRef.current = controller;
+        
+        // Wait for the promise to complete (or be cancelled)
+        controller.promise.finally(() => {
+          setIsMicrophoneRelaying(false);
+          microphoneRelayControllerRef.current = null;
+        });
+      } catch (error) {
+        console.error('Failed to start microphone relay:', error);
+        setIsMicrophoneRelaying(false);
+        microphoneRelayControllerRef.current = null;
+      }
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (audioControllerRef.current) {
         audioControllerRef.current.cancel();
+      }
+      if (microphoneRelayControllerRef.current) {
+        microphoneRelayControllerRef.current.cancel();
       }
       stopAudio().catch(() => {});
     };
@@ -724,6 +764,25 @@ export default function AudioTab() {
         <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
           Buffer: {bufferLength} samples
         </Text>
+      </View>
+      
+      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Microphone Test</Text>
+        <Pressable
+          onPress={handleMicrophoneRelayToggle}
+          style={{
+            backgroundColor: '#39ff14',
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 8,
+            marginBottom: 16,
+          }}
+          android_ripple={null}
+        >
+          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+            {isMicrophoneRelaying ? 'Stop Relay' : 'Start Microphone Relay'}
+          </Text>
+        </Pressable>
       </View>
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>

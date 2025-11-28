@@ -97,8 +97,8 @@ export async function playWaveform(
   getShape: () => 'sine' | 'sawtooth',
   onBufferLengthUpdate?: (length: number) => void
 ): Promise<AudioController> {
-  // Initialize audio
-  await Sensorlib.initializeAudio({ 
+  // Initialize speakers
+  await Sensorlib.initializeSpeakers({ 
     sampleRate: SAMPLE_RATE, 
     channelCount: CHANNEL_COUNT 
   });
@@ -146,7 +146,7 @@ export async function playWaveform(
   if (onBufferLengthUpdate) {
     bufferUpdateInterval = setInterval(() => {
       try {
-        const length = Sensorlib.getCurrentBufferLength();
+        const length = Sensorlib.getCurrentSpeakerBufferLength();
         onBufferLengthUpdate(length);
       } catch (error) {
         console.error('Error getting buffer length:', error);
@@ -163,7 +163,7 @@ export async function playWaveform(
         }
         
         // Check current buffer length - only generate more if we're below threshold
-        const currentBufferLength = Sensorlib.getCurrentBufferLength();
+        const currentBufferLength = Sensorlib.getCurrentSpeakerBufferLength();
         if (currentBufferLength >= MAX_BUFFERED_SAMPLES) {
           // Buffer is full, wait a bit before checking again
           await new Promise(resolve => setTimeout(resolve, 10));
@@ -180,7 +180,7 @@ export async function playWaveform(
         
         // When buffer reaches batch size, send it
         if (sampleBuffer.length >= AUDIO_SAMPLE_BATCH_SIZE) {
-          Sensorlib.playSamplesBatch({ samples: sampleBuffer });
+          Sensorlib.playSpeakersBatch({ samples: sampleBuffer });
           sampleBuffer.length = 0; // Clear the buffer
         }
         
@@ -251,10 +251,67 @@ export async function playSawtooth(
  */
 export async function stopAudio(): Promise<void> {
   try {
-    await Sensorlib.stopAudio();
+    await Sensorlib.stopSpeakers();
   } catch (error) {
     console.error('Failed to stop audio:', error);
   }
+}
+
+/**
+ * Relays microphone input to speakers in real-time.
+ * Initializes both microphone and speakers, then continuously reads samples
+ * from the microphone and plays them to the speakers.
+ */
+export async function relayMicrophoneToSpeakers(): Promise<AudioController> {
+  // Initialize both microphone and speakers
+  await Sensorlib.initializeMicrophone({
+    sampleRate: SAMPLE_RATE,
+    channelCount: CHANNEL_COUNT
+  });
+  
+  await Sensorlib.initializeSpeakers({
+    sampleRate: SAMPLE_RATE,
+    channelCount: CHANNEL_COUNT
+  });
+  
+  let cancelled = false;
+  
+  const relayAudio = async (): Promise<void> => {
+    try {
+      while (!cancelled) {
+        // Read samples from microphone
+        const samples = Sensorlib.readSamplesBatch();
+        
+        // If we have samples, play them to speakers
+        if (samples.length > 0) {
+          Sensorlib.playSpeakersBatch({ samples });
+        }
+        
+        // Yield to event loop to prevent blocking
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    } catch (error) {
+      console.error('Microphone relay error:', error);
+      throw error;
+    } finally {
+      // Cleanup: stop both microphone and speakers
+      try {
+        Sensorlib.stopListening();
+        await Sensorlib.stopSpeakers();
+      } catch (error) {
+        console.error('Failed to stop microphone relay:', error);
+      }
+    }
+  };
+  
+  const promise = relayAudio();
+  
+  return {
+    cancel: () => {
+      cancelled = true;
+    },
+    promise
+  };
 }
 
 // Sensor controller types
