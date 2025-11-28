@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal } from 'react-native';
+import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeviceMotion, Magnetometer } from 'expo-sensors';
 import { useFocusEffect } from '@react-navigation/native';
+import { Audio } from 'expo-av';
 import { playContinuousHaptic } from '../utils/haptics';
 import { 
   playWaveform, 
@@ -16,6 +17,7 @@ import {
 import { MagnetometerData } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
+import AudioWaveformPlot from '../../components/AudioWaveformPlot';
 
 // Default frequency constant
 const DEFAULT_FREQUENCY = 744;
@@ -142,6 +144,20 @@ export default function AudioTab() {
   const duration = 0.5;
   const [isPlaying, setIsPlaying] = useState(false);
   const controllerRef = React.useRef<{ cancel: () => void } | null>(null);
+  
+  // Microphone test state
+  const [isRecording, setIsRecording] = useState(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [audioWaveformData, setAudioWaveformData] = useState<Array<{ t: number; amplitude: number }>>([]);
+  const audioSampleBufferRef = useRef<number[]>([]);
+  const audioProcessingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioDataTimeRef = useRef(0);
+  const MICROPHONE_SAMPLE_RATE = 44100;
+  const AVERAGING_WINDOW_MS = 10; // 0.01s = 10ms
+  const SAMPLES_PER_WINDOW = Math.floor((MICROPHONE_SAMPLE_RATE * AVERAGING_WINDOW_MS) / 1000); // ~441 samples per 10ms
+  const MAX_DATA_POINTS = 1000; // 10 seconds at 100Hz (10 points per second)
+  const PLOT_WIDTH = Dimensions.get('window').width - 48; // Account for padding
+  const PLOT_HEIGHT = 200;
   
   // Audio test state
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -571,6 +587,103 @@ export default function AudioTab() {
     }
   };
   
+  // Microphone recording functions
+  // Note: expo-av doesn't provide real-time access to raw audio samples.
+  // For true real-time visualization, we'd need to extend the native AudioModule.
+  // This implementation processes audio data periodically from the recording file.
+  const startMicrophoneRecording = async () => {
+    try {
+      // Request permissions
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.error('Microphone permission not granted');
+        return;
+      }
+
+      // Configure audio mode for recording
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // Create and start recording with high quality settings
+      const { recording } = await Audio.Recording.createAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        sampleRate: MICROPHONE_SAMPLE_RATE,
+        numberOfChannels: 1,
+        isMeteringEnabled: true, // Enable metering to get amplitude data
+      });
+
+      recordingRef.current = recording;
+      setIsRecording(true);
+      audioDataTimeRef.current = 0;
+      audioSampleBufferRef.current = [];
+      setAudioWaveformData([]);
+
+      // Start periodic processing to get metering data and update waveform
+      audioProcessingIntervalRef.current = setInterval(async () => {
+        if (!recordingRef.current) return;
+        try {
+          const status = await recordingRef.current.getStatusAsync();
+          if (status.isRecording && status.metering !== undefined) {
+            // Use metering value as amplitude (normalized -160 to 0 dB, convert to 0-1)
+            // Metering values are typically in dB, ranging from -160 (silence) to 0 (max)
+            const dbValue = status.metering;
+            // Convert dB to linear amplitude (0-1 range)
+            // Using a more accurate conversion: 10^(db/20) normalized
+            const linearAmplitude = dbValue > -160 
+              ? Math.max(0, Math.min(1, Math.pow(10, dbValue / 20) / Math.pow(10, 0 / 20)))
+              : 0;
+            
+            // Add new data point
+            setAudioWaveformData((prev) => {
+              const newData = [...prev, { t: audioDataTimeRef.current, amplitude: linearAmplitude }];
+              audioDataTimeRef.current += AVERAGING_WINDOW_MS / 1000; // Increment time by 0.01s
+              
+              // Keep only last 10 seconds (1000 points at 100Hz)
+              if (newData.length > MAX_DATA_POINTS) {
+                return newData.slice(-MAX_DATA_POINTS);
+              }
+              return newData;
+            });
+          }
+        } catch (error) {
+          console.error('Error processing audio:', error);
+        }
+      }, AVERAGING_WINDOW_MS); // Update every 10ms (100Hz)
+
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      setIsRecording(false);
+    }
+  };
+
+  const stopMicrophoneRecording = async () => {
+    try {
+      if (audioProcessingIntervalRef.current) {
+        clearInterval(audioProcessingIntervalRef.current);
+        audioProcessingIntervalRef.current = null;
+      }
+
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync();
+        recordingRef.current = null;
+      }
+
+      setIsRecording(false);
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+    }
+  };
+
+  const handleMicrophoneToggle = () => {
+    if (isRecording) {
+      stopMicrophoneRecording();
+    } else {
+      startMicrophoneRecording();
+    }
+  };
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -578,12 +691,47 @@ export default function AudioTab() {
         audioControllerRef.current.cancel();
       }
       stopAudio().catch(() => {});
+      
+      // Cleanup microphone recording
+      if (audioProcessingIntervalRef.current) {
+        clearInterval(audioProcessingIntervalRef.current);
+      }
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => {});
+      }
     };
   }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000', padding: 24 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Microphone Test</Text>
+      <View style={{ marginBottom: 32 }}>
+        <AudioWaveformPlot
+          data={audioWaveformData}
+          width={PLOT_WIDTH}
+          height={PLOT_HEIGHT}
+          title="Microphone Input"
+          color="#39ff14"
+        />
+        <Pressable
+          onPress={handleMicrophoneToggle}
+          style={{
+            backgroundColor: isRecording ? '#ff0000' : '#39ff14',
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 8,
+            marginTop: 16,
+          }}
+          android_ripple={null}
+        >
+          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+            {isRecording ? 'Stop Recording' : 'Start Recording'}
+          </Text>
+        </Pressable>
+      </View>
+      
+      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Speaker Test</Text>
       <View style={{ marginBottom: 32 }}>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
@@ -629,6 +777,7 @@ export default function AudioTab() {
         <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
           Buffer: {bufferLength} samples
         </Text>
+      </View>
       </View>
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
