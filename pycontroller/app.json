@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dyllan.xlate",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record and visualize audio waveforms."
       }
     },
     "android": {
@@ -24,7 +25,10 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.dyllan.xlate"
+      "package": "com.dyllan.xlate",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
