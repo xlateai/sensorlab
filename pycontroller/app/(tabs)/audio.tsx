@@ -609,9 +609,41 @@ export default function AudioTab() {
         throw new Error('expo-av Audio module not available. Please install expo-av.');
       }
 
-      // Skip permission request - it's crashing at native level
-      // Let the recording API handle permissions natively
-      console.log('Skipping permission request - will let recording handle it natively');
+      // Request permissions - try a safer approach
+      console.log('Checking microphone permissions...');
+      let hasPermission = false;
+      
+      try {
+        // Try to get current permission status first (safer than requesting directly)
+        if (Audio.getPermissionsAsync) {
+          const currentStatus = await Audio.getPermissionsAsync();
+          console.log('Current permission status:', currentStatus);
+          hasPermission = currentStatus.status === 'granted' || currentStatus.granted === true;
+        }
+        
+        // If not granted, try to request
+        if (!hasPermission && Audio.requestPermissionsAsync) {
+          console.log('Requesting microphone permission...');
+          const response = await Audio.requestPermissionsAsync();
+          hasPermission = response.status === 'granted' || response.granted === true;
+          console.log('Permission request result:', hasPermission);
+        }
+      } catch (permError) {
+        // If permission API fails, log but continue - recording will fail with a clear error
+        console.warn('Permission check failed, will attempt recording anyway:', permError);
+        hasPermission = false;
+      }
+      
+      if (!hasPermission) {
+        Alert.alert(
+          'Microphone Permission Required',
+          'Please grant microphone access in your device Settings to record audio.',
+          [
+            { text: 'OK', style: 'default' }
+          ]
+        );
+        return;
+      }
 
       // Stop any existing audio playback to avoid conflicts
       if (isAudioPlaying) {
