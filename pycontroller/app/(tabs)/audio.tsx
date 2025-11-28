@@ -982,10 +982,10 @@ export default function AudioTab() {
             onPress={handleMicrophoneToggle}
             style={{
               backgroundColor: isRecording ? '#ff0000' : '#39ff14',
-              paddingVertical: 8,
+              paddingVertical: 6,
               paddingHorizontal: 16,
               borderRadius: 6,
-              flex: 1,
+              flex: 2,
             }}
             android_ripple={null}
             disabled={isListening}
@@ -998,7 +998,7 @@ export default function AudioTab() {
             onPress={handleListenToggle}
             style={{
               backgroundColor: isListening ? '#ff0000' : '#39ff14',
-              paddingVertical: 8,
+              paddingVertical: 6,
               paddingHorizontal: 16,
               borderRadius: 6,
               flex: 1,
@@ -1014,7 +1014,7 @@ export default function AudioTab() {
             onPress={clearMicrophoneData}
             style={{
               backgroundColor: '#888',
-              paddingVertical: 8,
+              paddingVertical: 6,
               paddingHorizontal: 16,
               borderRadius: 6,
             }}
