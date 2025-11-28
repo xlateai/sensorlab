@@ -168,12 +168,8 @@ final class AudioModule {
     // Check current permission status
     let currentStatus = audioSession.recordPermission
     
-    if currentStatus == .denied {
-      throw NSError(domain: "AudioModule", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied"])
-    }
-    
-    // If not determined, request permission
-    if currentStatus == .undetermined {
+    // If not already granted, request permission
+    if currentStatus != .granted {
       let semaphore = DispatchSemaphore(value: 0)
       var permissionGranted = false
       
