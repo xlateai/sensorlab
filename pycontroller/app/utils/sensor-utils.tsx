@@ -103,3 +103,66 @@ export function getMagnetometerAverageNormalized(
   
   return normalized;
 }
+
+/**
+ * Calculates the average of a specific magnetometer axis over the buffer
+ */
+function calculateAverageMagnetometerAxis(buffer: MagnetometerData[], axis: 'x' | 'y' | 'z'): number {
+  if (buffer.length === 0) {
+    return 0;
+  }
+  
+  const values = buffer.map(v => v[axis]);
+  const total = values.reduce((acc, val) => acc + val, 0);
+  
+  return total / buffer.length;
+}
+
+/**
+ * Calculates the standard deviation of a specific magnetometer axis in the buffer
+ */
+function calculateStandardDeviationAxis(buffer: MagnetometerData[], axis: 'x' | 'y' | 'z', average: number): number {
+  if (buffer.length === 0) {
+    return 1; // Default to avoid division by zero
+  }
+  
+  const values = buffer.map(v => v[axis]);
+  const variance = values.reduce((acc, val) => acc + Math.pow(val - average, 2), 0) / buffer.length;
+  
+  return Math.sqrt(variance);
+}
+
+/**
+ * Gets the normalized value for a specific magnetometer axis based on delta from buffer average
+ * Returns a value that can be used for frequency control (0-1 range)
+ */
+export function getMagnetometerAxisNormalized(
+  buffer: MagnetometerData[],
+  currentValue: MagnetometerData | null,
+  axis: 'x' | 'y' | 'z'
+): number {
+  if (currentValue === null || buffer.length === 0) {
+    return 0.5; // Default to middle value
+  }
+  
+  const currentAxisValue = currentValue[axis];
+  const average = calculateAverageMagnetometerAxis(buffer, axis);
+  
+  // Calculate delta (difference from average)
+  const delta = currentAxisValue - average;
+  
+  // Calculate standard deviation to normalize the delta
+  const stdDev = calculateStandardDeviationAxis(buffer, axis, average);
+  
+  if (stdDev === 0) {
+    return 0.5; // If no variation, return middle value
+  }
+  
+  // Normalize delta by standard deviation (using 2 std devs as the range)
+  const normalizedDelta = delta / (2 * stdDev);
+  
+  // Map to 0-1 range using sigmoid-like function (tanh scaled and shifted)
+  const normalized = (Math.tanh(normalizedDelta) + 1) / 2;
+  
+  return normalized;
+}

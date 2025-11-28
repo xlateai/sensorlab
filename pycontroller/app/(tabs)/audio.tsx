@@ -13,7 +13,7 @@ import {
   RotationControllerState,
   AmbientControllerState
 } from '../utils/audio-utils';
-import { MagnetometerData, getMagnetometerAverageNormalized } from '../utils/sensor-utils';
+import { MagnetometerData, getMagnetometerAverageNormalized, getMagnetometerAxisNormalized } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
 
@@ -175,8 +175,15 @@ export default function AudioTab() {
   const MAGNETOMETER_BUFFER_SIZE = 64;
   
   // Interpolation state for smooth frequency transitions
-  const previousNormalizedRef = useRef<number>(0.5); // Previous normalized value (0-1)
-  const currentNormalizedRef = useRef<number>(0.5); // Current normalized value (0-1)
+  const previousNormalizedRef = useRef<number>(0.5); // Previous normalized value (0-1) - legacy, kept for compatibility
+  const currentNormalizedRef = useRef<number>(0.5); // Current normalized value (0-1) - legacy, kept for compatibility
+  // Per-axis normalized values for 3-wave additive synthesis
+  const previousNormalizedXRef = useRef<number>(0.5);
+  const currentNormalizedXRef = useRef<number>(0.5);
+  const previousNormalizedYRef = useRef<number>(0.5);
+  const currentNormalizedYRef = useRef<number>(0.5);
+  const previousNormalizedZRef = useRef<number>(0.5);
+  const currentNormalizedZRef = useRef<number>(0.5);
   const lastMagnetometerUpdateTimeRef = useRef<number>(Date.now()); // Timestamp of last magnetometer update
   const MAGNETOMETER_UPDATE_INTERVAL = 24; // ms (matches setUpdateInterval)
   
@@ -287,14 +294,39 @@ export default function AudioTab() {
       startingFrequencyRef.current = absFreq * (frequencySignRef.current ? 1 : -1);
       
       // Initialize normalized values for ambient mode interpolation
-      // Calculate initial normalized value if we have magnetometer data
+      // Calculate initial normalized values if we have magnetometer data
       if (magnetometerBufferRef.current.length > 0 && currentMagnetometerRef.current) {
+        // Legacy: combined normalized value
         const initialNormalized = getMagnetometerAverageNormalized(
           magnetometerBufferRef.current,
           currentMagnetometerRef.current
         );
         previousNormalizedRef.current = initialNormalized;
         currentNormalizedRef.current = initialNormalized;
+        
+        // Per-axis normalized values for 3-wave additive synthesis
+        const initialX = getMagnetometerAxisNormalized(
+          magnetometerBufferRef.current,
+          currentMagnetometerRef.current,
+          'x'
+        );
+        const initialY = getMagnetometerAxisNormalized(
+          magnetometerBufferRef.current,
+          currentMagnetometerRef.current,
+          'y'
+        );
+        const initialZ = getMagnetometerAxisNormalized(
+          magnetometerBufferRef.current,
+          currentMagnetometerRef.current,
+          'z'
+        );
+        previousNormalizedXRef.current = initialX;
+        currentNormalizedXRef.current = initialX;
+        previousNormalizedYRef.current = initialY;
+        currentNormalizedYRef.current = initialY;
+        previousNormalizedZRef.current = initialZ;
+        currentNormalizedZRef.current = initialZ;
+        
         lastMagnetometerUpdateTimeRef.current = Date.now();
       }
       
@@ -315,6 +347,12 @@ export default function AudioTab() {
         startingFrequency: startingFrequencyRef.current,
         previousNormalized: previousNormalizedRef.current,
         currentNormalized: currentNormalizedRef.current,
+        previousNormalizedX: previousNormalizedXRef.current,
+        currentNormalizedX: currentNormalizedXRef.current,
+        previousNormalizedY: previousNormalizedYRef.current,
+        currentNormalizedY: currentNormalizedYRef.current,
+        previousNormalizedZ: previousNormalizedZRef.current,
+        currentNormalizedZ: currentNormalizedZRef.current,
         lastUpdateTime: lastMagnetometerUpdateTimeRef.current,
         updateInterval: MAGNETOMETER_UPDATE_INTERVAL,
       });
@@ -543,12 +581,33 @@ export default function AudioTab() {
         
         // Update interpolation state: move current to previous, calculate new current
         previousNormalizedRef.current = currentNormalizedRef.current;
+        previousNormalizedXRef.current = currentNormalizedXRef.current;
+        previousNormalizedYRef.current = currentNormalizedYRef.current;
+        previousNormalizedZRef.current = currentNormalizedZRef.current;
         
-        // Calculate new normalized value from current magnetometer reading
+        // Calculate new normalized values from current magnetometer reading
         if (magnetometerBufferRef.current.length > 0) {
+          // Legacy: calculate combined normalized value
           currentNormalizedRef.current = getMagnetometerAverageNormalized(
             magnetometerBufferRef.current,
             magnetometerData
+          );
+          
+          // Per-axis normalized values for 3-wave additive synthesis
+          currentNormalizedXRef.current = getMagnetometerAxisNormalized(
+            magnetometerBufferRef.current,
+            magnetometerData,
+            'x'
+          );
+          currentNormalizedYRef.current = getMagnetometerAxisNormalized(
+            magnetometerBufferRef.current,
+            magnetometerData,
+            'y'
+          );
+          currentNormalizedZRef.current = getMagnetometerAxisNormalized(
+            magnetometerBufferRef.current,
+            magnetometerData,
+            'z'
           );
         }
         

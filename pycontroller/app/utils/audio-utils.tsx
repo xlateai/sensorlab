@@ -16,44 +16,71 @@ export interface AudioController {
 }
 
 /**
+ * Generates a single waveform sample for a given phase, frequency, volume, and shape
+ */
+function generateSample(phase: number, volume: number, shape: 'sine' | 'sawtooth'): number {
+  if (shape === 'sine') {
+    return Math.sin(phase) * volume;
+  } else if (shape === 'sawtooth') {
+    // Sawtooth: linear ramp from -1 to 1, then reset
+    // Normalize phase to 0-1 range, then map to -1 to 1
+    // Handle negative phase by wrapping it to positive range
+    let wrappedPhase = phase;
+    while (wrappedPhase < 0) wrappedPhase += 2 * Math.PI;
+    while (wrappedPhase >= 2 * Math.PI) wrappedPhase -= 2 * Math.PI;
+    const normalizedPhase = wrappedPhase / (2 * Math.PI);
+    return (2 * normalizedPhase - 1) * volume;
+  } else {
+    // Fallback to sine if unknown shape
+    return Math.sin(phase) * volume;
+  }
+}
+
+/**
  * Generates waveform samples with dynamic frequency, volume, and shape support.
  * Can switch between waveform shapes in real-time without restarting.
+ * Supports single frequency or array of frequencies (for additive synthesis).
  */
 function* generateWaveformSamples(
-  getFrequency: () => number,
+  getFrequency: () => number | number[],
   getVolume: () => number,
   getShape: () => 'sine' | 'sawtooth'
 ): Generator<number, void, unknown> {
-  let phase = 0;
+  const phases: number[] = [0]; // Start with single phase for single frequency mode
   
   while (true) {
-    const frequency = getFrequency();
+    const frequencyOrFrequencies = getFrequency();
     const volume = getVolume();
     const shape = getShape();
-    const phaseIncrement = (2 * Math.PI * frequency) / SAMPLE_RATE;
     
-    let sample: number;
-    if (shape === 'sine') {
-      sample = Math.sin(phase) * volume;
-    } else if (shape === 'sawtooth') {
-      // Sawtooth: linear ramp from -1 to 1, then reset
-      // Normalize phase to 0-1 range, then map to -1 to 1
-      // Handle negative phase by wrapping it to positive range
-      let wrappedPhase = phase;
-      while (wrappedPhase < 0) wrappedPhase += 2 * Math.PI;
-      while (wrappedPhase >= 2 * Math.PI) wrappedPhase -= 2 * Math.PI;
-      const normalizedPhase = wrappedPhase / (2 * Math.PI);
-      sample = (2 * normalizedPhase - 1) * volume;
-    } else {
-      // Fallback to sine if unknown shape
-      sample = Math.sin(phase) * volume;
+    // Check if we have multiple frequencies (array) or single frequency
+    const isMultiFrequency = Array.isArray(frequencyOrFrequencies);
+    const frequencies = isMultiFrequency ? frequencyOrFrequencies : [frequencyOrFrequencies];
+    
+    // Ensure we have enough phases for all frequencies
+    while (phases.length < frequencies.length) {
+      phases.push(0);
     }
     
-    phase += phaseIncrement;
-    // Wrap phase to keep it in reasonable range (prevents overflow/underflow)
-    while (phase > 2 * Math.PI) phase -= 2 * Math.PI;
-    while (phase < -2 * Math.PI) phase += 2 * Math.PI;
-    yield sample;
+    // Generate sample for each frequency and add them together
+    let combinedSample = 0;
+    for (let i = 0; i < frequencies.length; i++) {
+      const frequency = frequencies[i];
+      const phaseIncrement = (2 * Math.PI * frequency) / SAMPLE_RATE;
+      
+      // Generate sample for this frequency
+      // Divide volume by number of frequencies to keep total volume consistent
+      const perFrequencyVolume = volume / frequencies.length;
+      combinedSample += generateSample(phases[i], perFrequencyVolume, shape);
+      
+      // Update phase for next iteration
+      phases[i] += phaseIncrement;
+      // Wrap phase to keep it in reasonable range (prevents overflow/underflow)
+      while (phases[i] > 2 * Math.PI) phases[i] -= 2 * Math.PI;
+      while (phases[i] < -2 * Math.PI) phases[i] += 2 * Math.PI;
+    }
+    
+    yield combinedSample;
   }
 }
 
@@ -62,9 +89,10 @@ function* generateWaveformSamples(
  * Manages batch generation and limits buffering to prevent memory overload.
  * Frequency, volume, and shape can be updated dynamically via getter functions.
  * Includes volume ramping on start (0 to target over 1s) and stop (target to 0 over 1s).
+ * Supports single frequency or array of frequencies (for additive synthesis with multiple waves).
  */
 export async function playWaveform(
-  getFrequency: () => number,
+  getFrequency: () => number | number[],
   getVolume: () => number,
   getShape: () => 'sine' | 'sawtooth',
   onBufferLengthUpdate?: (length: number) => void
@@ -245,6 +273,12 @@ export interface AmbientControllerState {
   startingFrequency: number | null;
   previousNormalized: number;
   currentNormalized: number;
+  previousNormalizedX: number;
+  currentNormalizedX: number;
+  previousNormalizedY: number;
+  currentNormalizedY: number;
+  previousNormalizedZ: number;
+  currentNormalizedZ: number;
   lastUpdateTime: number;
   updateInterval: number;
 }
@@ -296,11 +330,12 @@ export function createRotationFrequencyGetter(
  * Uses interpolation to smoothly transition between magnetometer readings
  * This ensures smooth frequency changes at audio sample rate (44.1kHz) even though
  * magnetometer only updates at ~42Hz
+ * Returns an array of 3 frequencies (one for each axis: x, y, z) for additive synthesis
  */
 export function createAmbientFrequencyGetter(
   baseFrequency: () => number,
   ambientState: () => AmbientControllerState
-): () => number {
+): () => number | number[] {
   return () => {
     const state = ambientState();
     
@@ -308,34 +343,42 @@ export function createAmbientFrequencyGetter(
       return baseFrequency();
     }
     
-    // Interpolate between previous and current normalized values
+    // Interpolate between previous and current normalized values for each axis
     // based on time elapsed since last magnetometer update
     const now = Date.now();
     const timeSinceUpdate = now - state.lastUpdateTime;
     const interpolationProgress = Math.min(timeSinceUpdate / state.updateInterval, 1.0); // Clamp to 0-1
     
-    // Linear interpolation: previous + (current - previous) * progress
-    // This smoothly transitions from previousNormalized to currentNormalized over the update interval
-    // previousNormalized and currentNormalized are stored when magnetometer updates (every ~24ms)
-    const interpolatedNormalized = state.previousNormalized + (state.currentNormalized - state.previousNormalized) * interpolationProgress;
+    // Linear interpolation for each axis: previous + (current - previous) * progress
+    const interpolatedX = state.previousNormalizedX + (state.currentNormalizedX - state.previousNormalizedX) * interpolationProgress;
+    const interpolatedY = state.previousNormalizedY + (state.currentNormalizedY - state.previousNormalizedY) * interpolationProgress;
+    const interpolatedZ = state.previousNormalizedZ + (state.currentNormalizedZ - state.previousNormalizedZ) * interpolationProgress;
     
-    // Apply multiplier based on starting frequency
-    // interpolatedNormalized ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * multiplier
-    const frequencyOffset = interpolatedNormalized * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
+    // Apply multiplier based on starting frequency for each axis
+    // Each normalized value ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * multiplier
+    const frequencyOffsetX = interpolatedX * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
+    const frequencyOffsetY = interpolatedY * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
+    const frequencyOffsetZ = interpolatedZ * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
     
-    return state.startingFrequency + frequencyOffset;
+    // Return array of 3 frequencies (one per axis) for additive synthesis
+    return [
+      state.startingFrequency + frequencyOffsetX,
+      state.startingFrequency + frequencyOffsetY,
+      state.startingFrequency + frequencyOffsetZ,
+    ];
   };
 }
 
 /**
  * Creates a frequency getter based on control mode
+ * Returns either a single number or array of numbers (for ambient mode with 3 axes)
  */
 export function createFrequencyGetter(
   controlMode: () => ControlMode,
   baseFrequency: () => number,
   rotationState: () => RotationControllerState,
   ambientState: () => AmbientControllerState
-): () => number {
+): () => number | number[] {
   return () => {
     const mode = controlMode();
     
