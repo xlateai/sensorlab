@@ -44,6 +44,15 @@ public class SensorlibModule: Module {
     AsyncFunction("stopAudio") {
       stopAudio()
     }
+    
+    // Microphone passthrough functions
+    AsyncFunction("startMicrophonePassthrough") {
+      try startMicrophonePassthrough()
+    }
+    
+    AsyncFunction("stopMicrophonePassthrough") {
+      stopMicrophonePassthrough()
+    }
 
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
     // view definition: Prop, Events.

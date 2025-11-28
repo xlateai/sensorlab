@@ -21,7 +21,9 @@ import {
   ControlMode,
   createFrequencyGetter,
   RotationControllerState,
-  AmbientControllerState
+  AmbientControllerState,
+  startMicrophonePassthrough,
+  stopMicrophonePassthrough
 } from '../utils/audio-utils';
 import { MagnetometerData } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
@@ -161,6 +163,9 @@ export default function AudioTab() {
   const audioSampleBufferRef = useRef<number[]>([]);
   const audioProcessingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioDataTimeRef = useRef(0);
+  
+  // Microphone passthrough state
+  const [isListening, setIsListening] = useState(false);
   const MICROPHONE_SAMPLE_RATE = 44100;
   const AVERAGING_WINDOW_MS = 10; // 0.01s = 10ms
   const SAMPLES_PER_WINDOW = Math.floor((MICROPHONE_SAMPLE_RATE * AVERAGING_WINDOW_MS) / 1000); // ~441 samples per 10ms
@@ -911,6 +916,30 @@ export default function AudioTab() {
     }
   };
   
+  const handleListenToggle = async () => {
+    try {
+      if (isListening) {
+        await stopMicrophonePassthrough();
+        setIsListening(false);
+      } else {
+        // Stop any other audio first
+        if (isAudioPlaying) {
+          await stopTestAudio();
+        }
+        if (isRecording) {
+          await stopMicrophoneRecording();
+        }
+        await startMicrophonePassthrough();
+        setIsListening(true);
+      }
+    } catch (error) {
+      console.error('Error in handleListenToggle:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Alert.alert('Error', `Failed to start listening: ${errorMessage}`);
+      setIsListening(false);
+    }
+  };
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -926,6 +955,9 @@ export default function AudioTab() {
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync().catch(() => {});
       }
+      
+      // Cleanup microphone passthrough
+      stopMicrophonePassthrough().catch(() => {});
     };
   }, []);
 
@@ -945,34 +977,51 @@ export default function AudioTab() {
           title="Microphone Input"
           color="#39ff14"
         />
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
           <Pressable
             onPress={handleMicrophoneToggle}
             style={{
               backgroundColor: isRecording ? '#ff0000' : '#39ff14',
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              borderRadius: 8,
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+              borderRadius: 6,
               flex: 1,
             }}
             android_ripple={null}
+            disabled={isListening}
           >
-            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
               {isRecording ? 'Stop Recording' : 'Start Recording'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={handleListenToggle}
+            style={{
+              backgroundColor: isListening ? '#ff0000' : '#39ff14',
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+              borderRadius: 6,
+              flex: 1,
+            }}
+            android_ripple={null}
+            disabled={isRecording}
+          >
+            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+              {isListening ? 'Stop Listening' : 'Listen'}
             </Text>
           </Pressable>
           <Pressable
             onPress={clearMicrophoneData}
             style={{
               backgroundColor: '#888',
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              borderRadius: 8,
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+              borderRadius: 6,
             }}
             android_ripple={null}
-            disabled={isRecording}
+            disabled={isRecording || isListening}
           >
-            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600' }}>
+            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
               Clear
             </Text>
           </Pressable>

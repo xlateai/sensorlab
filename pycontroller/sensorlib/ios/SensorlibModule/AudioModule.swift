@@ -16,6 +16,11 @@ final class AudioModule {
   
   private var engine: AVAudioEngine?
   private var player: AVAudioPlayerNode?
+  
+  // Microphone passthrough
+  private var passthroughEngine: AVAudioEngine?
+  private var inputNode: AVAudioInputNode?
+  private var isPassthroughActive: Bool = false
 
   private var sampleRate: Double = 44100
   private var channels: Int = 1
@@ -126,6 +131,68 @@ final class AudioModule {
       // Ignore errors when deactivating
     }
   }
+  
+  // Microphone passthrough functions
+  func startMicrophonePassthrough() throws {
+    stopMicrophonePassthrough()
+    
+    // Configure audio session for recording and playback
+    let audioSession = AVAudioSession.sharedInstance()
+    do {
+      try? audioSession.setActive(false)
+      // Use playAndRecord category to allow both input and output
+      try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+      try audioSession.setActive(true)
+    } catch {
+      throw error
+    }
+    
+    let engine = AVAudioEngine()
+    let inputNode = engine.inputNode
+    let inputFormat = inputNode.inputFormat(forBus: 0)
+    
+    // Create a mixer node to control volume/gain
+    let mixerNode = AVAudioMixerNode()
+    engine.attach(mixerNode)
+    
+    // Set a higher volume/gain for the mixer (2.0 = 2x amplification)
+    mixerNode.volume = 2.0
+    
+    // Connect input -> mixer -> main mixer for passthrough with volume control
+    engine.connect(inputNode, to: mixerNode, format: inputFormat)
+    engine.connect(mixerNode, to: engine.mainMixerNode, format: inputFormat)
+    
+    // Also boost the main mixer output volume
+    engine.mainMixerNode.volume = 1.5
+    
+    do {
+      try engine.start()
+      
+      self.passthroughEngine = engine
+      self.inputNode = inputNode
+      self.isPassthroughActive = true
+    } catch {
+      throw error
+    }
+  }
+  
+  func stopMicrophonePassthrough() {
+    isPassthroughActive = false
+    
+    inputNode?.removeTap(onBus: 0)
+    passthroughEngine?.stop()
+    passthroughEngine?.reset()
+    
+    passthroughEngine = nil
+    inputNode = nil
+    
+    // Reset audio session
+    do {
+      try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    } catch {
+      // Ignore errors
+    }
+  }
 }
 
 // wrapper functions
@@ -147,4 +214,12 @@ func stopAudio() {
 
 func getCurrentBufferLength() -> Int {
   return AudioModule.shared.getCurrentBufferLength()
+}
+
+func startMicrophonePassthrough() throws {
+  try AudioModule.shared.startMicrophonePassthrough()
+}
+
+func stopMicrophonePassthrough() {
+  AudioModule.shared.stopMicrophonePassthrough()
 }

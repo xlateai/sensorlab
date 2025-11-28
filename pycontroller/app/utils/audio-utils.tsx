@@ -229,6 +229,29 @@ export async function stopAudio(): Promise<void> {
   }
 }
 
+/**
+ * Starts microphone passthrough - streams microphone input directly to speakers
+ */
+export async function startMicrophonePassthrough(): Promise<void> {
+  try {
+    await Sensorlib.startMicrophonePassthrough();
+  } catch (error) {
+    console.error('Failed to start microphone passthrough:', error);
+    throw error;
+  }
+}
+
+/**
+ * Stops microphone passthrough
+ */
+export async function stopMicrophonePassthrough(): Promise<void> {
+  try {
+    await Sensorlib.stopMicrophonePassthrough();
+  } catch (error) {
+    console.error('Failed to stop microphone passthrough:', error);
+  }
+}
+
 // Sensor controller types
 export type ControlMode = 'rotation' | 'ambient' | 'none';
 
