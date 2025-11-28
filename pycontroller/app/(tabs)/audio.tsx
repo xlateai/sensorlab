@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal, Dimensions, Alert } from 'react-native';
+import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal, Dimensions, Alert, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeviceMotion, Magnetometer } from 'expo-sensors';
 import { useFocusEffect } from '@react-navigation/native';
@@ -609,6 +609,42 @@ export default function AudioTab() {
         throw new Error('expo-av Audio module not available. Please install expo-av.');
       }
 
+      // Ensure any previous recording is fully cleaned up
+      if (recordingRef.current) {
+        console.log('Cleaning up previous recording...');
+        try {
+          const status = await recordingRef.current.getStatusAsync();
+          if (status.isRecording) {
+            await recordingRef.current.stopAndUnloadAsync();
+          } else {
+            // If not recording, just stop and unload to clean up
+            try {
+              await recordingRef.current.stopAndUnloadAsync();
+            } catch (e) {
+              // If that fails, the recording might already be stopped
+              console.log('Previous recording already stopped');
+            }
+          }
+        } catch (cleanupError) {
+          console.warn('Error cleaning up previous recording:', cleanupError);
+          // Try to stop and unload anyway
+          try {
+            await recordingRef.current.stopAndUnloadAsync();
+          } catch (e) {
+            console.warn('Error unloading previous recording:', e);
+          }
+        }
+        recordingRef.current = null;
+        // Wait a bit for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      // Clear any existing interval
+      if (audioProcessingIntervalRef.current) {
+        clearInterval(audioProcessingIntervalRef.current);
+        audioProcessingIntervalRef.current = null;
+      }
+
       // Request permissions - try a safer approach
       console.log('Checking microphone permissions...');
       let hasPermission = false;
@@ -661,6 +697,13 @@ export default function AudioTab() {
         console.log('stopAudio error (may be expected):', e);
       }
 
+      // Ensure app is in foreground
+      const appState = AppState.currentState;
+      if (appState !== 'active') {
+        Alert.alert('App Not Active', 'Please ensure the app is in the foreground to start recording.');
+        return;
+      }
+
       // Configure audio mode for recording
       console.log('Setting audio mode...');
       try {
@@ -672,7 +715,7 @@ export default function AudioTab() {
         });
         console.log('Audio mode set successfully');
         // Small delay to ensure audio session is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
       } catch (modeError) {
         console.error('Error setting audio mode:', modeError);
         throw modeError;
@@ -783,25 +826,65 @@ export default function AudioTab() {
 
   const stopMicrophoneRecording = async () => {
     try {
+      // Clear the processing interval first
       if (audioProcessingIntervalRef.current) {
         clearInterval(audioProcessingIntervalRef.current);
         audioProcessingIntervalRef.current = null;
       }
 
+      // Stop and unload the recording
       if (recordingRef.current) {
         try {
-          await recordingRef.current.stopAndUnloadAsync();
+          const status = await recordingRef.current.getStatusAsync();
+          if (status.isRecording) {
+            await recordingRef.current.stopAndUnloadAsync();
+          } else {
+            // If not recording, just stop and unload to clean up
+            try {
+              await recordingRef.current.stopAndUnloadAsync();
+            } catch (e) {
+              // If that fails, the recording might already be stopped
+              console.log('Recording already stopped');
+            }
+          }
         } catch (error) {
           console.error('Error stopping recording:', error);
+          // Try to stop and unload anyway
+          try {
+            await recordingRef.current.stopAndUnloadAsync();
+          } catch (unloadError) {
+            console.error('Error unloading recording:', unloadError);
+          }
         }
         recordingRef.current = null;
+      }
+
+      // Reset audio mode to allow future recordings
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+        });
+      } catch (e) {
+        console.log('Error resetting audio mode (may be expected):', e);
       }
 
       setIsRecording(false);
     } catch (error) {
       console.error('Failed to stop recording:', error);
       setIsRecording(false);
+      // Ensure refs are cleared even on error
+      recordingRef.current = null;
+      if (audioProcessingIntervalRef.current) {
+        clearInterval(audioProcessingIntervalRef.current);
+        audioProcessingIntervalRef.current = null;
+      }
     }
+  };
+
+  const clearMicrophoneData = () => {
+    setAudioWaveformData([]);
+    audioDataTimeRef.current = 0;
+    audioSampleBufferRef.current = [];
   };
 
   const handleMicrophoneToggle = async () => {
@@ -862,21 +945,38 @@ export default function AudioTab() {
           title="Microphone Input"
           color="#39ff14"
         />
-        <Pressable
-          onPress={handleMicrophoneToggle}
-          style={{
-            backgroundColor: isRecording ? '#ff0000' : '#39ff14',
-            paddingVertical: 12,
-            paddingHorizontal: 24,
-            borderRadius: 8,
-            marginTop: 16,
-          }}
-          android_ripple={null}
-        >
-          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
-            {isRecording ? 'Stop Recording' : 'Start Recording'}
-          </Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+          <Pressable
+            onPress={handleMicrophoneToggle}
+            style={{
+              backgroundColor: isRecording ? '#ff0000' : '#39ff14',
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 8,
+              flex: 1,
+            }}
+            android_ripple={null}
+          >
+            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+              {isRecording ? 'Stop Recording' : 'Start Recording'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={clearMicrophoneData}
+            style={{
+              backgroundColor: '#888',
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 8,
+            }}
+            android_ripple={null}
+            disabled={isRecording}
+          >
+            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600' }}>
+              Clear
+            </Text>
+          </Pressable>
+        </View>
       </View>
       
       <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
