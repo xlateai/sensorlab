@@ -609,15 +609,9 @@ export default function AudioTab() {
         throw new Error('expo-av Audio module not available. Please install expo-av.');
       }
 
-      // Request permissions
-      console.log('Requesting permissions...');
-      const { status } = await Audio.requestPermissionsAsync();
-      console.log('Permission status:', status);
-      
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Microphone permission is required for recording');
-        return;
-      }
+      // Skip permission request - it's crashing at native level
+      // Let the recording API handle permissions natively
+      console.log('Skipping permission request - will let recording handle it natively');
 
       // Stop any existing audio playback to avoid conflicts
       if (isAudioPlaying) {
