@@ -668,8 +668,11 @@ export default function AudioTab() {
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
           staysActiveInBackground: false,
+          shouldDuckAndroid: true,
         });
         console.log('Audio mode set successfully');
+        // Small delay to ensure audio session is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (modeError) {
         console.error('Error setting audio mode:', modeError);
         throw modeError;
@@ -682,12 +685,22 @@ export default function AudioTab() {
       // Use the simplest preset configuration
       console.log('Preparing to record...');
       try {
+        // Add a small delay to ensure app is fully in foreground
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
         await recording.prepareToRecordAsync(
           Audio.RecordingOptionsPresets.HIGH_QUALITY
         );
         console.log('Prepare successful');
+        
+        // Another small delay before starting
+        await new Promise(resolve => setTimeout(resolve, 50));
       } catch (prepareError) {
         console.error('Prepare error:', prepareError);
+        // If it's a background error, provide helpful message
+        if (prepareError instanceof Error && prepareError.message.includes('background')) {
+          throw new Error('Please ensure the app is in the foreground to start recording.');
+        }
         throw prepareError;
       }
 
