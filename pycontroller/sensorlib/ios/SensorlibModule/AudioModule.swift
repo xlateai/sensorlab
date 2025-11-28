@@ -162,8 +162,34 @@ final class AudioModule {
     self.sampleRate = sampleRate
     self.channels = channelCount
 
-    // Configure audio session
+    // Request microphone permission first
     let audioSession = AVAudioSession.sharedInstance()
+    
+    // Check current permission status
+    let currentStatus = audioSession.recordPermission
+    
+    if currentStatus == .denied {
+      throw NSError(domain: "AudioModule", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied"])
+    }
+    
+    // If not determined, request permission
+    if currentStatus == .undetermined {
+      let semaphore = DispatchSemaphore(value: 0)
+      var permissionGranted = false
+      
+      audioSession.requestRecordPermission { granted in
+        permissionGranted = granted
+        semaphore.signal()
+      }
+      
+      // Wait for permission response (with timeout)
+      let timeout = semaphore.wait(timeout: .now() + 10.0)
+      if timeout == .timedOut || !permissionGranted {
+        throw NSError(domain: "AudioModule", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied or request timed out"])
+      }
+    }
+
+    // Configure audio session
     do {
       // Try to deactivate first to ensure clean state
       try? audioSession.setActive(false)
