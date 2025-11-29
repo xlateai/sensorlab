@@ -719,11 +719,17 @@ export default function AudioTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={{
           padding: 24,
           paddingBottom: 48,
+          flexGrow: 1,
         }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        scrollEnabled={true}
+        nestedScrollEnabled={true}
       >
         <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
         <View style={{ marginBottom: 32 }}>

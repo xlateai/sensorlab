@@ -30,19 +30,25 @@ final class AudioModule {
   private var microphoneSamples: [Float] = []
   private let queue = DispatchQueue(label: "com.audiolab.audio.buffer")
 
+  // Track whether speakers have already been configured so we don't
+  // tear down and rebuild the graph unnecessarily.
+  private var speakersInitialized: Bool = false
+
   private init() {}
 
   func initializeSpeakers(sampleRate: Double, channelCount: Int) throws {
-    // Check if microphone is active before stopping speakers
+    print("[AudioModule] initializeSpeakers called - sampleRate=\(sampleRate), channelCount=\(channelCount)")
+    // Check if microphone is active
     let microphoneActive = inputNode != nil
     
-    stopSpeakers()
+    print("[AudioModule] initializeSpeakers - microphoneActive=\(microphoneActive)")
 
     self.sampleRate = sampleRate
     self.channels = channelCount
 
-    // Configure audio session
+    // Configure audio session (do not tear down existing engine/graph)
     let audioSession = AVAudioSession.sharedInstance()
+    print("[AudioModule] initializeSpeakers - configuring AVAudioSession (microphoneActive=\(microphoneActive))")
     do {
       // Try to deactivate first to ensure clean state
       try? audioSession.setActive(false)
@@ -70,36 +76,87 @@ final class AudioModule {
       }
     }
 
-    // Use existing engine or create new one
+    // If speakers are already initialized and we have a running engine and player,
+    // just make sure the engine is running and return. This avoids tearing down
+    // the graph when starting microphone relay.
+    if speakersInitialized, let existingEngine = engine, let existingPlayer = player {
+      print("[AudioModule] initializeSpeakers - reusing existing speakers configuration")
+      DispatchQueue.main.async {
+        do {
+          if !existingEngine.isRunning {
+            print("[AudioModule] initializeSpeakers - restarting existing AVAudioEngine")
+            try existingEngine.start()
+          } else {
+            print("[AudioModule] initializeSpeakers - existing engine already running")
+          }
+          
+          guard existingPlayer.engine === existingEngine else {
+            print("[AudioModule] initializeSpeakers - WARNING: existing player.engine mismatch, not calling play()")
+            return
+          }
+          
+          print("[AudioModule] initializeSpeakers - ensuring player is playing")
+          if !existingPlayer.isPlaying {
+            existingPlayer.play()
+          }
+        } catch {
+          print("[AudioModule] initializeSpeakers - failed to restart existing engine: \(error.localizedDescription)")
+        }
+      }
+      return
+    }
+
+    // First-time speaker initialization: create engine / player graph.
     if engine == nil {
+      print("[AudioModule] initializeSpeakers - creating AVAudioEngine")
       engine = AVAudioEngine()
     }
     guard let engine = engine else { return }
     
-    let player = AVAudioPlayerNode()
-
     let format = AVAudioFormat(
       commonFormat: .pcmFormatFloat32,
       sampleRate: sampleRate,
       channels: AVAudioChannelCount(channelCount),
       interleaved: false
     )!
-
-    self.player = player
-    self.format = format
     
     // Reset frame count
     queue.async {
       self.scheduledFrameCount = 0
     }
-
-    engine.attach(player)
-    engine.connect(player, to: engine.mainMixerNode, format: format)
-
-    if !engine.isRunning {
-      try engine.start()
+    
+    // Configure player and engine graph on the main thread to avoid race conditions
+    DispatchQueue.main.async {
+      let player = AVAudioPlayerNode()
+      print("[AudioModule] initializeSpeakers - creating AVAudioPlayerNode on main thread (first init)")
+      
+      self.player = player
+      self.format = format
+      
+      engine.attach(player)
+      engine.connect(player, to: engine.mainMixerNode, format: format)
+      print("[AudioModule] initializeSpeakers - attached and connected player node (first init)")
+      
+      do {
+        if !engine.isRunning {
+          print("[AudioModule] initializeSpeakers - starting AVAudioEngine on main thread (first init)")
+          try engine.start()
+        } else {
+          print("[AudioModule] initializeSpeakers - engine already running (main thread, first init)")
+        }
+        
+        guard player.engine === engine else {
+          print("[AudioModule] initializeSpeakers - WARNING: player.engine is not the expected engine, skipping play() (first init)")
+          return
+        }
+        
+        print("[AudioModule] initializeSpeakers - starting player node on main thread (first init)")
+        player.play()
+        self.speakersInitialized = true
+      } catch {
+        print("[AudioModule] initializeSpeakers - failed to start engine (first init): \(error.localizedDescription)")
+      }
     }
-    player.play()
   }
 
   func playSpeakersBatch(input: AudioSamplesInput) {
@@ -136,6 +193,7 @@ final class AudioModule {
   func stopSpeakers() {
     player?.stop()
     player = nil
+    speakersInitialized = false
     queue.async {
       self.scheduledFrameCount = 0
     }
@@ -154,9 +212,11 @@ final class AudioModule {
   }
 
   func initializeMicrophone(sampleRate: Double, channelCount: Int) throws {
+    print("[AudioModule] initializeMicrophone called - sampleRate=\(sampleRate), channelCount=\(channelCount), onMainThread=\(Thread.isMainThread)")
     // Check if speakers are active before stopping microphone
     let speakersActive = player != nil
     
+    print("[AudioModule] initializeMicrophone - speakersActive=\(speakersActive)")
     stopListening()
 
     self.sampleRate = sampleRate
@@ -167,22 +227,57 @@ final class AudioModule {
     
     // Check current permission status
     let currentStatus = audioSession.recordPermission
+    print("[AudioModule] initializeMicrophone - current recordPermission status=\(currentStatus.rawValue)")
     
-    // If not already granted, request permission
+    // If already denied, fail fast with a clear error
+    if currentStatus == .denied {
+      print("[AudioModule] initializeMicrophone - permission previously denied")
+      throw NSError(
+        domain: "AudioModule",
+        code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "Microphone permission has been denied in Settings"]
+      )
+    }
+    
+    // If not already granted, request permission.
+    // IMPORTANT: Don't block the main thread while waiting.
     if currentStatus != .granted {
-      let semaphore = DispatchSemaphore(value: 0)
-      var permissionGranted = false
-      
-      audioSession.requestRecordPermission { granted in
-        permissionGranted = granted
-        semaphore.signal()
+      if Thread.isMainThread {
+        print("[AudioModule] initializeMicrophone - WARNING: on main thread, requesting permission without blocking")
+        audioSession.requestRecordPermission { granted in
+          print("[AudioModule] initializeMicrophone - requestRecordPermission callback (main-thread path), granted=\(granted)")
+        }
+        throw NSError(
+          domain: "AudioModule",
+          code: 2,
+          userInfo: [NSLocalizedDescriptionKey: "Microphone permission request in progress; please retry after the user responds"]
+        )
+      } else {
+        print("[AudioModule] initializeMicrophone - requesting permission on main queue and waiting (background thread)")
+        let semaphore = DispatchSemaphore(value: 0)
+        var permissionGranted = false
+        
+        DispatchQueue.main.async {
+          audioSession.requestRecordPermission { granted in
+            print("[AudioModule] initializeMicrophone - requestRecordPermission callback, granted=\(granted)")
+            permissionGranted = granted
+            semaphore.signal()
+          }
+        }
+        
+        // Wait for permission response (with timeout)
+        let timeout = semaphore.wait(timeout: .now() + 10.0)
+        if timeout == .timedOut || !permissionGranted {
+          print("[AudioModule] initializeMicrophone - permission denied or request timed out (timeout=\(timeout == .timedOut))")
+          throw NSError(
+            domain: "AudioModule",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied or request timed out"]
+          )
+        }
       }
-      
-      // Wait for permission response (with timeout)
-      let timeout = semaphore.wait(timeout: .now() + 10.0)
-      if timeout == .timedOut || !permissionGranted {
-        throw NSError(domain: "AudioModule", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied or request timed out"])
-      }
+    } else {
+      print("[AudioModule] initializeMicrophone - permission already granted")
     }
 
     // Configure audio session
@@ -198,28 +293,31 @@ final class AudioModule {
         try audioSession.setCategory(.record, mode: .default)
       }
       try audioSession.setActive(true)
+      print("[AudioModule] initializeMicrophone - AVAudioSession configured successfully (speakersActive=\(speakersActive))")
     } catch {
       // Fallback: try to activate (might already be configured)
+      print("[AudioModule] initializeMicrophone - AVAudioSession primary configuration failed: \(error.localizedDescription)")
       try? audioSession.setActive(true)
+      print("[AudioModule] initializeMicrophone - AVAudioSession fallback activation attempted")
     }
 
     // Use existing engine or create new one
     if engine == nil {
+      print("[AudioModule] initializeMicrophone - creating AVAudioEngine")
       engine = AVAudioEngine()
     }
     guard let engine = engine else { return }
     
     let inputNode = engine.inputNode
     self.inputNode = inputNode
-
-    let format = AVAudioFormat(
-      commonFormat: .pcmFormatFloat32,
-      sampleRate: sampleRate,
-      channels: AVAudioChannelCount(channelCount),
-      interleaved: false
-    )!
-
-    self.format = format
+    
+    // IMPORTANT: For installTap, the format must match the node's output format (or be nil).
+    // Using a mismatched format will cause an abort with "Failed to create tap due to format mismatch".
+    let inputFormat = inputNode.outputFormat(forBus: 0)
+    print("[AudioModule] initializeMicrophone - inputNode.outputFormat: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount), commonFormat=\(inputFormat.commonFormat.rawValue), interleaved=\(inputFormat.isInterleaved)")
+    
+    // Store the actual input format we are tapping from
+    self.format = inputFormat
     
     // Clear microphone samples buffer
     queue.async {
@@ -228,7 +326,8 @@ final class AudioModule {
 
     // Install tap on input node to capture audio
     let bufferSize: AVAudioFrameCount = 4096
-    inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] (buffer, time) in
+    print("[AudioModule] initializeMicrophone - installing tap with bufferSize=\(bufferSize) using inputNode.outputFormat")
+    inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer, time) in
       guard let self = self, let channelData = buffer.floatChannelData else { return }
       
       let frameLength = Int(buffer.frameLength)
@@ -252,8 +351,12 @@ final class AudioModule {
     }
 
     if !engine.isRunning {
+      print("[AudioModule] initializeMicrophone - starting AVAudioEngine")
       try engine.start()
+    } else {
+      print("[AudioModule] initializeMicrophone - engine already running")
     }
+    print("[AudioModule] initializeMicrophone - completed successfully")
   }
 
   func readSamplesBatch() -> [Float] {
