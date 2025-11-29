@@ -717,9 +717,16 @@ export default function AudioTab() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000', padding: 24 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
-      <View style={{ marginBottom: 32 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 24,
+          paddingBottom: 48,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
+        <View style={{ marginBottom: 32 }}>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
           precisionOffset={precisionOffset}
@@ -766,47 +773,48 @@ export default function AudioTab() {
         </Text>
       </View>
       
-      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Microphone Test</Text>
-        <Pressable
-          onPress={handleMicrophoneRelayToggle}
-          style={{
-            backgroundColor: '#39ff14',
-            paddingVertical: 12,
-            paddingHorizontal: 24,
-            borderRadius: 8,
-            marginBottom: 16,
-          }}
-          android_ripple={null}
-        >
-          <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
-            {isMicrophoneRelaying ? 'Stop Relay' : 'Start Microphone Relay'}
-          </Text>
-        </Pressable>
-      </View>
-      
-      <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
-        <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
-        <Slider
-          value={intensity}
-          onValueChange={handleIntensityChange}
-          trackColor="#39ff14"
-        />
-        <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
-        <Slider
-          value={sharpness}
-          onValueChange={handleSharpnessChange}
-          trackColor="#39ff14"
-        />
-        <View style={{ marginTop: 24 }}>
-          <Button
-            title={isPlaying ? 'Pause' : 'Play Haptic'}
-            color="#39ff14"
-            onPress={handlePlayPause}
-          />
+        <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Microphone Test</Text>
+          <Pressable
+            onPress={handleMicrophoneRelayToggle}
+            style={{
+              backgroundColor: '#39ff14',
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 8,
+              marginBottom: 16,
+            }}
+            android_ripple={null}
+          >
+            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+              {isMicrophoneRelaying ? 'Stop Relay' : 'Start Microphone Relay'}
+            </Text>
+          </Pressable>
         </View>
-      </View>
+      
+        <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Haptic Player</Text>
+          <Text style={{ color: '#fff', marginBottom: 8 }}>Intensity: {intensity.toFixed(2)}</Text>
+          <Slider
+            value={intensity}
+            onValueChange={handleIntensityChange}
+            trackColor="#39ff14"
+          />
+          <Text style={{ color: '#fff', marginTop: 16, marginBottom: 8 }}>Sharpness: {sharpness.toFixed(2)}</Text>
+          <Slider
+            value={sharpness}
+            onValueChange={handleSharpnessChange}
+            trackColor="#39ff14"
+          />
+          <View style={{ marginTop: 24 }}>
+            <Button
+              title={isPlaying ? 'Pause' : 'Play Haptic'}
+              color="#39ff14"
+              onPress={handlePlayPause}
+            />
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
