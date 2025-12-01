@@ -55,7 +55,7 @@ async def handle_magneto(websocket) -> None:
       t = data.get("t")
 
       # print(f"[Magneto] sample t={t}  x={x}  y={y}  z={z}")
-      print(z)
+      print(x, y, z)
 
   except websockets.ConnectionClosedOK:
     print(f"[Magneto] Client closed: {peer}")
