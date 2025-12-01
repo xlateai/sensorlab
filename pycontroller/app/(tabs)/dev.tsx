@@ -14,7 +14,7 @@ import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 
-const MAGNETO_WS_URL = 'ws://localhost:8765';
+const MAGNETO_WS_URL = 'ws://0.0.0.0:8765';
 
 const screenHeight = Dimensions.get('window').height;
 

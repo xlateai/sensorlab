@@ -23,14 +23,13 @@ import json
 from typing import Any, Dict
 
 import websockets
-from websockets.server import WebSocketServerProtocol
 
 
-HOST = "localhost"
+HOST = "0.0.0.0"
 PORT = 8765
 
 
-async def handle_magneto(websocket: WebSocketServerProtocol) -> None:
+async def handle_magneto(websocket) -> None:
   """
   Handle a single WebSocket client, printing incoming magnetometer samples.
   """
