@@ -259,12 +259,24 @@ export default function DevScreen() {
 
   // Push latest magnetometer readings over WebSocket
   useEffect(() => {
-    if (
-      !magnetoStreaming ||
-      !magnetometerData ||
-      !magnetoWsRef.current ||
-      magnetoWsRef.current.readyState !== WebSocket.OPEN
-    ) {
+    if (!magnetoStreaming) {
+      return;
+    }
+
+    // Debug logging to understand why samples might not be sending
+    if (!magnetometerData) {
+      console.log('[Magneto] send skipped: no magnetometerData');
+      return;
+    }
+    if (!magnetoWsRef.current) {
+      console.log('[Magneto] send skipped: no WebSocket instance');
+      return;
+    }
+    if (magnetoWsRef.current.readyState !== WebSocket.OPEN) {
+      console.log(
+        '[Magneto] send skipped: WebSocket not open, readyState=',
+        magnetoWsRef.current.readyState,
+      );
       return;
     }
 
@@ -276,6 +288,7 @@ export default function DevScreen() {
         y: magnetometerData.y,
         z: magnetometerData.z,
       });
+      console.log('[Magneto] sending sample', payload);
       magnetoWsRef.current.send(payload);
     } catch (err) {
       console.warn('[Magneto] Failed to send magnetometer sample', err);

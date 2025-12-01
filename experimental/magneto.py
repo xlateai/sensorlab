@@ -38,14 +38,15 @@ async def handle_magneto(websocket) -> None:
 
   try:
     async for message in websocket:
+      print(f"[Magneto] raw message: {message!r}")
       try:
         data: Dict[str, Any] = json.loads(message)
       except json.JSONDecodeError:
-        print(f"[Magneto] Non-JSON message: {message!r}")
+        print(f"[Magneto] Non-JSON message, skipping")
         continue
 
       if data.get("type") != "magnetometer":
-        print(f"[Magneto] Unknown message type: {data}")
+        print(f"[Magneto] Unknown message type: {data.get('type')!r}, skipping")
         continue
 
       x = data.get("x")
@@ -53,7 +54,7 @@ async def handle_magneto(websocket) -> None:
       z = data.get("z")
       t = data.get("t")
 
-      print(f"[Magneto] t={t} ms  x={x:.3f}  y={y:.3f}  z={z:.3f}")
+      print(f"[Magneto] sample t={t}  x={x}  y={y}  z={z}")
 
   except websockets.ConnectionClosedOK:
     print(f"[Magneto] Client closed: {peer}")
