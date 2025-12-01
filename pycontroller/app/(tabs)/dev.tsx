@@ -14,6 +14,8 @@ import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 
+const MAGNETO_WS_URL = 'ws://localhost:8765';
+
 const screenHeight = Dimensions.get('window').height;
 
 // Blank popup component
@@ -131,6 +133,10 @@ export default function DevScreen() {
   const [gyroscopeData, setGyroscopeData] = useState<{x: number, y: number, z: number} | null>(null);
   const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
   const [paused, setPaused] = useState(true); // default to paused
+
+  // Magnetometer -> Python streaming
+  const magnetoWsRef = useRef<WebSocket | null>(null);
+  const [magnetoStreaming, setMagnetoStreaming] = useState(false);
   
   // UI/UX slider states
   const [r, setR] = useState(0.5);
@@ -169,6 +175,41 @@ export default function DevScreen() {
     try { Barometer.removeAllListeners(); } catch {}
   };
 
+  const connectMagnetoSocket = () => {
+    if (magnetoWsRef.current && 
+      (magnetoWsRef.current.readyState === WebSocket.OPEN || 
+       magnetoWsRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    try {
+      const ws = new WebSocket(MAGNETO_WS_URL);
+      ws.onopen = () => {
+        console.log('[Magneto] WebSocket connected');
+      };
+      ws.onerror = (event) => {
+        console.warn('[Magneto] WebSocket error', event);
+      };
+      ws.onclose = () => {
+        console.log('[Magneto] WebSocket closed');
+      };
+      magnetoWsRef.current = ws;
+    } catch (err) {
+      console.warn('[Magneto] Failed to open WebSocket', err);
+    }
+  };
+
+  const disconnectMagnetoSocket = () => {
+    if (magnetoWsRef.current) {
+      try {
+        magnetoWsRef.current.close();
+      } catch (err) {
+        console.warn('[Magneto] Error closing WebSocket', err);
+      }
+      magnetoWsRef.current = null;
+    }
+  };
+
   useEffect(() => {
     if (!paused) {
       killAllListeners(); // Always kill before creating new
@@ -196,8 +237,50 @@ export default function DevScreen() {
       setMagnetometerData(null);
       setGyroscopeData(null);
       setBarometerData(null);
+      disconnectMagnetoSocket();
     };
   }, [paused]);
+
+  // Open / close WebSocket when streaming toggled
+  useEffect(() => {
+    if (magnetoStreaming) {
+      connectMagnetoSocket();
+    } else {
+      disconnectMagnetoSocket();
+    }
+
+    return () => {
+      // On effect cleanup (e.g. unmount), ensure socket is closed when streaming is off
+      if (!magnetoStreaming) {
+        disconnectMagnetoSocket();
+      }
+    };
+  }, [magnetoStreaming]);
+
+  // Push latest magnetometer readings over WebSocket
+  useEffect(() => {
+    if (
+      !magnetoStreaming ||
+      !magnetometerData ||
+      !magnetoWsRef.current ||
+      magnetoWsRef.current.readyState !== WebSocket.OPEN
+    ) {
+      return;
+    }
+
+    try {
+      const payload = JSON.stringify({
+        type: 'magnetometer',
+        t: Date.now(),
+        x: magnetometerData.x,
+        y: magnetometerData.y,
+        z: magnetometerData.z,
+      });
+      magnetoWsRef.current.send(payload);
+    } catch (err) {
+      console.warn('[Magneto] Failed to send magnetometer sample', err);
+    }
+  }, [magnetometerData, magnetoStreaming]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -357,7 +440,7 @@ export default function DevScreen() {
                 )}
             </BlankPopup>
           </CollapsibleSection>
-          
+
           <CollapsibleSection title="UI/UX">
             <View style={uiStyles.container}>
               <View style={uiStyles.sliderRow}>
@@ -413,6 +496,31 @@ export default function DevScreen() {
               </View>
             </View>
           </CollapsibleSection>
+
+          <View style={{ marginTop: 24, alignItems: 'center' }}>
+            <Pressable
+              onPress={() => setMagnetoStreaming((v) => !v)}
+              style={{
+                backgroundColor: magnetoStreaming ? '#43a047' : '#222',
+                paddingHorizontal: 36,
+                paddingVertical: 14,
+                borderRadius: 32,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 2,
+                marginBottom: 4,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
+                {magnetoStreaming ? 'Stop Magnetometer → Python Stream' : 'Start Magnetometer → Python Stream'}
+              </Text>
+            </Pressable>
+            <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+              Streams magnetometer x / y / z over WebSocket to Python at {MAGNETO_WS_URL}.
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
