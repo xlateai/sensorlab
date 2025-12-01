@@ -21,9 +21,9 @@ This script also logs each sample to a CSV file whose name is the current
 short git commit hash (e.g. `abc1234.csv`) with columns:
     x, y, z, target
 
-`target` is a synthetic label that alternates between 0 and 1 in runs of
+`target` is a synthetic label that can be 0, 1, or "clear" in runs of
 length between 10 and 30 samples. Whenever a new run starts, the next target
-value (0 or 1) is printed on its own line in the console.
+value (0, 1, or "clear") is printed on its own line in the console.
 """
 
 import asyncio
@@ -46,7 +46,7 @@ COUNT = 1
 CSV_WRITER: csv.writer
 CSV_FILE: IO[str]
 CSV_FILE_PATH: Path
-TARGET_STATE: int  # 0 or 1
+TARGET_STATE: str  # "0", "1", or "clear"
 TARGET_REMAINING: int
 
 
@@ -91,9 +91,9 @@ def _init_target_state() -> None:
     Initialize the synthetic target label state.
     """
     global TARGET_STATE, TARGET_REMAINING
-    TARGET_STATE = random.randint(0, 1)
+    TARGET_STATE = random.choice(["0", "1", "clear"])
     TARGET_REMAINING = random.randint(10, 30)
-    # Print initial target value as 0 or 1.
+    # Print initial target value ("0", "1", or "clear").
     print(TARGET_STATE)
 
 
@@ -102,15 +102,20 @@ def _next_target_label() -> str:
     Advance/run the target state machine and return the current label ("T"/"F").
 
     The label is constant for TARGET_REMAINING samples; when the run ends,
-    the state flips and a new run length [10, 30] is chosen.
+    a new state is chosen at random (0, 1, or "clear") and a new run length
+    [10, 30] is chosen.
     """
     global TARGET_STATE, TARGET_REMAINING
 
     if TARGET_REMAINING <= 0:
-        # Start a new run with the opposite state (flip 0 <-> 1).
-        TARGET_STATE = 1 - TARGET_STATE
+        # Start a new run with a randomly selected state, different from
+        # the current state.
+        choices = ["0", "1", "clear"]
+        if TARGET_STATE in choices:
+            choices = [c for c in choices if c != TARGET_STATE]
+        TARGET_STATE = random.choice(choices)
         TARGET_REMAINING = random.randint(10, 30)
-        # Print only the new target value (0 or 1) on its own line.
+        # Print only the new target value ("0", "1", or "clear") on its own line.
         print(TARGET_STATE)
 
     label = TARGET_STATE
@@ -141,7 +146,7 @@ async def handle_magneto(websocket) -> None:
             z = data.get("z")
             t = data.get("t")  # currently unused but kept for completeness
 
-            # Determine synthetic target label for this sample (0 or 1).
+            # Determine synthetic target label for this sample ("0", "1", or "clear").
             target_label = _next_target_label()
 
             COUNT += 1
