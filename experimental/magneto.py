@@ -38,7 +38,7 @@ async def handle_magneto(websocket) -> None:
 
   try:
     async for message in websocket:
-      print(f"[Magneto] raw message: {message!r}")
+      # print(f"[Magneto] raw message: {message!r}")
       try:
         data: Dict[str, Any] = json.loads(message)
       except json.JSONDecodeError:
@@ -54,7 +54,8 @@ async def handle_magneto(websocket) -> None:
       z = data.get("z")
       t = data.get("t")
 
-      print(f"[Magneto] sample t={t}  x={x}  y={y}  z={z}")
+      # print(f"[Magneto] sample t={t}  x={x}  y={y}  z={z}")
+      print(z)
 
   except websockets.ConnectionClosedOK:
     print(f"[Magneto] Client closed: {peer}")
