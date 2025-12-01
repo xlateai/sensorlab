@@ -214,12 +214,10 @@ export default function DevScreen() {
     if (!paused) {
       killAllListeners(); // Always kill before creating new
       motionSubRef.current = DeviceMotion.addListener(setMotionData);
-      magSubRef.current = Magnetometer.addListener(setMagnetometerData);
       gyroSubRef.current = Gyroscope.addListener(setGyroscopeData);
       baroSubRef.current = Barometer.addListener(setBarometerData);
 
       DeviceMotion.setUpdateInterval(100);
-      Magnetometer.setUpdateInterval(100);
       Gyroscope.setUpdateInterval(100);
       Barometer.setUpdateInterval(500);
     } else {
@@ -234,12 +232,53 @@ export default function DevScreen() {
     return () => {
       killAllListeners();
       setMotionData(null);
-      setMagnetometerData(null);
       setGyroscopeData(null);
       setBarometerData(null);
       disconnectMagnetoSocket();
     };
   }, [paused]);
+
+  // Manage magnetometer subscription independently so streaming can be enabled
+  // without having to start all sensors.
+  useEffect(() => {
+    // We want magnetometer data if either the main sensors are playing
+    // or the magnetometer->Python stream is enabled.
+    const wantMagData = !paused || magnetoStreaming;
+
+    if (!wantMagData) {
+      if (magSubRef.current) {
+        try {
+          magSubRef.current.remove();
+        } catch {}
+        magSubRef.current = null;
+      }
+      setMagnetometerData(null);
+      return;
+    }
+
+    // (Re)subscribe magnetometer
+    if (magSubRef.current) {
+      try {
+        magSubRef.current.remove();
+      } catch {}
+    }
+    try {
+      magSubRef.current = Magnetometer.addListener(setMagnetometerData);
+      Magnetometer.setUpdateInterval(100);
+    } catch (err) {
+      console.warn('[Magneto] Failed to subscribe magnetometer', err);
+    }
+
+    // Cleanup
+    return () => {
+      if (!wantMagData && magSubRef.current) {
+        try {
+          magSubRef.current.remove();
+        } catch {}
+        magSubRef.current = null;
+      }
+    };
+  }, [paused, magnetoStreaming]);
 
   // Open / close WebSocket when streaming toggled
   useEffect(() => {
