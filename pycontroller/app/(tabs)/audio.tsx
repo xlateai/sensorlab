@@ -156,6 +156,18 @@ export default function AudioTab() {
   const [volume, setVolume] = useState(50); // Volume percentage (0-100), default 50%
   const [waveformShape, setWaveformShape] = useState<'sine' | 'sawtooth'>(DEFAULT_SHAPE);
   const [controlMode, setControlMode] = useState<ControlMode>(DEFAULT_CONTROL_MODE);
+  // Control multiplier state (slider value 0-1, maps to multiplier 1-20)
+  const CONTROL_MULTIPLIER_MIN = 1;
+  const CONTROL_MULTIPLIER_MAX = 20;
+  const DEFAULT_MULTIPLIER = 6; // Default multiplier value
+  const [controlMultiplier, setControlMultiplier] = useState(
+    (DEFAULT_MULTIPLIER - CONTROL_MULTIPLIER_MIN) / (CONTROL_MULTIPLIER_MAX - CONTROL_MULTIPLIER_MIN)
+  ); // Slider value (0-1), initialized to map to default multiplier
+  
+  // Convert slider value (0-1) to multiplier (1-20)
+  const getMultiplierValue = (sliderValue: number) => {
+    return CONTROL_MULTIPLIER_MIN + (sliderValue * (CONTROL_MULTIPLIER_MAX - CONTROL_MULTIPLIER_MIN));
+  };
   const [pitchRotation, setPitchRotation] = useState(0); // Current pitch rotation in radians (beta)
   const [rollRotation, setRollRotation] = useState(0); // Current roll rotation in radians (gamma)
   const baselinePitchRef = useRef<number | null>(null); // Baseline pitch (rolling average)
@@ -168,6 +180,7 @@ export default function AudioTab() {
   const audioParamsRef = useRef({ frequency: DEFAULT_FREQUENCY, volume: 0.5 }); // 0.5 = 50%
   const waveformShapeRef = useRef<'sine' | 'sawtooth'>(DEFAULT_SHAPE); // Ref for live shape access
   const controlModeRef = useRef<ControlMode>(DEFAULT_CONTROL_MODE); // Ref for live control mode access
+  const controlMultiplierRef = useRef(DEFAULT_MULTIPLIER); // Ref for live control multiplier access (actual multiplier value, not slider value)
   const pitchRotationRef = useRef(0); // Ref for live pitch rotation access
   const rollRotationRef = useRef(0); // Ref for live roll rotation access
   const frequencySignRef = useRef(true); // Ref for live frequency sign access
@@ -342,6 +355,7 @@ export default function AudioTab() {
         rollRotation: rollRotationRef.current,
         baselinePitch: baselinePitchRef.current,
         baselineRoll: baselineRollRef.current,
+        multiplier: controlMultiplierRef.current,
       });
       
       const getAmbientState = (): AmbientControllerState => ({
@@ -358,6 +372,7 @@ export default function AudioTab() {
         currentNormalizedZ: currentNormalizedZRef.current,
         lastUpdateTime: lastMagnetometerUpdateTimeRef.current,
         updateInterval: MAGNETOMETER_UPDATE_INTERVAL,
+        multiplier: controlMultiplierRef.current,
       });
       
       const getBaseFrequency = (): number => {
@@ -503,6 +518,11 @@ export default function AudioTab() {
   useEffect(() => {
     controlModeRef.current = controlMode;
   }, [controlMode]);
+
+  // Update control multiplier ref when multiplier changes (for live updates)
+  useEffect(() => {
+    controlMultiplierRef.current = getMultiplierValue(controlMultiplier);
+  }, [controlMultiplier]);
 
   // Update frequency sign ref when sign changes (for live updates)
   useEffect(() => {
@@ -773,6 +793,19 @@ export default function AudioTab() {
             controlMode={controlMode}
             onControlModeChange={setControlMode}
           />
+        </View>
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ color: '#fff', marginBottom: 8, fontSize: 14 }}>
+            Control Multiplier: {getMultiplierValue(controlMultiplier).toFixed(1)}x
+          </Text>
+          <Slider
+            value={controlMultiplier}
+            onValueChange={setControlMultiplier}
+            trackColor="#39ff14"
+          />
+          <Text style={{ color: '#888', marginTop: 4, fontSize: 12 }}>
+            Adjusts sensitivity for rotation and ambient control modes (1x - 20x)
+          </Text>
         </View>
         <Text style={{ color: '#888', marginTop: 8, fontSize: 12 }}>
           Buffer: {bufferLength} samples

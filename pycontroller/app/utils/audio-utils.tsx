@@ -322,6 +322,7 @@ export interface RotationControllerState {
   rollRotation: number;
   baselinePitch: number | null;
   baselineRoll: number | null;
+  multiplier: number; // Multiplier for rotation control (max frequency multiplier)
 }
 
 export interface AmbientControllerState {
@@ -338,10 +339,12 @@ export interface AmbientControllerState {
   currentNormalizedZ: number;
   lastUpdateTime: number;
   updateInterval: number;
+  multiplier: number; // Multiplier for ambient control
 }
 
 const MAX_ROTATION_THRESHOLD = 0.5; // radians
-const AMBIENT_FREQUENCY_MULTIPLIER = 6;
+const DEFAULT_AMBIENT_FREQUENCY_MULTIPLIER = 6;
+const DEFAULT_ROTATION_MAX_MULTIPLIER = 10;
 
 /**
  * Creates a frequency getter for rotation control mode
@@ -374,9 +377,10 @@ export function createRotationFrequencyGetter(
     // Apply sine to get smooth curve
     const sinedDistance = Math.sin(avgDistance * Math.PI / 2);
     
-    // Map to multiplier: 1.0x (baseline) to 10x (max)
-    // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * 9.0) = 1.0 to 10.0
-    const frequencyMultiplier = 1.0 + (sinedDistance * 9.0);
+    // Map to multiplier: 1.0x (baseline) to maxMultiplier (from state)
+    // sinedDistance ranges from 0 to 1, so: 1.0 + (sinedDistance * (maxMultiplier - 1.0))
+    const maxMultiplier = state.multiplier || DEFAULT_ROTATION_MAX_MULTIPLIER;
+    const frequencyMultiplier = 1.0 + (sinedDistance * (maxMultiplier - 1.0));
     
     return baseFreq * frequencyMultiplier;
   };
@@ -413,9 +417,10 @@ export function createAmbientFrequencyGetter(
     
     // Apply multiplier based on starting frequency for each axis
     // Each normalized value ranges from 0 to 1, so frequency ranges from startingFreq to startingFreq * multiplier
-    const frequencyOffsetX = interpolatedX * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
-    const frequencyOffsetY = interpolatedY * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
-    const frequencyOffsetZ = interpolatedZ * (state.startingFrequency * AMBIENT_FREQUENCY_MULTIPLIER - state.startingFrequency);
+    const multiplier = state.multiplier || DEFAULT_AMBIENT_FREQUENCY_MULTIPLIER;
+    const frequencyOffsetX = interpolatedX * (state.startingFrequency * multiplier - state.startingFrequency);
+    const frequencyOffsetY = interpolatedY * (state.startingFrequency * multiplier - state.startingFrequency);
+    const frequencyOffsetZ = interpolatedZ * (state.startingFrequency * multiplier - state.startingFrequency);
     
     // Return array of 3 frequencies (one per axis) for additive synthesis
     return [
