@@ -28,8 +28,11 @@ import websockets
 HOST = "0.0.0.0"
 PORT = 8765
 
+COUNT = 1
+
 
 async def handle_magneto(websocket) -> None:
+  global COUNT
   """
   Handle a single WebSocket client, printing incoming magnetometer samples.
   """
@@ -54,8 +57,10 @@ async def handle_magneto(websocket) -> None:
       z = data.get("z")
       t = data.get("t")
 
+
       # print(f"[Magneto] sample t={t}  x={x}  y={y}  z={z}")
-      print(x, y, z)
+      print(x, y, z, COUNT)
+      COUNT += 1
 
   except websockets.ConnectionClosedOK:
     print(f"[Magneto] Client closed: {peer}")
