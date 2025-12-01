@@ -21,9 +21,9 @@ This script also logs each sample to a CSV file whose name is the current
 short git commit hash (e.g. `abc1234.csv`) with columns:
     x, y, z, target
 
-`target` is a synthetic label that alternates between "T" and "F" in runs of
+`target` is a synthetic label that alternates between 0 and 1 in runs of
 length between 10 and 30 samples. Whenever a new run starts, the next target
-value is printed to the console.
+value (0 or 1) is printed on its own line in the console.
 """
 
 import asyncio
@@ -46,7 +46,7 @@ COUNT = 1
 CSV_WRITER: csv.writer
 CSV_FILE: IO[str]
 CSV_FILE_PATH: Path
-TARGET_STATE: bool  # True => "T", False => "F"
+TARGET_STATE: int  # 0 or 1
 TARGET_REMAINING: int
 
 
@@ -91,10 +91,10 @@ def _init_target_state() -> None:
     Initialize the synthetic target label state.
     """
     global TARGET_STATE, TARGET_REMAINING
-    TARGET_STATE = bool(random.getrandbits(1))
+    TARGET_STATE = random.randint(0, 1)
     TARGET_REMAINING = random.randint(10, 30)
-    label = "T" if TARGET_STATE else "F"
-    print(f"\n[Magneto] Next target: {label} (for next {TARGET_REMAINING} samples)")
+    # Print initial target value as 0 or 1.
+    print(TARGET_STATE)
 
 
 def _next_target_label() -> str:
@@ -107,13 +107,13 @@ def _next_target_label() -> str:
     global TARGET_STATE, TARGET_REMAINING
 
     if TARGET_REMAINING <= 0:
-        # Start a new run with the opposite state.
-        TARGET_STATE = not TARGET_STATE
+        # Start a new run with the opposite state (flip 0 <-> 1).
+        TARGET_STATE = 1 - TARGET_STATE
         TARGET_REMAINING = random.randint(10, 30)
-        label = "T" if TARGET_STATE else "F"
-        print(f"\n[Magneto] Next target: {label} (for next {TARGET_REMAINING} samples)")
+        # Print only the new target value (0 or 1) on its own line.
+        print(TARGET_STATE)
 
-    label = "T" if TARGET_STATE else "F"
+    label = TARGET_STATE
     TARGET_REMAINING -= 1
     return label
 
@@ -123,20 +123,17 @@ async def handle_magneto(websocket) -> None:
     """
     Handle a single WebSocket client, printing incoming magnetometer samples.
     """
-    peer = websocket.remote_address
-    print(f"[Magneto] Client connected: {peer}")
+    # We intentionally avoid printing connection info to keep the console
+    # restricted to target value changes only.
 
     try:
         async for message in websocket:
-            # print(f"[Magneto] raw message: {message!r}")
             try:
                 data: Dict[str, Any] = json.loads(message)
             except json.JSONDecodeError:
-                print(f"[Magneto] Non-JSON message, skipping")
                 continue
 
             if data.get("type") != "magnetometer":
-                print(f"[Magneto] Unknown message type: {data.get('type')!r}, skipping")
                 continue
 
             x = data.get("x")
@@ -144,11 +141,9 @@ async def handle_magneto(websocket) -> None:
             z = data.get("z")
             t = data.get("t")  # currently unused but kept for completeness
 
-            # Determine synthetic target label for this sample.
+            # Determine synthetic target label for this sample (0 or 1).
             target_label = _next_target_label()
 
-            # Log to console (x, y, z, T/F, count).
-            print(x, y, z, target_label, COUNT)
             COUNT += 1
 
             # Write to CSV.
@@ -156,16 +151,15 @@ async def handle_magneto(websocket) -> None:
                 CSV_WRITER.writerow([x, y, z, target_label])
                 CSV_FILE.flush()
             except Exception as exc:
-                print(f"[Magneto] Failed to write CSV row: {exc}")
+                # Swallow CSV write errors to keep console clean.
+                pass
 
-    except websockets.ConnectionClosedOK:
-        print(f"[Magneto] Client closed: {peer}")
-    except websockets.ConnectionClosedError:
-        print(f"[Magneto] Client error/closed: {peer}")
-    except Exception as exc:
-        print(f"[Magneto] Error: {exc}")
-    finally:
-        print(f"[Magneto] Connection finished: {peer}")
+    except (websockets.ConnectionClosedOK, websockets.ConnectionClosedError):
+        # No logging; keep console reserved for target flips.
+        pass
+    except Exception:
+        # Unexpected errors are suppressed to avoid extra console output.
+        pass
 
 
 async def main() -> None:
@@ -173,9 +167,6 @@ async def main() -> None:
 
     CSV_WRITER, CSV_FILE, CSV_FILE_PATH = _init_csv_writer()
     _init_target_state()
-
-    print(f"[Magneto] Logging to CSV: {CSV_FILE_PATH}")
-    print(f"[Magneto] Listening on ws://{HOST}:{PORT}")
 
     async with websockets.serve(handle_magneto, HOST, PORT):
         try:
@@ -192,4 +183,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n[Magneto] Server stopped by user")
+        # Suppress shutdown print to keep console clean.
+        pass
