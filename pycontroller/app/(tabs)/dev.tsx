@@ -662,6 +662,12 @@ function TouchpadComponent({
             }}
             value={keyboardText}
             onChangeText={onKeyboardTextChange}
+            onKeyPress={(e) => {
+              // Handle backspace in Raw mode even when text is empty
+              if (!chatMode && e.nativeEvent.key === 'Backspace') {
+                onSendKey('backspace');
+              }
+            }}
             placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Inputs are immediately sent to device"}
             placeholderTextColor="#666"
             multiline
@@ -719,6 +725,12 @@ function TouchpadComponent({
                     }}
                     value={keyboardText}
                     onChangeText={onKeyboardTextChange}
+                    onKeyPress={(e) => {
+                      // Handle backspace in Raw mode even when text is empty
+                      if (!chatMode && e.nativeEvent.key === 'Backspace') {
+                        onSendKey('backspace');
+                      }
+                    }}
                     placeholder={chatMode ? "Type here..." : "Inputs are immediately sent to device"}
                     placeholderTextColor="#666"
                     multiline
@@ -777,15 +789,20 @@ function TouchpadComponent({
                   {/* Dismiss button - hugging right */}
                   <Pressable
                     onPress={() => {
-                      // Force blur both inputs
-                      if (keyboardInputAccessoryRef.current) {
-                        keyboardInputAccessoryRef.current.blur();
-                      }
-                      if (keyboardInputRef.current) {
-                        keyboardInputRef.current.blur();
-                      }
-                      // Dismiss keyboard immediately
-                      Keyboard.dismiss();
+                      // Use requestAnimationFrame to ensure proper timing
+                      requestAnimationFrame(() => {
+                        // Force blur both inputs
+                        if (keyboardInputAccessoryRef.current) {
+                          keyboardInputAccessoryRef.current.blur();
+                        }
+                        if (keyboardInputRef.current) {
+                          keyboardInputRef.current.blur();
+                        }
+                        // Dismiss keyboard after a brief delay to ensure blur completes
+                        setTimeout(() => {
+                          Keyboard.dismiss();
+                        }, 50);
+                      });
                     }}
                     style={{
                       backgroundColor: '#39ff14',
@@ -824,11 +841,17 @@ function TouchpadComponent({
                     textAlignVertical: 'top',
                   }}
                   value={keyboardText}
-                  onChangeText={chatMode ? onKeyboardTextChange : undefined}
+                  onChangeText={onKeyboardTextChange}
+                  onKeyPress={(e) => {
+                    // Handle backspace in Raw mode even when text is empty
+                    if (!chatMode && e.nativeEvent.key === 'Backspace') {
+                      onSendKey('backspace');
+                    }
+                  }}
                   placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Inputs are immediately sent to device"}
                   placeholderTextColor="#666"
                   multiline
-                  editable={chatMode}
+                  editable={true}
                   autoCorrect={false}
                   autoCapitalize="none"
                   onSubmitEditing={() => {
@@ -877,12 +900,17 @@ function TouchpadComponent({
                 {/* Dismiss button - hugging right */}
                 <Pressable
                   onPress={() => {
-                    // Force blur input
-                    if (keyboardInputRef.current) {
-                      keyboardInputRef.current.blur();
-                    }
-                    // Dismiss keyboard immediately
-                    Keyboard.dismiss();
+                    // Use requestAnimationFrame to ensure proper timing
+                    requestAnimationFrame(() => {
+                      // Force blur input
+                      if (keyboardInputRef.current) {
+                        keyboardInputRef.current.blur();
+                      }
+                      // Dismiss keyboard after a brief delay to ensure blur completes
+                      setTimeout(() => {
+                        Keyboard.dismiss();
+                      }, 50);
+                    });
                   }}
                   style={{
                     backgroundColor: '#39ff14',
@@ -1616,8 +1644,8 @@ export default function DevScreen() {
               const oldText = lastKeyboardTextRef.current;
               
               if (!chatMode) {
-                // Raw Mode: send immediately, but temporarily store text to keep keyboard open
-                // We'll clear it after sending
+                // Raw Mode: send immediately, temporarily store text to keep keyboard open
+                // Store it so keyboard stays visible, but clear it after a brief delay
                 setKeyboardText(newText);
                 lastKeyboardTextRef.current = newText;
                 
