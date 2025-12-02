@@ -125,11 +125,13 @@ function TouchpadComponent({
   onTouchEvent,
   onClick,
   onDragEvent,
+  onScrollEvent,
 }: {
   onDismiss: () => void;
   onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
   onClick: (x: number, y: number) => void;
   onDragEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
+  onScrollEvent: (deltaY: number) => void;
 }) {
   const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
   const [isTouching, setIsTouching] = useState(false);
@@ -146,9 +148,22 @@ function TouchpadComponent({
   const dragModeRef = React.useRef<boolean>(false);
   const pendingDragModeRef = React.useRef<boolean>(false); // Set after double tap, activated on movement
 
+  // Scroll wheel state
+  const leftScrollRef = React.useRef<View>(null);
+  const rightScrollRef = React.useRef<View>(null);
+  const [isScrolling, setIsScrolling] = useState<'left' | 'right' | null>(null);
+  const scrollOriginYRef = React.useRef<number | null>(null);
+  const scrollCurrentYRef = React.useRef<number | null>(null);
+  const scrollIntervalRef = React.useRef<number | null>(null);
+  const scrollAccumulatedRef = React.useRef<number>(0); // Accumulate fractional scrolls
+  const [scrollPosition, setScrollPosition] = useState({ left: 0, right: 0 }); // Visual scroll position for infinite scrolling
+  const scrollTargetRef = React.useRef({ left: 0, right: 0 }); // Target position for interpolation
+  const scrollInterpolatedRef = React.useRef({ left: 0, right: 0 }); // Interpolated position
+
   // Calculate the size to be a 1:1 square based on screen dimensions
   const minDimension = Math.min(screenWidth, screenHeight);
   const touchpadDimension = minDimension * 0.8; // 80% of the smaller dimension
+  const scrollWheelWidth = 40; // Width of scroll wheels in pixels
 
   // Keep refs in sync with state for interval callback
   useEffect(() => {
@@ -354,23 +369,226 @@ function TouchpadComponent({
     }
   };
 
+  // Scroll wheel handlers
+  const handleScrollStart = (side: 'left' | 'right', evt: any) => {
+    const touch = evt.nativeEvent.touches[0];
+    if (!touch) return;
+    
+    const scrollRef = side === 'left' ? leftScrollRef : rightScrollRef;
+    if (!scrollRef.current) return;
+    
+    scrollRef.current.measure((x, y, width, height, pageX, pageY) => {
+      const localY = touch.pageY - pageY;
+      scrollOriginYRef.current = localY;
+      scrollCurrentYRef.current = localY;
+      scrollAccumulatedRef.current = 0;
+      setIsScrolling(side);
+    });
+  };
+
+  const handleScrollMove = (side: 'left' | 'right', evt: any) => {
+    if (!isScrolling || isScrolling !== side) return;
+    
+    const touch = evt.nativeEvent.touches[0];
+    if (!touch) return;
+    
+    const scrollRef = side === 'left' ? leftScrollRef : rightScrollRef;
+    if (!scrollRef.current) return;
+    
+    scrollRef.current.measure((x, y, width, height, pageX, pageY) => {
+      const localY = touch.pageY - pageY;
+      scrollCurrentYRef.current = localY;
+    });
+  };
+
+  const handleScrollEnd = () => {
+    setIsScrolling(null);
+    scrollOriginYRef.current = null;
+    scrollCurrentYRef.current = null;
+    scrollAccumulatedRef.current = 0;
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  };
+
+  // Scroll wheel continuous update effect with interpolation
+  useEffect(() => {
+    if (isScrolling && scrollOriginYRef.current !== null) {
+      let lastProcessedY = scrollOriginYRef.current;
+      const side = isScrolling;
+      
+      // Send scroll events at 60Hz for smoother scrolling
+      scrollIntervalRef.current = setInterval(() => {
+        const currentY = scrollCurrentYRef.current;
+        const originY = scrollOriginYRef.current;
+        
+        if (currentY !== null && originY !== null) {
+          // Calculate total delta from origin (negative = scroll up, positive = scroll down)
+          const totalDeltaY = originY - currentY;
+          const deltaSinceLast = lastProcessedY - currentY;
+          
+          if (Math.abs(deltaSinceLast) > 0.1) { // Small threshold to avoid jitter
+            // Normalize delta to scroll amount (scale factor for sensitivity)
+            // Use smaller multiplier for smoother, more precise scrolling
+            const scrollAmount = deltaSinceLast * 0.05;
+            onScrollEvent(scrollAmount);
+            
+            // Update visual scroll position (infinite scrolling - use modulo to wrap)
+            const tickHeight = 20; // Height of each tick mark in pixels
+            const scrollDelta = deltaSinceLast;
+            scrollTargetRef.current[side] += scrollDelta;
+            
+            // Wrap around for infinite scrolling (modulo with large range)
+            const maxScroll = 10000; // Large number for infinite feel
+            scrollTargetRef.current[side] = ((scrollTargetRef.current[side] % maxScroll) + maxScroll) % maxScroll;
+            
+            lastProcessedY = currentY;
+          }
+        }
+      }, 16); // ~60Hz for smoother scrolling
+    } else {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+  }, [isScrolling, onScrollEvent]);
+
+  // Interpolation effect for smooth visual scrolling
+  useEffect(() => {
+    const interpolationInterval = setInterval(() => {
+      // Smooth interpolation towards target position
+      const smoothing = 0.15; // Interpolation factor (lower = smoother but slower)
+      scrollInterpolatedRef.current.left += (scrollTargetRef.current.left - scrollInterpolatedRef.current.left) * smoothing;
+      scrollInterpolatedRef.current.right += (scrollTargetRef.current.right - scrollInterpolatedRef.current.right) * smoothing;
+      
+      setScrollPosition({
+        left: scrollInterpolatedRef.current.left,
+        right: scrollInterpolatedRef.current.right,
+      });
+    }, 16); // ~60Hz for smooth animation
+
+    return () => clearInterval(interpolationInterval);
+  }, []);
+
+  // Ruler scroll wheel component
+  const RulerScrollWheel = ({ side, scrollPos }: { side: 'left' | 'right'; scrollPos: number }) => {
+    const tickHeight = 20; // Height between major ticks
+    const minorTickHeight = 10; // Height between minor ticks
+    const numTicks = Math.ceil(touchpadDimension / minorTickHeight) + 2; // Extra ticks for seamless scrolling
+    
+    // Calculate offset for infinite scrolling
+    const baseOffset = scrollPos % tickHeight;
+    const offset = baseOffset - (baseOffset % minorTickHeight);
+    
+    return (
+      <View style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+        {/* Ruler ticks */}
+        {Array.from({ length: numTicks }).map((_, i) => {
+          const tickY = i * minorTickHeight - offset;
+          const isMajorTick = i % 2 === 0;
+          const tickLength = isMajorTick ? scrollWheelWidth * 0.6 : scrollWheelWidth * 0.4;
+          
+          return (
+            <View
+              key={i}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: tickY,
+                width: scrollWheelWidth,
+                height: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: tickLength,
+                  height: 1,
+                  backgroundColor: '#39ff14',
+                  opacity: isMajorTick ? 0.8 : 0.4,
+                }}
+              />
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, width: '100%' }}>
-      <View
-        ref={touchpadRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        style={{
-          width: touchpadDimension,
-          height: touchpadDimension,
-          backgroundColor: '#000',
-          borderWidth: 2,
-          borderColor: '#39ff14',
-          borderRadius: 8,
-        }}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Left scroll wheel - positioned outside the touchpad */}
+        <View
+          ref={leftScrollRef}
+          onTouchStart={(evt) => handleScrollStart('left', evt)}
+          onTouchMove={(evt) => handleScrollMove('left', evt)}
+          onTouchEnd={handleScrollEnd}
+          onTouchCancel={handleScrollEnd}
+          style={{
+            width: scrollWheelWidth,
+            height: touchpadDimension,
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderColor: '#39ff14',
+            borderRadius: 8,
+            marginRight: 4, // Gap between scroll wheel and touchpad
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <RulerScrollWheel side="left" scrollPos={scrollPosition.left} />
+        </View>
+        
+        {/* Main touchpad */}
+        <View
+          ref={touchpadRef}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          style={{
+            width: touchpadDimension,
+            height: touchpadDimension,
+            backgroundColor: '#000',
+            borderWidth: 2,
+            borderColor: '#39ff14',
+            borderRadius: 8,
+          }}
+        />
+        
+        {/* Right scroll wheel - positioned outside the touchpad */}
+        <View
+          ref={rightScrollRef}
+          onTouchStart={(evt) => handleScrollStart('right', evt)}
+          onTouchMove={(evt) => handleScrollMove('right', evt)}
+          onTouchEnd={handleScrollEnd}
+          onTouchCancel={handleScrollEnd}
+          style={{
+            width: scrollWheelWidth,
+            height: touchpadDimension,
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderColor: '#39ff14',
+            borderRadius: 8,
+            marginLeft: 4, // Gap between scroll wheel and touchpad
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <RulerScrollWheel side="right" scrollPos={scrollPosition.right} />
+        </View>
+      </View>
       <Pressable
         onPress={onDismiss}
         style={{
@@ -1045,6 +1263,20 @@ export default function DevScreen() {
                   mouseWsRef.current.send(payload);
                 } catch (err) {
                   console.warn('[Mouse] Failed to send drag event', err);
+                }
+              }
+            }}
+            onScrollEvent={(deltaY) => {
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'scroll',
+                    t: Date.now(),
+                    deltaY,
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send scroll event', err);
                 }
               }
             }}

@@ -40,6 +40,14 @@ Message format:
         "screenWidth": <int>,
         "screenHeight": <int>
     }
+    
+    OR
+    
+    {
+        "type": "scroll",
+        "t": <unix_ms>,
+        "deltaY": <float>  // scroll amount (negative = up, positive = down)
+    }
 """
 
 from __future__ import annotations
@@ -82,6 +90,8 @@ async def handle_touch(websocket) -> None:
     is_dragging: bool = False
     drag_origin_norm: Optional[Tuple[float, float]] = None
     drag_mouse_origin_pos: Optional[Tuple[int, int]] = None
+    # Scroll accumulator for smooth decimal scrolling
+    scroll_accumulator: float = 0.0
 
     try:
         async for message in websocket:
@@ -92,6 +102,25 @@ async def handle_touch(websocket) -> None:
                 continue
 
             msg_type = data.get("type")
+            
+            # Handle scroll events
+            if msg_type == "scroll":
+                delta_y = data.get("deltaY", 0.0)
+                try:
+                    # Accumulate fractional scrolls for smooth decimal scrolling
+                    # Negative deltaY means scroll up, positive means scroll down
+                    # We accumulate fractional scrolls and only execute when >= 1.0
+                    scroll_accumulator += -delta_y * 2.0  # Scale factor for sensitivity
+                    
+                    # Execute scroll when accumulated value >= 1.0 or <= -1.0
+                    if abs(scroll_accumulator) >= 1.0:
+                        scroll_clicks = int(scroll_accumulator)
+                        scroll_accumulator -= scroll_clicks  # Keep the remainder
+                        if scroll_clicks != 0:
+                            pyautogui.scroll(scroll_clicks)
+                except Exception as e:
+                    print(f"[Mouse] Failed to scroll: {e}")
+                continue
             
             # Handle click events
             if msg_type == "click":
