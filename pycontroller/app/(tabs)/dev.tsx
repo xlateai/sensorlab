@@ -127,15 +127,59 @@ function TouchpadComponent({
   onDismiss: () => void;
   onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
 }) {
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
+  const [isTouching, setIsTouching] = useState(false);
   const touchpadRef = React.useRef<View>(null);
-  const [touchpadSize, setTouchpadSize] = useState({ width: 0, height: 0 });
+  const intervalRef = React.useRef<number | null>(null);
+  const lastSentRef = React.useRef<{ x: number; y: number } | null>(null);
+  const currentTouchRef = React.useRef<{ x: number; y: number } | null>(null);
 
   // Calculate the size to be a 1:1 square based on screen dimensions
   const minDimension = Math.min(screenWidth, screenHeight);
   const touchpadDimension = minDimension * 0.8; // 80% of the smaller dimension
 
-  const handleTouchStart = (evt: any) => {
+  // Keep ref in sync with state for interval callback
+  useEffect(() => {
+    currentTouchRef.current = currentTouch;
+  }, [currentTouch]);
+
+  // Send coordinates at 30Hz (~33ms interval) when actively touching
+  useEffect(() => {
+    if (isTouching && currentTouch) {
+      // Send start event immediately on first touch
+      onTouchEvent('start', currentTouch.x, currentTouch.y);
+      lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
+
+      // Then send coordinates at 30Hz
+      intervalRef.current = setInterval(() => {
+        const touch = currentTouchRef.current;
+        if (touch && lastSentRef.current) {
+          // Always send current position (Python will interpolate)
+          onTouchEvent('move', touch.x, touch.y);
+          lastSentRef.current = { x: touch.x, y: touch.y };
+        }
+      }, 33); // ~30Hz
+    } else {
+      // Touch ended, send end event and clear interval
+      if (lastSentRef.current) {
+        onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+        lastSentRef.current = null;
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isTouching, onTouchEvent]);
+
+  const updateTouchPosition = (evt: any) => {
     const touch = evt.nativeEvent.touches[0];
     if (!touch || !touchpadRef.current) return;
 
@@ -147,44 +191,28 @@ function TouchpadComponent({
       const normalizedX = Math.max(0, Math.min(1, localX / width));
       const normalizedY = Math.max(0, Math.min(1, localY / height));
 
-      setTouchStart({ x: normalizedX, y: normalizedY });
-      onTouchEvent('start', normalizedX, normalizedY);
+      setCurrentTouch({ x: normalizedX, y: normalizedY });
     });
+  };
+
+  const handleTouchStart = (evt: any) => {
+    updateTouchPosition(evt);
+    setIsTouching(true);
   };
 
   const handleTouchMove = (evt: any) => {
-    if (!touchStart || !touchpadRef.current) return;
-
-    const touch = evt.nativeEvent.touches[0];
-    if (!touch) return;
-
-    touchpadRef.current.measure((x, y, width, height, pageX, pageY) => {
-      const localX = touch.pageX - pageX;
-      const localY = touch.pageY - pageY;
-
-      // Normalize coordinates (0-1)
-      const normalizedX = Math.max(0, Math.min(1, localX / width));
-      const normalizedY = Math.max(0, Math.min(1, localY / height));
-
-      onTouchEvent('move', normalizedX, normalizedY);
-    });
+    updateTouchPosition(evt);
   };
 
   const handleTouchEnd = () => {
-    if (touchStart) {
-      onTouchEvent('end', touchStart.x, touchStart.y);
-      setTouchStart(null);
-    }
+    setIsTouching(false);
+    setCurrentTouch(null);
   };
 
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, width: '100%' }}>
       <View
         ref={touchpadRef}
-        onLayout={(e) => {
-          const { width, height } = e.nativeEvent.layout;
-          setTouchpadSize({ width, height });
-        }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -341,6 +369,19 @@ export default function DevScreen() {
   const disconnectMouseSocket = () => {
     if (mouseWsRef.current) {
       try {
+        // Send end event before closing to reset mouse tracking
+        if (mouseWsRef.current.readyState === WebSocket.OPEN) {
+          const payload = JSON.stringify({
+            type: 'touch',
+            t: Date.now(),
+            action: 'end',
+            x: 0,
+            y: 0,
+            screenWidth: Math.round(screenWidth),
+            screenHeight: Math.round(screenHeight),
+          });
+          mouseWsRef.current.send(payload);
+        }
         mouseWsRef.current.close();
       } catch (err) {
         console.warn('[Mouse] Error closing WebSocket', err);
@@ -445,9 +486,7 @@ export default function DevScreen() {
     }
 
     return () => {
-      if (!mouseControlActive) {
-        disconnectMouseSocket();
-      }
+      disconnectMouseSocket();
     };
   }, [mouseControlActive]);
 
@@ -770,6 +809,23 @@ export default function DevScreen() {
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
+          // Send end event before closing
+          if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+            try {
+              const payload = JSON.stringify({
+                type: 'touch',
+                t: Date.now(),
+                action: 'end',
+                x: 0,
+                y: 0,
+                screenWidth: Math.round(screenWidth),
+                screenHeight: Math.round(screenHeight),
+              });
+              mouseWsRef.current.send(payload);
+            } catch (err) {
+              console.warn('[Mouse] Failed to send end event', err);
+            }
+          }
           setTouchpadVisible(false);
           setMouseControlActive(false);
         }}
@@ -777,6 +833,23 @@ export default function DevScreen() {
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)', justifyContent: 'center', alignItems: 'center' }}>
           <TouchpadComponent
             onDismiss={() => {
+              // Send end event before closing
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'touch',
+                    t: Date.now(),
+                    action: 'end',
+                    x: 0,
+                    y: 0,
+                    screenWidth: Math.round(screenWidth),
+                    screenHeight: Math.round(screenHeight),
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send end event', err);
+                }
+              }
               setTouchpadVisible(false);
               setMouseControlActive(false);
             }}
