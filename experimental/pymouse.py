@@ -146,11 +146,59 @@ async def handle_touch(websocket) -> None:
                 dx_norm = float(x) - touch_origin_norm[0]
                 dy_norm = float(y) - touch_origin_norm[1]
 
-                # Map that delta to pixel space relative to where the mouse was
-                target_x = int(mouse_origin_pos[0] + dx_norm * screen_width)
-                target_y = int(mouse_origin_pos[1] + dy_norm * screen_height)
+                # Calculate dynamic sensitivity based on available movement range
+                # This ensures the full finger range maps to the full mouse range from current position to edges
+                
+                # X axis: calculate sensitivity for left and right movement separately
+                mouse_x = mouse_origin_pos[0]
+                touch_origin_x = touch_origin_norm[0]
+                
+                # Available mouse movement ranges
+                mouse_range_right = (screen_width - 1) - mouse_x  # Distance to right edge
+                mouse_range_left = mouse_x  # Distance to left edge
+                
+                # Available finger movement ranges
+                finger_range_right = 1.0 - touch_origin_x  # Distance to right edge
+                finger_range_left = touch_origin_x  # Distance to left edge
+                
+                # Calculate sensitivity based on direction
+                if dx_norm > 0:  # Moving right
+                    if finger_range_right > 0:
+                        sensitivity_x = mouse_range_right / finger_range_right
+                    else:
+                        sensitivity_x = screen_width  # Fallback if at right edge
+                else:  # Moving left (dx_norm <= 0)
+                    if finger_range_left > 0:
+                        sensitivity_x = mouse_range_left / finger_range_left
+                    else:
+                        sensitivity_x = screen_width  # Fallback if at left edge
+                
+                # Y axis: same logic
+                mouse_y = mouse_origin_pos[1]
+                touch_origin_y = touch_origin_norm[1]
+                
+                mouse_range_down = (screen_height - 1) - mouse_y
+                mouse_range_up = mouse_y
+                
+                finger_range_down = 1.0 - touch_origin_y
+                finger_range_up = touch_origin_y
+                
+                if dy_norm > 0:  # Moving down
+                    if finger_range_down > 0:
+                        sensitivity_y = mouse_range_down / finger_range_down
+                    else:
+                        sensitivity_y = screen_height  # Fallback if at bottom edge
+                else:  # Moving up (dy_norm <= 0)
+                    if finger_range_up > 0:
+                        sensitivity_y = mouse_range_up / finger_range_up
+                    else:
+                        sensitivity_y = screen_height  # Fallback if at top edge
+                
+                # Apply sensitivity to map finger movement to mouse movement
+                target_x = int(mouse_x + dx_norm * sensitivity_x)
+                target_y = int(mouse_y + dy_norm * sensitivity_y)
 
-                # Clamp to screen bounds
+                # Clamp to screen bounds (ensures we can always reach edges)
                 target_x = max(0, min(screen_width - 1, target_x))
                 target_y = max(0, min(screen_height - 1, target_y))
                 target_pos = (target_x, target_y)
