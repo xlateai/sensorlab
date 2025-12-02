@@ -660,18 +660,8 @@ function TouchpadComponent({
               minHeight: 50,
               textAlignVertical: 'top',
             }}
-            value={chatMode ? keyboardText : ''}
-            onChangeText={chatMode ? onKeyboardTextChange : (text) => {
-              // In Raw mode, send immediately and don't store
-              onKeyboardTextChange(text);
-              // Clear immediately after processing
-              setTimeout(() => {
-                if (!chatMode) {
-                  setKeyboardText('');
-                  lastKeyboardTextRef.current = '';
-                }
-              }, 0);
-            }}
+            value={keyboardText}
+            onChangeText={onKeyboardTextChange}
             placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Inputs are immediately sent to device"}
             placeholderTextColor="#666"
             multiline
@@ -727,12 +717,12 @@ function TouchpadComponent({
                       maxHeight: 100,
                       textAlignVertical: 'top',
                     }}
-                    value={chatMode ? keyboardText : ''}
-                    onChangeText={chatMode ? onKeyboardTextChange : undefined}
+                    value={keyboardText}
+                    onChangeText={onKeyboardTextChange}
                     placeholder={chatMode ? "Type here..." : "Inputs are immediately sent to device"}
                     placeholderTextColor="#666"
                     multiline
-                    editable={chatMode}
+                    editable={true}
                     autoCorrect={false}
                     autoCapitalize="none"
                     onSubmitEditing={() => {
@@ -787,9 +777,15 @@ function TouchpadComponent({
                   {/* Dismiss button - hugging right */}
                   <Pressable
                     onPress={() => {
+                      // Force blur both inputs
+                      if (keyboardInputAccessoryRef.current) {
+                        keyboardInputAccessoryRef.current.blur();
+                      }
+                      if (keyboardInputRef.current) {
+                        keyboardInputRef.current.blur();
+                      }
+                      // Dismiss keyboard immediately
                       Keyboard.dismiss();
-                      keyboardInputAccessoryRef.current?.blur();
-                      keyboardInputRef.current?.blur();
                     }}
                     style={{
                       backgroundColor: '#39ff14',
@@ -827,7 +823,7 @@ function TouchpadComponent({
                     minHeight: 50,
                     textAlignVertical: 'top',
                   }}
-                  value={chatMode ? keyboardText : ''}
+                  value={keyboardText}
                   onChangeText={chatMode ? onKeyboardTextChange : undefined}
                   placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Inputs are immediately sent to device"}
                   placeholderTextColor="#666"
@@ -881,8 +877,12 @@ function TouchpadComponent({
                 {/* Dismiss button - hugging right */}
                 <Pressable
                   onPress={() => {
+                    // Force blur input
+                    if (keyboardInputRef.current) {
+                      keyboardInputRef.current.blur();
+                    }
+                    // Dismiss keyboard immediately
                     Keyboard.dismiss();
-                    keyboardInputRef.current?.blur();
                   }}
                   style={{
                     backgroundColor: '#39ff14',
@@ -1615,71 +1615,79 @@ export default function DevScreen() {
               // Use ref to get the previous value to avoid stale closure issues
               const oldText = lastKeyboardTextRef.current;
               
-              // Always update the text state first to allow normal editing
-              setKeyboardText(newText);
-              lastKeyboardTextRef.current = newText;
-              
-              // Only send keystrokes as user types in Raw Mode (not Chat Mode)
-              if (!chatMode && mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  if (newText.length > oldText.length) {
-                    // Text was added - send new characters
-                    const addedChars = newText.slice(oldText.length);
-                    for (const char of addedChars) {
-                      const payload = JSON.stringify({
-                        type: 'key',
-                        t: Date.now(),
-                        key: char,
-                      });
-                      mouseWsRef.current.send(payload);
+              if (!chatMode) {
+                // Raw Mode: send immediately, but temporarily store text to keep keyboard open
+                // We'll clear it after sending
+                setKeyboardText(newText);
+                lastKeyboardTextRef.current = newText;
+                
+                if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                  try {
+                    if (newText.length > oldText.length) {
+                      // Text was added - send new characters
+                      const addedChars = newText.slice(oldText.length);
+                      for (const char of addedChars) {
+                        const payload = JSON.stringify({
+                          type: 'key',
+                          t: Date.now(),
+                          key: char,
+                        });
+                        mouseWsRef.current.send(payload);
+                      }
+                    } else if (newText.length < oldText.length) {
+                      // Text was deleted - send backspace
+                      const deletedCount = oldText.length - newText.length;
+                      for (let i = 0; i < deletedCount; i++) {
+                        const payload = JSON.stringify({
+                          type: 'key',
+                          t: Date.now(),
+                          key: 'backspace',
+                        });
+                        mouseWsRef.current.send(payload);
+                      }
+                    } else if (newText !== oldText) {
+                      // Text was modified in place
+                      let i = 0;
+                      while (i < Math.min(oldText.length, newText.length) && oldText[i] === newText[i]) {
+                        i++;
+                      }
+                      const deletedFromPos = oldText.length - i;
+                      
+                      // Send backspaces for deleted characters
+                      for (let j = 0; j < deletedFromPos; j++) {
+                        const payload = JSON.stringify({
+                          type: 'key',
+                          t: Date.now(),
+                          key: 'backspace',
+                        });
+                        mouseWsRef.current.send(payload);
+                      }
+                      // Send new characters
+                      for (let j = i; j < newText.length; j++) {
+                        const payload = JSON.stringify({
+                          type: 'key',
+                          t: Date.now(),
+                          key: newText[j],
+                        });
+                        mouseWsRef.current.send(payload);
+                      }
                     }
-                  } else if (newText.length < oldText.length) {
-                    // Text was deleted - send backspace
-                    // Calculate how many characters were deleted
-                    const deletedCount = oldText.length - newText.length;
-                    for (let i = 0; i < deletedCount; i++) {
-                      const payload = JSON.stringify({
-                        type: 'key',
-                        t: Date.now(),
-                        key: 'backspace',
-                      });
-                      mouseWsRef.current.send(payload);
-                    }
-                  } else if (newText !== oldText) {
-                    // Text was modified in place (e.g., character replaced)
-                    // This can happen with autocorrect or when editing in the middle
-                    // For simplicity, send backspace for deleted chars and type new ones
-                    // Find the difference
-                    let i = 0;
-                    while (i < Math.min(oldText.length, newText.length) && oldText[i] === newText[i]) {
-                      i++;
-                    }
-                    // Characters from position i onwards changed
-                    const deletedFromPos = oldText.length - i;
-                    const addedFromPos = newText.length - i;
-                    
-                    // Send backspaces for deleted characters
-                    for (let j = 0; j < deletedFromPos; j++) {
-                      const payload = JSON.stringify({
-                        type: 'key',
-                        t: Date.now(),
-                        key: 'backspace',
-                      });
-                      mouseWsRef.current.send(payload);
-                    }
-                    // Send new characters
-                    for (let j = i; j < newText.length; j++) {
-                      const payload = JSON.stringify({
-                        type: 'key',
-                        t: Date.now(),
-                        key: newText[j],
-                      });
-                      mouseWsRef.current.send(payload);
-                    }
+                  } catch (err) {
+                    console.warn('[Keyboard] Failed to send keystroke', err);
                   }
-                } catch (err) {
-                  console.warn('[Keyboard] Failed to send keystroke', err);
                 }
+                // Clear text in Raw Mode after a delay to keep keyboard open
+                // Only clear if text hasn't changed (user stopped typing)
+                setTimeout(() => {
+                  if (!chatMode && lastKeyboardTextRef.current === newText) {
+                    setKeyboardText('');
+                    lastKeyboardTextRef.current = '';
+                  }
+                }, 200);
+              } else {
+                // Chat Mode - store the text normally
+                setKeyboardText(newText);
+                lastKeyboardTextRef.current = newText;
               }
             }}
             onSendKey={(key) => {
