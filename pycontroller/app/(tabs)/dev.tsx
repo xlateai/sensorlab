@@ -124,10 +124,12 @@ function TouchpadComponent({
   onDismiss,
   onTouchEvent,
   onClick,
+  onDragEvent,
 }: {
   onDismiss: () => void;
   onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
   onClick: (x: number, y: number) => void;
+  onDragEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
 }) {
   const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
   const [isTouching, setIsTouching] = useState(false);
@@ -137,50 +139,109 @@ function TouchpadComponent({
   const currentTouchRef = React.useRef<{ x: number; y: number } | null>(null);
   const initialTouchRef = React.useRef<{ x: number; y: number } | null>(null);
   const hasMovedRef = React.useRef<boolean>(false);
+  
+  // Double tap detection for drag
+  const lastTapRef = React.useRef<{ time: number; x: number; y: number } | null>(null);
+  const [isDragMode, setIsDragMode] = useState(false);
+  const dragModeRef = React.useRef<boolean>(false);
+  const pendingDragModeRef = React.useRef<boolean>(false); // Set after double tap, activated on movement
 
   // Calculate the size to be a 1:1 square based on screen dimensions
   const minDimension = Math.min(screenWidth, screenHeight);
   const touchpadDimension = minDimension * 0.8; // 80% of the smaller dimension
 
-  // Keep ref in sync with state for interval callback
+  // Keep refs in sync with state for interval callback
   useEffect(() => {
     currentTouchRef.current = currentTouch;
   }, [currentTouch]);
+  
+  useEffect(() => {
+    dragModeRef.current = isDragMode;
+  }, [isDragMode]);
 
   // Send coordinates at 30Hz (~33ms interval) when actively touching
   useEffect(() => {
     if (isTouching && currentTouch) {
-      // Send start event immediately on first touch
-      onTouchEvent('start', currentTouch.x, currentTouch.y);
-      lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
-      initialTouchRef.current = { x: currentTouch.x, y: currentTouch.y };
-      hasMovedRef.current = false;
-
-      // Then send coordinates at 30Hz
-      intervalRef.current = setInterval(() => {
-        const touch = currentTouchRef.current;
-        if (touch && lastSentRef.current && initialTouchRef.current) {
-          // Check if we've moved significantly (more than 0.02 normalized units = ~2% of touchpad)
-          const dx = Math.abs(touch.x - initialTouchRef.current.x);
-          const dy = Math.abs(touch.y - initialTouchRef.current.y);
-          if (dx > 0.02 || dy > 0.02) {
-            hasMovedRef.current = true;
-          }
-          
-          // Always send current position (Python will interpolate)
-          onTouchEvent('move', touch.x, touch.y);
-          lastSentRef.current = { x: touch.x, y: touch.y };
+      const isDrag = dragModeRef.current;
+      const pendingDrag = pendingDragModeRef.current;
+      
+      if (isDrag) {
+        // In drag mode, send drag events
+        if (!lastSentRef.current) {
+          // First touch in drag mode - send drag start
+          onDragEvent('start', currentTouch.x, currentTouch.y);
         }
-      }, 33); // ~30Hz
+        lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
+        initialTouchRef.current = { x: currentTouch.x, y: currentTouch.y };
+
+        // Send drag move events at 30Hz
+        intervalRef.current = setInterval(() => {
+          const touch = currentTouchRef.current;
+          if (touch && lastSentRef.current) {
+            onDragEvent('move', touch.x, touch.y);
+            lastSentRef.current = { x: touch.x, y: touch.y };
+          }
+        }, 33); // ~30Hz
+      } else {
+        // Normal touch mode (or pending drag mode)
+        // Send start event immediately on first touch
+        onTouchEvent('start', currentTouch.x, currentTouch.y);
+        lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
+        initialTouchRef.current = { x: currentTouch.x, y: currentTouch.y };
+        hasMovedRef.current = false;
+
+        // Then send coordinates at 30Hz
+        intervalRef.current = setInterval(() => {
+          const touch = currentTouchRef.current;
+          if (touch && lastSentRef.current && initialTouchRef.current) {
+            // Check if we've moved significantly (more than 0.02 normalized units = ~2% of touchpad)
+            const dx = Math.abs(touch.x - initialTouchRef.current.x);
+            const dy = Math.abs(touch.y - initialTouchRef.current.y);
+            if (dx > 0.02 || dy > 0.02) {
+              hasMovedRef.current = true;
+              
+              // If pending drag mode and we've moved, activate drag mode
+              if (pendingDrag && !isDrag) {
+                setIsDragMode(true);
+                pendingDragModeRef.current = false;
+                // Send drag start and cancel the current touch
+                onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+                onDragEvent('start', touch.x, touch.y);
+                lastSentRef.current = { x: touch.x, y: touch.y };
+                initialTouchRef.current = { x: touch.x, y: touch.y };
+              }
+            }
+            
+            // Send events based on current mode
+            if (dragModeRef.current) {
+              // Now in drag mode, send drag move
+              onDragEvent('move', touch.x, touch.y);
+            } else {
+              // Still in normal touch mode
+              onTouchEvent('move', touch.x, touch.y);
+            }
+            lastSentRef.current = { x: touch.x, y: touch.y };
+          }
+        }, 33); // ~30Hz
+      }
     } else {
       // Touch ended
       if (lastSentRef.current && initialTouchRef.current) {
-        // If no significant movement, treat as a click
-        if (!hasMovedRef.current) {
-          onClick(initialTouchRef.current.x, initialTouchRef.current.y);
+        const isDrag = dragModeRef.current;
+        
+        if (isDrag) {
+          // Send drag end event
+          onDragEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+          setIsDragMode(false);
         } else {
-          // Otherwise send normal end event
-          onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+          // Normal touch mode
+          // If no significant movement, treat as a click
+          if (!hasMovedRef.current) {
+            onClick(initialTouchRef.current.x, initialTouchRef.current.y);
+          } else {
+            // Otherwise send normal end event
+            onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+          }
         }
         lastSentRef.current = null;
         initialTouchRef.current = null;
@@ -198,7 +259,7 @@ function TouchpadComponent({
         intervalRef.current = null;
       }
     };
-  }, [isTouching, onTouchEvent, onClick]);
+  }, [isTouching, isDragMode, onTouchEvent, onClick, onDragEvent]);
 
   const updateTouchPosition = (evt: any) => {
     const touch = evt.nativeEvent.touches[0];
@@ -218,16 +279,62 @@ function TouchpadComponent({
 
   const handleTouchStart = (evt: any) => {
     updateTouchPosition(evt);
+    
+    // Check for double tap
+    const now = Date.now();
+    const touch = evt.nativeEvent.touches[0];
+    if (touch && touchpadRef.current) {
+      touchpadRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const localX = touch.pageX - pageX;
+        const localY = touch.pageY - pageY;
+        const normalizedX = Math.max(0, Math.min(1, localX / width));
+        const normalizedY = Math.max(0, Math.min(1, localY / height));
+        
+        if (lastTapRef.current) {
+          const timeDiff = now - lastTapRef.current.time;
+          const distX = Math.abs(normalizedX - lastTapRef.current.x);
+          const distY = Math.abs(normalizedY - lastTapRef.current.y);
+          
+          // Double tap detected if within 300ms and similar position (within 0.05 normalized units)
+          if (timeDiff < 300 && distX < 0.05 && distY < 0.05) {
+            // Enter drag mode - will activate on first movement
+            setIsDragMode(true);
+            lastTapRef.current = null; // Reset to prevent triple tap
+          } else {
+            lastTapRef.current = { time: now, x: normalizedX, y: normalizedY };
+          }
+        } else {
+          lastTapRef.current = { time: now, x: normalizedX, y: normalizedY };
+        }
+      });
+    }
+    
     setIsTouching(true);
   };
 
   const handleTouchMove = (evt: any) => {
     updateTouchPosition(evt);
+    
+    // If in drag mode and we start moving, ensure drag mode is active
+    if (dragModeRef.current && !isDragMode) {
+      setIsDragMode(true);
+    }
   };
 
   const handleTouchEnd = () => {
     setIsTouching(false);
     setCurrentTouch(null);
+    
+    // Reset drag mode after a delay (in case of another double tap)
+    // But only if we're not currently in a drag operation
+    if (!isDragMode) {
+      // Clear double tap tracking after a delay
+      setTimeout(() => {
+        if (!isTouching) {
+          lastTapRef.current = null;
+        }
+      }, 300);
+    }
   };
 
   return (
@@ -903,6 +1010,24 @@ export default function DevScreen() {
                   mouseWsRef.current.send(payload);
                 } catch (err) {
                   console.warn('[Mouse] Failed to send click event', err);
+                }
+              }
+            }}
+            onDragEvent={(action, x, y) => {
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'drag',
+                    t: Date.now(),
+                    action,
+                    x,
+                    y,
+                    screenWidth: Math.round(screenWidth),
+                    screenHeight: Math.round(screenHeight),
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send drag event', err);
                 }
               }
             }}

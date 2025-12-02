@@ -28,6 +28,18 @@ Message format:
         "t": <unix_ms>,
         "button": "left" | "right" | "middle"
     }
+    
+    OR
+    
+    {
+        "type": "drag",
+        "t": <unix_ms>,
+        "action": "start" | "move" | "end",
+        "x": <float>,  // normalized 0-1
+        "y": <float>,  // normalized 0-1
+        "screenWidth": <int>,
+        "screenHeight": <int>
+    }
 """
 
 from __future__ import annotations
@@ -95,6 +107,10 @@ async def handle_touch(websocket) -> None:
     touch_origin_norm: Optional[Tuple[float, float]] = None
     # For relative control: where the mouse was when the finger first touched (absolute pixels)
     mouse_origin_pos: Optional[Tuple[int, int]] = None
+    # Drag state
+    is_dragging: bool = False
+    drag_origin_norm: Optional[Tuple[float, float]] = None
+    drag_mouse_origin_pos: Optional[Tuple[int, int]] = None
 
     try:
         async for message in websocket:
@@ -124,6 +140,147 @@ async def handle_touch(websocket) -> None:
                 mouse_x, mouse_y = pyautogui.position()
                 print(f"[Mouse] {button} click at ({mouse_x}, {mouse_y})")
                 continue
+            
+            # Handle drag events (double-tap to drag)
+            if msg_type == "drag":
+                action = data.get("action")
+                x = data.get("x")  # normalized 0-1
+                y = data.get("y")  # normalized 0-1
+
+                if action is None or x is None or y is None:
+                    continue
+
+                screen_width, screen_height = pyautogui.size()
+
+                if action == "start":
+                    # Cancel any ongoing interpolation
+                    if interpolation_task and not interpolation_task.done():
+                        interpolation_task.cancel()
+                        try:
+                            await interpolation_task
+                        except asyncio.CancelledError:
+                            pass
+
+                    # Mouse down at current position
+                    mouse_x, mouse_y = pyautogui.position()
+                    pyautogui.mouseDown(button='left')
+                    is_dragging = True
+                    drag_mouse_origin_pos = (mouse_x, mouse_y)
+                    drag_origin_norm = (float(x), float(y))
+                    current_target = (mouse_x, mouse_y)
+                    print(
+                        f"[Mouse] Drag started. "
+                        f"Mouse origin=({mouse_x}, {mouse_y}), "
+                        f"touch origin norm=({float(x):.3f}, {float(y):.3f})"
+                    )
+                    continue
+
+                elif action == "move":
+                    if not is_dragging or drag_mouse_origin_pos is None or drag_origin_norm is None:
+                        # If drag wasn't properly started, start it now
+                        mouse_x, mouse_y = pyautogui.position()
+                        pyautogui.mouseDown(button='left')
+                        is_dragging = True
+                        drag_mouse_origin_pos = (mouse_x, mouse_y)
+                        drag_origin_norm = (float(x), float(y))
+                        current_target = (mouse_x, mouse_y)
+
+                    # Compute delta in normalized space from where the drag started
+                    dx_norm = float(x) - drag_origin_norm[0]
+                    dy_norm = float(y) - drag_origin_norm[1]
+
+                    # Calculate dynamic sensitivity (same logic as touch events)
+                    mouse_x = drag_mouse_origin_pos[0]
+                    touch_origin_x = drag_origin_norm[0]
+                    
+                    mouse_range_right = (screen_width - 1) - mouse_x
+                    mouse_range_left = mouse_x
+                    
+                    finger_range_right = 1.0 - touch_origin_x
+                    finger_range_left = touch_origin_x
+                    
+                    if dx_norm > 0:
+                        if finger_range_right > 0:
+                            sensitivity_x = mouse_range_right / finger_range_right
+                        else:
+                            sensitivity_x = screen_width
+                    else:
+                        if finger_range_left > 0:
+                            sensitivity_x = mouse_range_left / finger_range_left
+                        else:
+                            sensitivity_x = screen_width
+                    
+                    mouse_y = drag_mouse_origin_pos[1]
+                    touch_origin_y = drag_origin_norm[1]
+                    
+                    mouse_range_down = (screen_height - 1) - mouse_y
+                    mouse_range_up = mouse_y
+                    
+                    finger_range_down = 1.0 - touch_origin_y
+                    finger_range_up = touch_origin_y
+                    
+                    if dy_norm > 0:
+                        if finger_range_down > 0:
+                            sensitivity_y = mouse_range_down / finger_range_down
+                        else:
+                            sensitivity_y = screen_height
+                    else:
+                        if finger_range_up > 0:
+                            sensitivity_y = mouse_range_up / finger_range_up
+                        else:
+                            sensitivity_y = screen_height
+                    
+                    # Apply sensitivity to map finger movement to mouse movement
+                    target_x = int(mouse_x + dx_norm * sensitivity_x)
+                    target_y = int(mouse_y + dy_norm * sensitivity_y)
+
+                    # Clamp to screen bounds
+                    target_x = max(0, min(screen_width - 1, target_x))
+                    target_y = max(0, min(screen_height - 1, target_y))
+                    target_pos = (target_x, target_y)
+
+                    # Cancel any ongoing interpolation
+                    if interpolation_task and not interpolation_task.done():
+                        interpolation_task.cancel()
+                        try:
+                            await interpolation_task
+                        except asyncio.CancelledError:
+                            pass
+
+                    # Start interpolation from current position to target
+                    start_pos = current_target
+                    interpolation_task = asyncio.create_task(
+                        interpolate_mouse(
+                            start_pos,
+                            target_pos,
+                            INTERPOLATION_STEPS,
+                            INTERPOLATION_DURATION,
+                            screen_width,
+                            screen_height,
+                        )
+                    )
+                    current_target = target_pos
+                    continue
+
+                elif action == "end":
+                    # Cancel any ongoing interpolation
+                    if interpolation_task and not interpolation_task.done():
+                        interpolation_task.cancel()
+                        try:
+                            await interpolation_task
+                        except asyncio.CancelledError:
+                            pass
+
+                    # Mouse up
+                    if is_dragging:
+                        pyautogui.mouseUp(button='left')
+                        is_dragging = False
+                    
+                    current_target = None
+                    drag_origin_norm = None
+                    drag_mouse_origin_pos = None
+                    print(f"[Mouse] Drag ended")
+                    continue
             
             # Handle touch events
             if msg_type != "touch":
@@ -282,6 +439,12 @@ async def handle_touch(websocket) -> None:
             try:
                 await interpolation_task
             except asyncio.CancelledError:
+                pass
+        # Release mouse button if still dragging
+        if is_dragging:
+            try:
+                pyautogui.mouseUp(button='left')
+            except:
                 pass
         print(f"[Mouse] Connection finished: {peer}")
 
