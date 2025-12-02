@@ -128,7 +128,6 @@ function TouchpadComponent({
   onScrollEvent,
   keyboardText,
   onKeyboardTextChange,
-  keyboardVisible,
   onSendKey,
 }: {
   onDismiss: () => void;
@@ -138,7 +137,6 @@ function TouchpadComponent({
   onScrollEvent: (deltaY: number) => void;
   keyboardText: string;
   onKeyboardTextChange: (text: string) => void;
-  keyboardVisible: boolean;
   onSendKey: (key: string) => void;
 }) {
   const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
@@ -637,9 +635,8 @@ function TouchpadComponent({
         </View>
       </View>
       
-      {/* Keyboard Input - shown when keyboardVisible is true */}
-      {keyboardVisible && (
-        <View style={{ width: '100%', marginTop: 24, paddingHorizontal: 20 }}>
+      {/* Keyboard Input - always shown */}
+      <View style={{ width: '100%', marginTop: 24, paddingHorizontal: 20 }}>
           <TextInput
             ref={keyboardInputRef}
             style={{
@@ -658,6 +655,9 @@ function TouchpadComponent({
             placeholder="Type here... (text will be sent as you type)"
             placeholderTextColor="#666"
             multiline
+            editable={true}
+            autoCorrect={false}
+            autoCapitalize="none"
             onSubmitEditing={() => {
               // Send Enter key
               onSendKey('enter');
@@ -709,7 +709,6 @@ function TouchpadComponent({
             </Pressable>
           )}
         </View>
-      )}
       
       <Pressable
         onPress={onDismiss}
@@ -756,7 +755,6 @@ export default function DevScreen() {
   const [touchpadVisible, setTouchpadVisible] = useState(false);
   
   // Keyboard input -> Python streaming
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardText, setKeyboardText] = useState('');
   
   // UI/UX slider states
@@ -1290,37 +1288,6 @@ export default function DevScreen() {
             </Text>
           </View>
 
-          <View style={{ marginTop: 24, alignItems: 'center' }}>
-            <Pressable
-              onPress={() => {
-                if (!mouseControlActive) {
-                  // Need mouse control active to send keyboard events
-                  setMouseControlActive(true);
-                  setTouchpadVisible(true);
-                }
-                setKeyboardVisible(!keyboardVisible);
-              }}
-              style={{
-                backgroundColor: keyboardVisible ? '#43a047' : '#222',
-                paddingHorizontal: 36,
-                paddingVertical: 14,
-                borderRadius: 32,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 2,
-                marginBottom: 4,
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
-                {keyboardVisible ? 'Hide Keyboard' : 'Show Keyboard'}
-              </Text>
-            </Pressable>
-            <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              Send keystrokes over WebSocket to Python at {MOUSE_WS_URL}.
-            </Text>
-          </View>
         </View>
       </ScrollView>
 
@@ -1440,12 +1407,17 @@ export default function DevScreen() {
             }}
             keyboardText={keyboardText}
             onKeyboardTextChange={(newText) => {
-              // Send keystrokes as user types
+              // Always update the text state first to allow normal editing
+              setKeyboardText(newText);
+              
+              // Then send keystrokes as user types
               if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
                 try {
-                  if (newText.length > keyboardText.length) {
+                  const oldText = keyboardText;
+                  
+                  if (newText.length > oldText.length) {
                     // Text was added - send new characters
-                    const addedChars = newText.slice(keyboardText.length);
+                    const addedChars = newText.slice(oldText.length);
                     for (const char of addedChars) {
                       const payload = JSON.stringify({
                         type: 'key',
@@ -1454,9 +1426,10 @@ export default function DevScreen() {
                       });
                       mouseWsRef.current.send(payload);
                     }
-                  } else if (newText.length < keyboardText.length) {
+                  } else if (newText.length < oldText.length) {
                     // Text was deleted - send backspace
-                    const deletedCount = keyboardText.length - newText.length;
+                    // Calculate how many characters were deleted
+                    const deletedCount = oldText.length - newText.length;
                     for (let i = 0; i < deletedCount; i++) {
                       const payload = JSON.stringify({
                         type: 'key',
@@ -1465,14 +1438,43 @@ export default function DevScreen() {
                       });
                       mouseWsRef.current.send(payload);
                     }
+                  } else if (newText !== oldText) {
+                    // Text was modified in place (e.g., character replaced)
+                    // This can happen with autocorrect or when editing in the middle
+                    // For simplicity, send backspace for deleted chars and type new ones
+                    // Find the difference
+                    let i = 0;
+                    while (i < Math.min(oldText.length, newText.length) && oldText[i] === newText[i]) {
+                      i++;
+                    }
+                    // Characters from position i onwards changed
+                    const deletedFromPos = oldText.length - i;
+                    const addedFromPos = newText.length - i;
+                    
+                    // Send backspaces for deleted characters
+                    for (let j = 0; j < deletedFromPos; j++) {
+                      const payload = JSON.stringify({
+                        type: 'key',
+                        t: Date.now(),
+                        key: 'backspace',
+                      });
+                      mouseWsRef.current.send(payload);
+                    }
+                    // Send new characters
+                    for (let j = i; j < newText.length; j++) {
+                      const payload = JSON.stringify({
+                        type: 'key',
+                        t: Date.now(),
+                        key: newText[j],
+                      });
+                      mouseWsRef.current.send(payload);
+                    }
                   }
                 } catch (err) {
                   console.warn('[Keyboard] Failed to send keystroke', err);
                 }
               }
-              setKeyboardText(newText);
             }}
-            keyboardVisible={keyboardVisible}
             onSendKey={(key) => {
               if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
                 try {
