@@ -99,19 +99,16 @@ async def handle_touch(websocket) -> None:
             action = data.get("action")
             x = data.get("x")  # normalized 0-1
             y = data.get("y")  # normalized 0-1
-            screen_width = data.get("screenWidth")
-            screen_height = data.get("screenHeight")
 
             if action is None or x is None or y is None:
                 continue
 
-            # Get current screen size if not provided
-            if screen_width is None or screen_height is None:
-                screen_width, screen_height = pyautogui.size()
-
+            # Always use the actual computer screen size (ignore phone screen dimensions)
+            screen_width, screen_height = pyautogui.size()
             current_screen_size = (screen_width, screen_height)
 
             # Convert normalized coordinates (0-1) to absolute screen coordinates
+            # Normalized 0.0 maps to screen 0, normalized 1.0 maps to screen_width/screen_height
             target_x = int(float(x) * screen_width)
             target_y = int(float(y) * screen_height)
 
