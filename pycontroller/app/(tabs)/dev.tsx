@@ -143,7 +143,10 @@ function TouchpadComponent({
   const [isTouching, setIsTouching] = useState(false);
   const touchpadRef = React.useRef<View>(null);
   const keyboardInputRef = React.useRef<TextInput>(null);
+  const keyboardInputAccessoryRef = React.useRef<TextInput>(null);
   const inputAccessoryViewID = React.useRef(`keyboardAccessory-${Date.now()}-${Math.random()}`).current;
+  const [isMainInputFocused, setIsMainInputFocused] = useState(false);
+  const [isAccessoryInputFocused, setIsAccessoryInputFocused] = useState(false);
   const intervalRef = React.useRef<number | null>(null);
   const lastSentRef = React.useRef<{ x: number; y: number } | null>(null);
   const currentTouchRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -635,8 +638,9 @@ function TouchpadComponent({
         </View>
       </View>
       
-      {/* Keyboard Input - always shown */}
+      {/* Keyboard Input - always shown, with duplicate in accessory view on iOS */}
       <View style={{ width: '100%', marginTop: 24, paddingHorizontal: 20 }}>
+          {/* Main input - always visible, but on iOS we'll show the accessory view when keyboard is open */}
           <TextInput
             ref={keyboardInputRef}
             style={{
@@ -662,6 +666,19 @@ function TouchpadComponent({
               // Send Enter key
               onSendKey('enter');
             }}
+            onFocus={() => {
+              setIsMainInputFocused(true);
+              // On iOS, when main input is focused, also focus the accessory input
+              // so the text appears in the accessory view
+              if (Platform.OS === 'ios') {
+                setTimeout(() => {
+                  keyboardInputAccessoryRef.current?.focus();
+                }, 50);
+              }
+            }}
+            onBlur={() => {
+              setIsMainInputFocused(false);
+            }}
             {...(Platform.OS === 'ios' ? { inputAccessoryViewID } : {})}
           />
           {Platform.OS === 'ios' && (
@@ -673,10 +690,45 @@ function TouchpadComponent({
                 paddingVertical: 8,
                 paddingHorizontal: 16,
                 flexDirection: 'row',
-                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 12,
               }}>
+                {/* Duplicate input in accessory view - both stay in sync via shared state */}
+                <TextInput
+                  ref={keyboardInputAccessoryRef}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#111',
+                    color: '#fff',
+                    padding: 10,
+                    borderRadius: 6,
+                    fontSize: 16,
+                    borderWidth: 1,
+                    borderColor: '#39ff14',
+                    maxHeight: 100,
+                    textAlignVertical: 'top',
+                  }}
+                  value={keyboardText}
+                  onChangeText={onKeyboardTextChange}
+                  placeholder="Type here..."
+                  placeholderTextColor="#666"
+                  multiline
+                  editable={true}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  onSubmitEditing={() => {
+                    onSendKey('enter');
+                  }}
+                  onFocus={() => {
+                    setIsAccessoryInputFocused(true);
+                  }}
+                  onBlur={() => {
+                    setIsAccessoryInputFocused(false);
+                  }}
+                />
                 <Pressable
                   onPress={() => {
+                    keyboardInputAccessoryRef.current?.blur();
                     keyboardInputRef.current?.blur();
                   }}
                   style={{
@@ -756,6 +808,12 @@ export default function DevScreen() {
   
   // Keyboard input -> Python streaming
   const [keyboardText, setKeyboardText] = useState('');
+  const lastKeyboardTextRef = React.useRef<string>('');
+  
+  // Keep ref in sync with keyboardText
+  React.useEffect(() => {
+    lastKeyboardTextRef.current = keyboardText;
+  }, [keyboardText]);
   
   // UI/UX slider states
   const [r, setR] = useState(0.5);
@@ -1407,14 +1465,16 @@ export default function DevScreen() {
             }}
             keyboardText={keyboardText}
             onKeyboardTextChange={(newText) => {
+              // Use ref to get the previous value to avoid stale closure issues
+              const oldText = lastKeyboardTextRef.current;
+              
               // Always update the text state first to allow normal editing
               setKeyboardText(newText);
+              lastKeyboardTextRef.current = newText;
               
               // Then send keystrokes as user types
               if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
                 try {
-                  const oldText = keyboardText;
-                  
                   if (newText.length > oldText.length) {
                     // Text was added - send new characters
                     const addedChars = newText.slice(oldText.length);
