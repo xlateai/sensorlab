@@ -123,9 +123,11 @@ function CollapsibleSection({
 function TouchpadComponent({
   onDismiss,
   onTouchEvent,
+  onClick,
 }: {
   onDismiss: () => void;
   onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
+  onClick: (x: number, y: number) => void;
 }) {
   const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
   const [isTouching, setIsTouching] = useState(false);
@@ -133,6 +135,8 @@ function TouchpadComponent({
   const intervalRef = React.useRef<number | null>(null);
   const lastSentRef = React.useRef<{ x: number; y: number } | null>(null);
   const currentTouchRef = React.useRef<{ x: number; y: number } | null>(null);
+  const initialTouchRef = React.useRef<{ x: number; y: number } | null>(null);
+  const hasMovedRef = React.useRef<boolean>(false);
 
   // Calculate the size to be a 1:1 square based on screen dimensions
   const minDimension = Math.min(screenWidth, screenHeight);
@@ -149,21 +153,38 @@ function TouchpadComponent({
       // Send start event immediately on first touch
       onTouchEvent('start', currentTouch.x, currentTouch.y);
       lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
+      initialTouchRef.current = { x: currentTouch.x, y: currentTouch.y };
+      hasMovedRef.current = false;
 
       // Then send coordinates at 30Hz
       intervalRef.current = setInterval(() => {
         const touch = currentTouchRef.current;
-        if (touch && lastSentRef.current) {
+        if (touch && lastSentRef.current && initialTouchRef.current) {
+          // Check if we've moved significantly (more than 0.02 normalized units = ~2% of touchpad)
+          const dx = Math.abs(touch.x - initialTouchRef.current.x);
+          const dy = Math.abs(touch.y - initialTouchRef.current.y);
+          if (dx > 0.02 || dy > 0.02) {
+            hasMovedRef.current = true;
+          }
+          
           // Always send current position (Python will interpolate)
           onTouchEvent('move', touch.x, touch.y);
           lastSentRef.current = { x: touch.x, y: touch.y };
         }
       }, 33); // ~30Hz
     } else {
-      // Touch ended, send end event and clear interval
-      if (lastSentRef.current) {
-        onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+      // Touch ended
+      if (lastSentRef.current && initialTouchRef.current) {
+        // If no significant movement, treat as a click
+        if (!hasMovedRef.current) {
+          onClick(initialTouchRef.current.x, initialTouchRef.current.y);
+        } else {
+          // Otherwise send normal end event
+          onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+        }
         lastSentRef.current = null;
+        initialTouchRef.current = null;
+        hasMovedRef.current = false;
       }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -177,7 +198,7 @@ function TouchpadComponent({
         intervalRef.current = null;
       }
     };
-  }, [isTouching, onTouchEvent]);
+  }, [isTouching, onTouchEvent, onClick]);
 
   const updateTouchPosition = (evt: any) => {
     const touch = evt.nativeEvent.touches[0];
@@ -868,6 +889,20 @@ export default function DevScreen() {
                   mouseWsRef.current.send(payload);
                 } catch (err) {
                   console.warn('[Mouse] Failed to send touch event', err);
+                }
+              }
+            }}
+            onClick={(x, y) => {
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'click',
+                    t: Date.now(),
+                    button: 'left',
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send click event', err);
                 }
               }
             }}

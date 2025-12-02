@@ -20,6 +20,14 @@ Message format:
         "screenWidth": <int>,
         "screenHeight": <int>
     }
+    
+    OR
+    
+    {
+        "type": "click",
+        "t": <unix_ms>,
+        "button": "left" | "right" | "middle"
+    }
 """
 
 from __future__ import annotations
@@ -96,8 +104,30 @@ async def handle_touch(websocket) -> None:
                 print("[Mouse] Non-JSON message, skipping")
                 continue
 
-            if data.get("type") != "touch":
-                print(f"[Mouse] Unknown message type: {data.get('type')!r}, skipping")
+            msg_type = data.get("type")
+            
+            # Handle click events
+            if msg_type == "click":
+                button = data.get("button", "left")
+                
+                # Perform the click at current mouse position (no movement)
+                if button == "left":
+                    pyautogui.click()
+                elif button == "right":
+                    pyautogui.rightClick()
+                elif button == "middle":
+                    pyautogui.middleClick()
+                else:
+                    print(f"[Mouse] Unknown button type: {button!r}, using left click")
+                    pyautogui.click()
+                
+                mouse_x, mouse_y = pyautogui.position()
+                print(f"[Mouse] {button} click at ({mouse_x}, {mouse_y})")
+                continue
+            
+            # Handle touch events
+            if msg_type != "touch":
+                print(f"[Mouse] Unknown message type: {msg_type!r}, skipping")
                 continue
 
             action = data.get("action")
