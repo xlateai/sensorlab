@@ -168,11 +168,16 @@ function TouchpadComponent({
       if (isDrag) {
         // In drag mode, send drag events
         if (!lastSentRef.current) {
-          // First touch in drag mode - send drag start
-          onDragEvent('start', currentTouch.x, currentTouch.y);
+          // Clamp origin to 0-1 (origin must be within green square)
+          const clampedOrigin = { 
+            x: Math.max(0, Math.min(1, currentTouch.x)), 
+            y: Math.max(0, Math.min(1, currentTouch.y)) 
+          };
+          // First touch in drag mode - send drag start with clamped origin
+          onDragEvent('start', clampedOrigin.x, clampedOrigin.y);
+          initialTouchRef.current = clampedOrigin;
         }
         lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
-        initialTouchRef.current = { x: currentTouch.x, y: currentTouch.y };
 
         // Send drag move events at 30Hz
         intervalRef.current = setInterval(() => {
@@ -184,10 +189,15 @@ function TouchpadComponent({
         }, 33); // ~30Hz
       } else {
         // Normal touch mode (or pending drag mode)
-        // Send start event immediately on first touch
-        onTouchEvent('start', currentTouch.x, currentTouch.y);
+        // Clamp origin to 0-1 (origin must be within green square)
+        const clampedOrigin = { 
+          x: Math.max(0, Math.min(1, currentTouch.x)), 
+          y: Math.max(0, Math.min(1, currentTouch.y)) 
+        };
+        // Send start event immediately on first touch with clamped origin
+        onTouchEvent('start', clampedOrigin.x, clampedOrigin.y);
         lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
-        initialTouchRef.current = { x: currentTouch.x, y: currentTouch.y };
+        initialTouchRef.current = clampedOrigin;
         hasMovedRef.current = false;
 
         // Then send coordinates at 30Hz
@@ -206,9 +216,14 @@ function TouchpadComponent({
                 pendingDragModeRef.current = false;
                 // Send drag start and cancel the current touch
                 onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
-                onDragEvent('start', touch.x, touch.y);
+                // Clamp origin to 0-1 (origin must be within green square)
+                const clampedOrigin = { 
+                  x: Math.max(0, Math.min(1, touch.x)), 
+                  y: Math.max(0, Math.min(1, touch.y)) 
+                };
+                onDragEvent('start', clampedOrigin.x, clampedOrigin.y);
                 lastSentRef.current = { x: touch.x, y: touch.y };
-                initialTouchRef.current = { x: touch.x, y: touch.y };
+                initialTouchRef.current = clampedOrigin;
               }
             }
             
@@ -269,9 +284,10 @@ function TouchpadComponent({
       const localX = touch.pageX - pageX;
       const localY = touch.pageY - pageY;
 
-      // Normalize coordinates (0-1)
-      const normalizedX = Math.max(0, Math.min(1, localX / width));
-      const normalizedY = Math.max(0, Math.min(1, localY / height));
+      // Normalize coordinates (allow <0 and >1 for movement outside touchpad)
+      // Origin will be clamped to 0-1 when stored
+      const normalizedX = localX / width;
+      const normalizedY = localY / height;
 
       setCurrentTouch({ x: normalizedX, y: normalizedY });
     });
@@ -287,6 +303,7 @@ function TouchpadComponent({
       touchpadRef.current.measure((x, y, width, height, pageX, pageY) => {
         const localX = touch.pageX - pageX;
         const localY = touch.pageY - pageY;
+        // Clamp origin to 0-1 for double-tap detection (origin must be within green square)
         const normalizedX = Math.max(0, Math.min(1, localX / width));
         const normalizedY = Math.max(0, Math.min(1, localY / height));
         
