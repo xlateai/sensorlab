@@ -83,6 +83,10 @@ async def handle_touch(websocket) -> None:
     current_target: Optional[Tuple[int, int]] = None
     current_screen_size: Optional[Tuple[int, int]] = None
     interpolation_task: Optional[asyncio.Task] = None
+    # For relative control: where the finger first touched (normalized 0-1)
+    touch_origin_norm: Optional[Tuple[float, float]] = None
+    # For relative control: where the mouse was when the finger first touched (absolute pixels)
+    mouse_origin_pos: Optional[Tuple[int, int]] = None
 
     try:
         async for message in websocket:
@@ -107,16 +111,6 @@ async def handle_touch(websocket) -> None:
             screen_width, screen_height = pyautogui.size()
             current_screen_size = (screen_width, screen_height)
 
-            # Convert normalized coordinates (0-1) to absolute screen coordinates
-            # Normalized 0.0 maps to screen 0, normalized 1.0 maps to screen_width/screen_height
-            target_x = int(float(x) * screen_width)
-            target_y = int(float(y) * screen_height)
-
-            # Clamp to screen bounds
-            target_x = max(0, min(screen_width - 1, target_x))
-            target_y = max(0, min(screen_height - 1, target_y))
-            target_pos = (target_x, target_y)
-
             if action == "start":
                 # Cancel any ongoing interpolation
                 if interpolation_task and not interpolation_task.done():
@@ -126,17 +120,40 @@ async def handle_touch(websocket) -> None:
                     except asyncio.CancelledError:
                         pass
 
-                # Move immediately to start position
-                pyautogui.moveTo(target_x, target_y)
-                current_target = target_pos
-                print(f"[Mouse] Touch started at ({target_x}, {target_y}) [normalized: {x:.3f}, {y:.3f}]")
+                # Set up relative control:
+                #   - Remember where on the screen the mouse currently is
+                #   - Remember where on the phone the finger first touched
+                mouse_x, mouse_y = pyautogui.position()
+                mouse_origin_pos = (mouse_x, mouse_y)
+                touch_origin_norm = (float(x), float(y))
+                current_target = mouse_origin_pos
+                print(
+                    f"[Mouse] Touch started (relative mode). "
+                    f"Mouse origin=({mouse_x}, {mouse_y}), "
+                    f"touch origin norm=({float(x):.3f}, {float(y):.3f})"
+                )
 
             elif action == "move":
-                if current_target is None:
-                    # Shouldn't happen, but handle gracefully
-                    current_target = target_pos
-                    pyautogui.moveTo(target_x, target_y)
-                    continue
+                if mouse_origin_pos is None or touch_origin_norm is None:
+                    # If for some reason we never got a proper start event,
+                    # treat this move as a new start.
+                    mouse_x, mouse_y = pyautogui.position()
+                    mouse_origin_pos = (mouse_x, mouse_y)
+                    touch_origin_norm = (float(x), float(y))
+                    current_target = mouse_origin_pos
+
+                # Compute delta in normalized space from where the finger first touched
+                dx_norm = float(x) - touch_origin_norm[0]
+                dy_norm = float(y) - touch_origin_norm[1]
+
+                # Map that delta to pixel space relative to where the mouse was
+                target_x = int(mouse_origin_pos[0] + dx_norm * screen_width)
+                target_y = int(mouse_origin_pos[1] + dy_norm * screen_height)
+
+                # Clamp to screen bounds
+                target_x = max(0, min(screen_width - 1, target_x))
+                target_y = max(0, min(screen_height - 1, target_y))
+                target_pos = (target_x, target_y)
 
                 # Cancel any ongoing interpolation
                 if interpolation_task and not interpolation_task.done():
@@ -170,7 +187,9 @@ async def handle_touch(websocket) -> None:
                         pass
 
                 current_target = None
-                print(f"[Mouse] Touch ended")
+                touch_origin_norm = None
+                mouse_origin_pos = None
+                print(f"[Mouse] Touch ended (relative mode reset)")
 
     except websockets.ConnectionClosedOK:
         print(f"[Mouse] Client closed: {peer}")
