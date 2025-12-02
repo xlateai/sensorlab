@@ -56,6 +56,14 @@ Message format:
         "t": <unix_ms>,
         "key": <string>  // character to type, or special key name (e.g., "enter", "tab", "backspace", "escape", "space")
     }
+    
+    OR
+    
+    {
+        "type": "text_batch",
+        "t": <unix_ms>,
+        "text": <string>  // entire text batch to send at once (Chat Mode)
+    }
 """
 
 from __future__ import annotations
@@ -110,6 +118,17 @@ async def handle_touch(websocket) -> None:
                 continue
 
             msg_type = data.get("type")
+            
+            # Handle batch text events (Chat Mode)
+            if msg_type == "text_batch":
+                text = data.get("text", "")
+                try:
+                    # Send the entire text batch at once
+                    pyautogui.write(text)
+                    print(f"[Keyboard] Sent batch text: {text!r}")
+                except Exception as e:
+                    print(f"[Keyboard] Failed to send batch text: {e}")
+                continue
             
             # Handle keyboard events
             if msg_type == "key":

@@ -1,6 +1,6 @@
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable, TextInput, InputAccessoryView, Platform } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable, TextInput, InputAccessoryView, Platform, Switch, Keyboard } from 'react-native';
 import { BlurView } from 'expo-blur';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
@@ -129,6 +129,9 @@ function TouchpadComponent({
   keyboardText,
   onKeyboardTextChange,
   onSendKey,
+  onSendBatchText,
+  chatMode,
+  onChatModeChange,
 }: {
   onDismiss: () => void;
   onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
@@ -138,6 +141,9 @@ function TouchpadComponent({
   keyboardText: string;
   onKeyboardTextChange: (text: string) => void;
   onSendKey: (key: string) => void;
+  onSendBatchText: (text: string) => void;
+  chatMode: boolean;
+  onChatModeChange: (enabled: boolean) => void;
 }) {
   const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
   const [isTouching, setIsTouching] = useState(false);
@@ -656,7 +662,7 @@ function TouchpadComponent({
             }}
             value={keyboardText}
             onChangeText={onKeyboardTextChange}
-            placeholder="Type here... (text will be sent as you type)"
+            placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Type here... (text will be sent as you type)"}
             placeholderTextColor="#666"
             multiline
             editable={true}
@@ -717,7 +723,11 @@ function TouchpadComponent({
                   autoCorrect={false}
                   autoCapitalize="none"
                   onSubmitEditing={() => {
-                    onSendKey('enter');
+                    if (chatMode) {
+                      onSendBatchText(keyboardText);
+                    } else {
+                      onSendKey('enter');
+                    }
                   }}
                   onFocus={() => {
                     setIsAccessoryInputFocused(true);
@@ -726,10 +736,40 @@ function TouchpadComponent({
                     setIsAccessoryInputFocused(false);
                   }}
                 />
+                {/* Mode Toggle */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ color: '#fff', fontSize: 12 }}>Raw</Text>
+                  <Switch
+                    value={chatMode}
+                    onValueChange={onChatModeChange}
+                    trackColor={{ false: '#555', true: '#39ff14' }}
+                    thumbColor={chatMode ? '#fff' : '#ccc'}
+                  />
+                  <Text style={{ color: '#fff', fontSize: 12 }}>Chat</Text>
+                </View>
+                {/* Send button (only in Chat Mode) */}
+                {chatMode && (
+                  <Pressable
+                    onPress={() => {
+                      if (keyboardText.trim().length > 0) {
+                        onSendBatchText(keyboardText);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: '#39ff14',
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Send</Text>
+                  </Pressable>
+                )}
                 <Pressable
                   onPress={() => {
                     keyboardInputAccessoryRef.current?.blur();
                     keyboardInputRef.current?.blur();
+                    Keyboard.dismiss();
                   }}
                   style={{
                     backgroundColor: '#39ff14',
@@ -738,27 +778,57 @@ function TouchpadComponent({
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Done</Text>
+                  <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
                 </Pressable>
               </View>
             </InputAccessoryView>
           )}
           {Platform.OS === 'android' && (
-            <Pressable
-              onPress={() => {
-                keyboardInputRef.current?.blur();
-              }}
-              style={{
-                backgroundColor: '#39ff14',
-                paddingHorizontal: 20,
-                paddingVertical: 8,
-                borderRadius: 6,
-                marginTop: 8,
-                alignSelf: 'flex-end',
-              }}
-            >
-              <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Done</Text>
-            </Pressable>
+            <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+              {/* Mode Toggle */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 12 }}>Raw</Text>
+                <Switch
+                  value={chatMode}
+                  onValueChange={onChatModeChange}
+                  trackColor={{ false: '#555', true: '#39ff14' }}
+                  thumbColor={chatMode ? '#fff' : '#ccc'}
+                />
+                <Text style={{ color: '#fff', fontSize: 12 }}>Chat</Text>
+              </View>
+              {/* Send button (only in Chat Mode) */}
+              {chatMode && (
+                <Pressable
+                  onPress={() => {
+                    if (keyboardText.trim().length > 0) {
+                      onSendBatchText(keyboardText);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#39ff14',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Send</Text>
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => {
+                  keyboardInputRef.current?.blur();
+                  Keyboard.dismiss();
+                }}
+                style={{
+                  backgroundColor: '#39ff14',
+                  paddingHorizontal: 20,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                }}
+              >
+                <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
+              </Pressable>
+            </View>
           )}
         </View>
       
@@ -808,6 +878,7 @@ export default function DevScreen() {
   
   // Keyboard input -> Python streaming
   const [keyboardText, setKeyboardText] = useState('');
+  const [chatMode, setChatMode] = useState(false); // false = Raw Mode, true = Chat Mode
   const lastKeyboardTextRef = React.useRef<string>('');
   
   // Keep ref in sync with keyboardText
@@ -1472,8 +1543,8 @@ export default function DevScreen() {
               setKeyboardText(newText);
               lastKeyboardTextRef.current = newText;
               
-              // Then send keystrokes as user types
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+              // Only send keystrokes as user types in Raw Mode (not Chat Mode)
+              if (!chatMode && mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
                 try {
                   if (newText.length > oldText.length) {
                     // Text was added - send new characters
@@ -1549,6 +1620,25 @@ export default function DevScreen() {
                 }
               }
             }}
+            onSendBatchText={(text) => {
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'text_batch',
+                    t: Date.now(),
+                    text,
+                  });
+                  mouseWsRef.current.send(payload);
+                  // Clear the text after sending
+                  setKeyboardText('');
+                  lastKeyboardTextRef.current = '';
+                } catch (err) {
+                  console.warn('[Keyboard] Failed to send batch text', err);
+                }
+              }
+            }}
+            chatMode={chatMode}
+            onChatModeChange={setChatMode}
           />
         </View>
       </Modal>
