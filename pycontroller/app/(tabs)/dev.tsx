@@ -660,9 +660,19 @@ function TouchpadComponent({
               minHeight: 50,
               textAlignVertical: 'top',
             }}
-            value={keyboardText}
-            onChangeText={onKeyboardTextChange}
-            placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Type here... (text will be sent as you type)"}
+            value={chatMode ? keyboardText : ''}
+            onChangeText={chatMode ? onKeyboardTextChange : (text) => {
+              // In Raw mode, send immediately and don't store
+              onKeyboardTextChange(text);
+              // Clear immediately after processing
+              setTimeout(() => {
+                if (!chatMode) {
+                  setKeyboardText('');
+                  lastKeyboardTextRef.current = '';
+                }
+              }, 0);
+            }}
+            placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Inputs are immediately sent to device"}
             placeholderTextColor="#666"
             multiline
             editable={true}
@@ -695,47 +705,168 @@ function TouchpadComponent({
                 borderTopColor: '#444',
                 paddingVertical: 8,
                 paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
               }}>
-                {/* Duplicate input in accessory view - both stay in sync via shared state */}
+                {/* Text input row - full width with Send button on right in Chat Mode */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'flex-start', 
+                  gap: 8,
+                  marginBottom: 8,
+                }}>
+                  <TextInput
+                    ref={keyboardInputAccessoryRef}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#111',
+                      color: '#fff',
+                      padding: 10,
+                      borderRadius: 6,
+                      fontSize: 16,
+                      borderWidth: 1,
+                      borderColor: '#39ff14',
+                      maxHeight: 100,
+                      textAlignVertical: 'top',
+                    }}
+                    value={chatMode ? keyboardText : ''}
+                    onChangeText={chatMode ? onKeyboardTextChange : undefined}
+                    placeholder={chatMode ? "Type here..." : "Inputs are immediately sent to device"}
+                    placeholderTextColor="#666"
+                    multiline
+                    editable={chatMode}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    onSubmitEditing={() => {
+                      if (chatMode && keyboardText.trim().length > 0) {
+                        onSendBatchText(keyboardText);
+                      }
+                    }}
+                    onFocus={() => {
+                      setIsAccessoryInputFocused(true);
+                    }}
+                    onBlur={() => {
+                      setIsAccessoryInputFocused(false);
+                    }}
+                  />
+                  {/* Send button (only in Chat Mode) - on right side of text bar */}
+                  {chatMode && (
+                    <Pressable
+                      onPress={() => {
+                        if (keyboardText.trim().length > 0) {
+                          onSendBatchText(keyboardText);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#39ff14',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 6,
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Send</Text>
+                    </Pressable>
+                  )}
+                </View>
+                {/* Bottom row: Mode Toggle on left, Dismiss on right */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                }}>
+                  {/* Mode Toggle */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: '#fff', fontSize: 12 }}>Raw</Text>
+                    <Switch
+                      value={chatMode}
+                      onValueChange={onChatModeChange}
+                      trackColor={{ false: '#555', true: '#39ff14' }}
+                      thumbColor={chatMode ? '#fff' : '#ccc'}
+                    />
+                    <Text style={{ color: '#fff', fontSize: 12 }}>Chat</Text>
+                  </View>
+                  {/* Dismiss button - hugging right */}
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      keyboardInputAccessoryRef.current?.blur();
+                      keyboardInputRef.current?.blur();
+                    }}
+                    style={{
+                      backgroundColor: '#39ff14',
+                      paddingHorizontal: 20,
+                      paddingVertical: 8,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </InputAccessoryView>
+          )}
+          {Platform.OS === 'android' && (
+            <View style={{ marginTop: 8 }}>
+              {/* Text input row - full width with Send button on right in Chat Mode */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'flex-start', 
+                gap: 8,
+                marginBottom: 8,
+              }}>
                 <TextInput
-                  ref={keyboardInputAccessoryRef}
+                  ref={keyboardInputRef}
                   style={{
                     flex: 1,
-                    backgroundColor: '#111',
+                    backgroundColor: '#222',
                     color: '#fff',
-                    padding: 10,
-                    borderRadius: 6,
+                    padding: 12,
+                    borderRadius: 8,
                     fontSize: 16,
-                    borderWidth: 1,
+                    borderWidth: 2,
                     borderColor: '#39ff14',
-                    maxHeight: 100,
+                    minHeight: 50,
                     textAlignVertical: 'top',
                   }}
-                  value={keyboardText}
-                  onChangeText={onKeyboardTextChange}
-                  placeholder="Type here..."
+                  value={chatMode ? keyboardText : ''}
+                  onChangeText={chatMode ? onKeyboardTextChange : undefined}
+                  placeholder={chatMode ? "Type here... (press Send to send all at once)" : "Inputs are immediately sent to device"}
                   placeholderTextColor="#666"
                   multiline
-                  editable={true}
+                  editable={chatMode}
                   autoCorrect={false}
                   autoCapitalize="none"
                   onSubmitEditing={() => {
-                    if (chatMode) {
+                    if (chatMode && keyboardText.trim().length > 0) {
                       onSendBatchText(keyboardText);
-                    } else {
-                      onSendKey('enter');
                     }
                   }}
-                  onFocus={() => {
-                    setIsAccessoryInputFocused(true);
-                  }}
-                  onBlur={() => {
-                    setIsAccessoryInputFocused(false);
-                  }}
                 />
+                {/* Send button (only in Chat Mode) - on right side of text bar */}
+                {chatMode && (
+                  <Pressable
+                    onPress={() => {
+                      if (keyboardText.trim().length > 0) {
+                        onSendBatchText(keyboardText);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: '#39ff14',
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderRadius: 6,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Send</Text>
+                  </Pressable>
+                )}
+              </View>
+              {/* Bottom row: Mode Toggle on left, Dismiss on right */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+              }}>
                 {/* Mode Toggle */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={{ color: '#fff', fontSize: 12 }}>Raw</Text>
@@ -747,29 +878,11 @@ function TouchpadComponent({
                   />
                   <Text style={{ color: '#fff', fontSize: 12 }}>Chat</Text>
                 </View>
-                {/* Send button (only in Chat Mode) */}
-                {chatMode && (
-                  <Pressable
-                    onPress={() => {
-                      if (keyboardText.trim().length > 0) {
-                        onSendBatchText(keyboardText);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: '#39ff14',
-                      paddingHorizontal: 16,
-                      paddingVertical: 8,
-                      borderRadius: 6,
-                    }}
-                  >
-                    <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Send</Text>
-                  </Pressable>
-                )}
+                {/* Dismiss button - hugging right */}
                 <Pressable
                   onPress={() => {
-                    keyboardInputAccessoryRef.current?.blur();
-                    keyboardInputRef.current?.blur();
                     Keyboard.dismiss();
+                    keyboardInputRef.current?.blur();
                   }}
                   style={{
                     backgroundColor: '#39ff14',
@@ -781,53 +894,6 @@ function TouchpadComponent({
                   <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
                 </Pressable>
               </View>
-            </InputAccessoryView>
-          )}
-          {Platform.OS === 'android' && (
-            <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-              {/* Mode Toggle */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 12 }}>Raw</Text>
-                <Switch
-                  value={chatMode}
-                  onValueChange={onChatModeChange}
-                  trackColor={{ false: '#555', true: '#39ff14' }}
-                  thumbColor={chatMode ? '#fff' : '#ccc'}
-                />
-                <Text style={{ color: '#fff', fontSize: 12 }}>Chat</Text>
-              </View>
-              {/* Send button (only in Chat Mode) */}
-              {chatMode && (
-                <Pressable
-                  onPress={() => {
-                    if (keyboardText.trim().length > 0) {
-                      onSendBatchText(keyboardText);
-                    }
-                  }}
-                  style={{
-                    backgroundColor: '#39ff14',
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderRadius: 6,
-                  }}
-                >
-                  <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Send</Text>
-                </Pressable>
-              )}
-              <Pressable
-                onPress={() => {
-                  keyboardInputRef.current?.blur();
-                  Keyboard.dismiss();
-                }}
-                style={{
-                  backgroundColor: '#39ff14',
-                  paddingHorizontal: 20,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                }}
-              >
-                <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Dismiss</Text>
-              </Pressable>
             </View>
           )}
         </View>
@@ -878,8 +944,18 @@ export default function DevScreen() {
   
   // Keyboard input -> Python streaming
   const [keyboardText, setKeyboardText] = useState('');
-  const [chatMode, setChatMode] = useState(false); // false = Raw Mode, true = Chat Mode
+  const [chatMode, setChatMode] = useState(true); // false = Raw Mode, true = Chat Mode (default to Chat)
   const lastKeyboardTextRef = React.useRef<string>('');
+  
+  // Clear text when switching to Raw mode
+  const handleChatModeChange = (enabled: boolean) => {
+    setChatMode(enabled);
+    if (!enabled) {
+      // Switching to Raw mode - clear the text
+      setKeyboardText('');
+      lastKeyboardTextRef.current = '';
+    }
+  };
   
   // Keep ref in sync with keyboardText
   React.useEffect(() => {
@@ -1638,7 +1714,7 @@ export default function DevScreen() {
               }
             }}
             chatMode={chatMode}
-            onChatModeChange={setChatMode}
+            onChatModeChange={handleChatModeChange}
           />
         </View>
       </Modal>
