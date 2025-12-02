@@ -48,6 +48,14 @@ Message format:
         "t": <unix_ms>,
         "deltaY": <float>  // scroll amount (negative = up, positive = down)
     }
+    
+    OR
+    
+    {
+        "type": "key",
+        "t": <unix_ms>,
+        "key": <string>  // character to type, or special key name (e.g., "enter", "tab", "backspace", "escape", "space")
+    }
 """
 
 from __future__ import annotations
@@ -102,6 +110,35 @@ async def handle_touch(websocket) -> None:
                 continue
 
             msg_type = data.get("type")
+            
+            # Handle keyboard events
+            if msg_type == "key":
+                key = data.get("key", "")
+                try:
+                    # Map special key names to pyautogui key names
+                    special_keys = {
+                        "enter": "enter",
+                        "return": "enter",
+                        "tab": "tab",
+                        "backspace": "backspace",
+                        "escape": "escape",
+                        "esc": "escape",
+                        "space": "space",
+                    }
+                    
+                    if key.lower() in special_keys:
+                        # Send special key
+                        pyautogui.press(special_keys[key.lower()])
+                        print(f"[Keyboard] Pressed special key: {key}")
+                    elif len(key) == 1:
+                        # Single character - type it
+                        pyautogui.write(key)
+                        print(f"[Keyboard] Typed character: {key!r}")
+                    else:
+                        print(f"[Keyboard] Unknown key: {key!r}")
+                except Exception as e:
+                    print(f"[Keyboard] Failed to send key: {e}")
+                continue
             
             # Handle scroll events
             if msg_type == "scroll":

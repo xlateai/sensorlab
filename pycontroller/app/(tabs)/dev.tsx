@@ -1,6 +1,6 @@
 // Subscription type not exported from expo-sensors; use 'any' for sensor subscriptions
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable, TextInput, InputAccessoryView, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
@@ -126,16 +126,26 @@ function TouchpadComponent({
   onClick,
   onDragEvent,
   onScrollEvent,
+  keyboardText,
+  onKeyboardTextChange,
+  keyboardVisible,
+  onSendKey,
 }: {
   onDismiss: () => void;
   onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
   onClick: (x: number, y: number) => void;
   onDragEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
   onScrollEvent: (deltaY: number) => void;
+  keyboardText: string;
+  onKeyboardTextChange: (text: string) => void;
+  keyboardVisible: boolean;
+  onSendKey: (key: string) => void;
 }) {
   const [currentTouch, setCurrentTouch] = useState<{ x: number; y: number } | null>(null);
   const [isTouching, setIsTouching] = useState(false);
   const touchpadRef = React.useRef<View>(null);
+  const keyboardInputRef = React.useRef<TextInput>(null);
+  const inputAccessoryViewID = React.useRef(`keyboardAccessory-${Date.now()}-${Math.random()}`).current;
   const intervalRef = React.useRef<number | null>(null);
   const lastSentRef = React.useRef<{ x: number; y: number } | null>(null);
   const currentTouchRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -215,14 +225,14 @@ function TouchpadComponent({
         initialTouchRef.current = clampedOrigin;
         hasMovedRef.current = false;
 
-        // Then send coordinates at 30Hz
+        // Then send coordinates at 30Hz for continuous updates
         intervalRef.current = setInterval(() => {
           const touch = currentTouchRef.current;
           if (touch && lastSentRef.current && initialTouchRef.current) {
-            // Check if we've moved significantly (more than 0.02 normalized units = ~2% of touchpad)
+            // Reduced threshold for higher precision (0.001 instead of 0.02)
             const dx = Math.abs(touch.x - initialTouchRef.current.x);
             const dy = Math.abs(touch.y - initialTouchRef.current.y);
-            if (dx > 0.02 || dy > 0.02) {
+            if (dx > 0.001 || dy > 0.001) {
               hasMovedRef.current = true;
               
               // If pending drag mode and we've moved, activate drag mode
@@ -242,15 +252,17 @@ function TouchpadComponent({
               }
             }
             
-            // Send events based on current mode
-            if (dragModeRef.current) {
-              // Now in drag mode, send drag move
-              onDragEvent('move', touch.x, touch.y);
-            } else {
-              // Still in normal touch mode
-              onTouchEvent('move', touch.x, touch.y);
+            // Send events based on current mode (only if position changed to avoid duplicates)
+            if (touch.x !== lastSentRef.current.x || touch.y !== lastSentRef.current.y) {
+              if (dragModeRef.current) {
+                // Now in drag mode, send drag move
+                onDragEvent('move', touch.x, touch.y);
+              } else {
+                // Still in normal touch mode
+                onTouchEvent('move', touch.x, touch.y);
+              }
+              lastSentRef.current = { x: touch.x, y: touch.y };
             }
-            lastSentRef.current = { x: touch.x, y: touch.y };
           }
         }, 33); // ~30Hz
       }
@@ -346,6 +358,41 @@ function TouchpadComponent({
 
   const handleTouchMove = (evt: any) => {
     updateTouchPosition(evt);
+    
+    // Send move events immediately for responsive mouse movement (trust higher precision)
+    if (isTouching && currentTouchRef.current && lastSentRef.current && initialTouchRef.current) {
+      const touch = currentTouchRef.current;
+      // Reduced threshold for higher precision (0.001 instead of 0.02)
+      const dx = Math.abs(touch.x - initialTouchRef.current.x);
+      const dy = Math.abs(touch.y - initialTouchRef.current.y);
+      if (dx > 0.001 || dy > 0.001) {
+        hasMovedRef.current = true;
+        
+        // If pending drag mode and we've moved, activate drag mode
+        if (pendingDragModeRef.current && !dragModeRef.current) {
+          setIsDragMode(true);
+          pendingDragModeRef.current = false;
+          // Send drag start and cancel the current touch
+          onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+          // Clamp origin to 0-1 (origin must be within green square)
+          const clampedOrigin = { 
+            x: Math.max(0, Math.min(1, touch.x)), 
+            y: Math.max(0, Math.min(1, touch.y)) 
+          };
+          onDragEvent('start', clampedOrigin.x, clampedOrigin.y);
+          lastSentRef.current = { x: touch.x, y: touch.y };
+          initialTouchRef.current = clampedOrigin;
+        }
+        
+        // Send move event immediately based on current mode
+        if (dragModeRef.current) {
+          onDragEvent('move', touch.x, touch.y);
+        } else {
+          onTouchEvent('move', touch.x, touch.y);
+        }
+        lastSentRef.current = { x: touch.x, y: touch.y };
+      }
+    }
     
     // If in drag mode and we start moving, ensure drag mode is active
     if (dragModeRef.current && !isDragMode) {
@@ -589,6 +636,81 @@ function TouchpadComponent({
           <RulerScrollWheel side="right" scrollPos={scrollPosition.right} />
         </View>
       </View>
+      
+      {/* Keyboard Input - shown when keyboardVisible is true */}
+      {keyboardVisible && (
+        <View style={{ width: '100%', marginTop: 24, paddingHorizontal: 20 }}>
+          <TextInput
+            ref={keyboardInputRef}
+            style={{
+              backgroundColor: '#222',
+              color: '#fff',
+              padding: 12,
+              borderRadius: 8,
+              fontSize: 16,
+              borderWidth: 2,
+              borderColor: '#39ff14',
+              minHeight: 50,
+              textAlignVertical: 'top',
+            }}
+            value={keyboardText}
+            onChangeText={onKeyboardTextChange}
+            placeholder="Type here... (text will be sent as you type)"
+            placeholderTextColor="#666"
+            multiline
+            onSubmitEditing={() => {
+              // Send Enter key
+              onSendKey('enter');
+            }}
+            {...(Platform.OS === 'ios' ? { inputAccessoryViewID } : {})}
+          />
+          {Platform.OS === 'ios' && (
+            <InputAccessoryView nativeID={inputAccessoryViewID}>
+              <View style={{ 
+                backgroundColor: '#222', 
+                borderTopWidth: 1, 
+                borderTopColor: '#444',
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+              }}>
+                <Pressable
+                  onPress={() => {
+                    keyboardInputRef.current?.blur();
+                  }}
+                  style={{
+                    backgroundColor: '#39ff14',
+                    paddingHorizontal: 20,
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Done</Text>
+                </Pressable>
+              </View>
+            </InputAccessoryView>
+          )}
+          {Platform.OS === 'android' && (
+            <Pressable
+              onPress={() => {
+                keyboardInputRef.current?.blur();
+              }}
+              style={{
+                backgroundColor: '#39ff14',
+                paddingHorizontal: 20,
+                paddingVertical: 8,
+                borderRadius: 6,
+                marginTop: 8,
+                alignSelf: 'flex-end',
+              }}
+            >
+              <Text style={{ color: '#000', fontWeight: '600', fontSize: 16 }}>Done</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      
       <Pressable
         onPress={onDismiss}
         style={{
@@ -632,6 +754,10 @@ export default function DevScreen() {
   const mouseWsRef = useRef<WebSocket | null>(null);
   const [mouseControlActive, setMouseControlActive] = useState(false);
   const [touchpadVisible, setTouchpadVisible] = useState(false);
+  
+  // Keyboard input -> Python streaming
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardText, setKeyboardText] = useState('');
   
   // UI/UX slider states
   const [r, setR] = useState(0.5);
@@ -1163,6 +1289,38 @@ export default function DevScreen() {
               Control mouse via touchpad over WebSocket to Python at {MOUSE_WS_URL}.
             </Text>
           </View>
+
+          <View style={{ marginTop: 24, alignItems: 'center' }}>
+            <Pressable
+              onPress={() => {
+                if (!mouseControlActive) {
+                  // Need mouse control active to send keyboard events
+                  setMouseControlActive(true);
+                  setTouchpadVisible(true);
+                }
+                setKeyboardVisible(!keyboardVisible);
+              }}
+              style={{
+                backgroundColor: keyboardVisible ? '#43a047' : '#222',
+                paddingHorizontal: 36,
+                paddingVertical: 14,
+                borderRadius: 32,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 2,
+                marginBottom: 4,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
+                {keyboardVisible ? 'Hide Keyboard' : 'Show Keyboard'}
+              </Text>
+            </Pressable>
+            <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+              Send keystrokes over WebSocket to Python at {MOUSE_WS_URL}.
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -1277,6 +1435,55 @@ export default function DevScreen() {
                   mouseWsRef.current.send(payload);
                 } catch (err) {
                   console.warn('[Mouse] Failed to send scroll event', err);
+                }
+              }
+            }}
+            keyboardText={keyboardText}
+            onKeyboardTextChange={(newText) => {
+              // Send keystrokes as user types
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  if (newText.length > keyboardText.length) {
+                    // Text was added - send new characters
+                    const addedChars = newText.slice(keyboardText.length);
+                    for (const char of addedChars) {
+                      const payload = JSON.stringify({
+                        type: 'key',
+                        t: Date.now(),
+                        key: char,
+                      });
+                      mouseWsRef.current.send(payload);
+                    }
+                  } else if (newText.length < keyboardText.length) {
+                    // Text was deleted - send backspace
+                    const deletedCount = keyboardText.length - newText.length;
+                    for (let i = 0; i < deletedCount; i++) {
+                      const payload = JSON.stringify({
+                        type: 'key',
+                        t: Date.now(),
+                        key: 'backspace',
+                      });
+                      mouseWsRef.current.send(payload);
+                    }
+                  }
+                } catch (err) {
+                  console.warn('[Keyboard] Failed to send keystroke', err);
+                }
+              }
+              setKeyboardText(newText);
+            }}
+            keyboardVisible={keyboardVisible}
+            onSendKey={(key) => {
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'key',
+                    t: Date.now(),
+                    key,
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Keyboard] Failed to send key', err);
                 }
               }
             }}
