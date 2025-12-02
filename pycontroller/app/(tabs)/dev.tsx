@@ -15,8 +15,10 @@ import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 
 const MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
+const MOUSE_WS_URL = 'ws://172.20.10.3:8766';
 
 const screenHeight = Dimensions.get('window').height;
+const screenWidth = Dimensions.get('window').width;
 
 // Blank popup component
 function BlankPopup({ visible, onClose, children }: {
@@ -117,6 +119,103 @@ function CollapsibleSection({
   );
 }
 
+// Touchpad component for mouse control
+function TouchpadComponent({
+  onDismiss,
+  onTouchEvent,
+}: {
+  onDismiss: () => void;
+  onTouchEvent: (action: 'start' | 'move' | 'end', x: number, y: number) => void;
+}) {
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const touchpadRef = React.useRef<View>(null);
+  const [touchpadSize, setTouchpadSize] = useState({ width: 0, height: 0 });
+
+  // Calculate the size to be a 1:1 square based on screen dimensions
+  const minDimension = Math.min(screenWidth, screenHeight);
+  const touchpadDimension = minDimension * 0.8; // 80% of the smaller dimension
+
+  const handleTouchStart = (evt: any) => {
+    const touch = evt.nativeEvent.touches[0];
+    if (!touch || !touchpadRef.current) return;
+
+    touchpadRef.current.measure((x, y, width, height, pageX, pageY) => {
+      const localX = touch.pageX - pageX;
+      const localY = touch.pageY - pageY;
+
+      // Normalize coordinates (0-1)
+      const normalizedX = Math.max(0, Math.min(1, localX / width));
+      const normalizedY = Math.max(0, Math.min(1, localY / height));
+
+      setTouchStart({ x: normalizedX, y: normalizedY });
+      onTouchEvent('start', normalizedX, normalizedY);
+    });
+  };
+
+  const handleTouchMove = (evt: any) => {
+    if (!touchStart || !touchpadRef.current) return;
+
+    const touch = evt.nativeEvent.touches[0];
+    if (!touch) return;
+
+    touchpadRef.current.measure((x, y, width, height, pageX, pageY) => {
+      const localX = touch.pageX - pageX;
+      const localY = touch.pageY - pageY;
+
+      // Normalize coordinates (0-1)
+      const normalizedX = Math.max(0, Math.min(1, localX / width));
+      const normalizedY = Math.max(0, Math.min(1, localY / height));
+
+      onTouchEvent('move', normalizedX, normalizedY);
+    });
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStart) {
+      onTouchEvent('end', touchStart.x, touchStart.y);
+      setTouchStart(null);
+    }
+  };
+
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, width: '100%' }}>
+      <View
+        ref={touchpadRef}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          setTouchpadSize({ width, height });
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{
+          width: touchpadDimension,
+          height: touchpadDimension,
+          backgroundColor: '#000',
+          borderWidth: 2,
+          borderColor: '#39ff14',
+          borderRadius: 8,
+        }}
+      />
+      <Pressable
+        onPress={onDismiss}
+        style={{
+          backgroundColor: '#222',
+          paddingHorizontal: 32,
+          paddingVertical: 12,
+          borderRadius: 10,
+          marginTop: 24,
+        }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16, textAlign: 'center' }}>
+          Dismiss
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function DevScreen() {
   // Popup state
   const [popupVisible, setPopupVisible] = useState(false);
@@ -137,6 +236,11 @@ export default function DevScreen() {
   // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
   const [magnetoStreaming, setMagnetoStreaming] = useState(false);
+  
+  // Mouse control -> Python streaming
+  const mouseWsRef = useRef<WebSocket | null>(null);
+  const [mouseControlActive, setMouseControlActive] = useState(false);
+  const [touchpadVisible, setTouchpadVisible] = useState(false);
   
   // UI/UX slider states
   const [r, setR] = useState(0.5);
@@ -207,6 +311,41 @@ export default function DevScreen() {
         console.warn('[Magneto] Error closing WebSocket', err);
       }
       magnetoWsRef.current = null;
+    }
+  };
+
+  const connectMouseSocket = () => {
+    if (mouseWsRef.current && 
+      (mouseWsRef.current.readyState === WebSocket.OPEN || 
+       mouseWsRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    try {
+      const ws = new WebSocket(MOUSE_WS_URL);
+      ws.onopen = () => {
+        console.log('[Mouse] WebSocket connected');
+      };
+      ws.onerror = (event) => {
+        console.warn('[Mouse] WebSocket error', event);
+      };
+      ws.onclose = () => {
+        console.log('[Mouse] WebSocket closed');
+      };
+      mouseWsRef.current = ws;
+    } catch (err) {
+      console.warn('[Mouse] Failed to open WebSocket', err);
+    }
+  };
+
+  const disconnectMouseSocket = () => {
+    if (mouseWsRef.current) {
+      try {
+        mouseWsRef.current.close();
+      } catch (err) {
+        console.warn('[Mouse] Error closing WebSocket', err);
+      }
+      mouseWsRef.current = null;
     }
   };
 
@@ -295,6 +434,22 @@ export default function DevScreen() {
       }
     };
   }, [magnetoStreaming]);
+
+  // Open / close WebSocket when mouse control toggled
+  useEffect(() => {
+    if (mouseControlActive) {
+      connectMouseSocket();
+    } else {
+      disconnectMouseSocket();
+      setTouchpadVisible(false);
+    }
+
+    return () => {
+      if (!mouseControlActive) {
+        disconnectMouseSocket();
+      }
+    };
+  }, [mouseControlActive]);
 
   // Push latest magnetometer readings over WebSocket
   useEffect(() => {
@@ -573,8 +728,79 @@ export default function DevScreen() {
               Streams magnetometer x / y / z over WebSocket to Python at {MAGNETO_WS_URL}.
             </Text>
           </View>
+
+          <View style={{ marginTop: 24, alignItems: 'center' }}>
+            <Pressable
+              onPress={() => {
+                if (!mouseControlActive) {
+                  setMouseControlActive(true);
+                  setTouchpadVisible(true);
+                } else {
+                  setMouseControlActive(false);
+                  setTouchpadVisible(false);
+                }
+              }}
+              style={{
+                backgroundColor: mouseControlActive ? '#43a047' : '#222',
+                paddingHorizontal: 36,
+                paddingVertical: 14,
+                borderRadius: 32,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 2,
+                marginBottom: 4,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
+                {mouseControlActive ? 'Stop Mouse Control' : 'Start Mouse Control'}
+              </Text>
+            </Pressable>
+            <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+              Control mouse via touchpad over WebSocket to Python at {MOUSE_WS_URL}.
+            </Text>
+          </View>
         </View>
       </ScrollView>
+
+      {/* Touchpad Modal */}
+      <Modal
+        visible={touchpadVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setTouchpadVisible(false);
+          setMouseControlActive(false);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchpadComponent
+            onDismiss={() => {
+              setTouchpadVisible(false);
+              setMouseControlActive(false);
+            }}
+            onTouchEvent={(action, x, y) => {
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
+                    type: 'touch',
+                    t: Date.now(),
+                    action,
+                    x,
+                    y,
+                    screenWidth: Math.round(screenWidth),
+                    screenHeight: Math.round(screenHeight),
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send touch event', err);
+                }
+              }
+            }}
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
