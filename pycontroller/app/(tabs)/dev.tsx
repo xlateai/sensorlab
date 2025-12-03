@@ -14,8 +14,13 @@ import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 
-const MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
-const MOUSE_WS_URL = 'ws://172.20.10.3:8766';
+// mDNS service types
+const MAGNETO_SERVICE_TYPE = '_magneto._tcp.local.';
+const MOUSE_SERVICE_TYPE = '_pymouse._tcp.local.';
+
+// Fallback URLs (used if mDNS discovery fails)
+const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
+const FALLBACK_MOUSE_WS_URL = 'ws://172.20.10.3:8766';
 
 const screenHeight = Dimensions.get('window').height;
 const screenWidth = Dimensions.get('window').width;
@@ -789,20 +794,34 @@ function TouchpadComponent({
                   {/* Dismiss button - hugging right */}
                   <Pressable
                     onPress={() => {
-                      // Use requestAnimationFrame to ensure proper timing
-                      requestAnimationFrame(() => {
-                        // Force blur both inputs
-                        if (keyboardInputAccessoryRef.current) {
-                          keyboardInputAccessoryRef.current.blur();
-                        }
-                        if (keyboardInputRef.current) {
-                          keyboardInputRef.current.blur();
-                        }
-                        // Dismiss keyboard after a brief delay to ensure blur completes
-                        setTimeout(() => {
-                          Keyboard.dismiss();
-                        }, 50);
-                      });
+                      // First, blur the currently focused input (accessory view input on iOS)
+                      if (isAccessoryInputFocused && keyboardInputAccessoryRef.current) {
+                        keyboardInputAccessoryRef.current.blur();
+                      } else if (isMainInputFocused && keyboardInputRef.current) {
+                        keyboardInputRef.current.blur();
+                      } else {
+                        // Blur both if we're not sure which is focused
+                        keyboardInputAccessoryRef.current?.blur();
+                        keyboardInputRef.current?.blur();
+                      }
+                      
+                      // Dismiss keyboard - call multiple times with delays
+                      Keyboard.dismiss();
+                      
+                      // Additional attempts to ensure keyboard closes
+                      setTimeout(() => {
+                        Keyboard.dismiss();
+                        keyboardInputAccessoryRef.current?.blur();
+                        keyboardInputRef.current?.blur();
+                      }, 10);
+                      
+                      setTimeout(() => {
+                        Keyboard.dismiss();
+                      }, 100);
+                      
+                      setTimeout(() => {
+                        Keyboard.dismiss();
+                      }, 200);
                     }}
                     style={{
                       backgroundColor: '#39ff14',
@@ -900,17 +919,19 @@ function TouchpadComponent({
                 {/* Dismiss button - hugging right */}
                 <Pressable
                   onPress={() => {
-                    // Use requestAnimationFrame to ensure proper timing
-                    requestAnimationFrame(() => {
-                      // Force blur input
-                      if (keyboardInputRef.current) {
-                        keyboardInputRef.current.blur();
-                      }
-                      // Dismiss keyboard after a brief delay to ensure blur completes
+                    // Force blur input with multiple attempts
+                    if (keyboardInputRef.current) {
+                      keyboardInputRef.current.blur();
+                      keyboardInputRef.current.setNativeProps({ editable: false });
                       setTimeout(() => {
-                        Keyboard.dismiss();
-                      }, 50);
-                    });
+                        keyboardInputRef.current?.setNativeProps({ editable: true });
+                      }, 100);
+                    }
+                    // Dismiss keyboard with multiple attempts
+                    Keyboard.dismiss();
+                    setTimeout(() => Keyboard.dismiss(), 50);
+                    setTimeout(() => Keyboard.dismiss(), 150);
+                    setTimeout(() => Keyboard.dismiss(), 300);
                   }}
                   style={{
                     backgroundColor: '#39ff14',
@@ -961,6 +982,11 @@ export default function DevScreen() {
   const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
   const [paused, setPaused] = useState(true); // default to paused
 
+  // mDNS discovered URLs
+  const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
+  const [mouseWsUrl, setMouseWsUrl] = useState<string>(FALLBACK_MOUSE_WS_URL);
+  const [mdnsStatus, setMdnsStatus] = useState<string>('Discovering...');
+  
   // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
   const [magnetoStreaming, setMagnetoStreaming] = useState(false);
@@ -1004,6 +1030,123 @@ export default function DevScreen() {
   const magSubRef = useRef<any>(null);
   const gyroSubRef = useRef<any>(null);
   const baroSubRef = useRef<any>(null);
+  
+  // Service discovery using HTTP discovery endpoint
+  // The Python server provides an HTTP endpoint at /discover for service discovery
+  useEffect(() => {
+    const discoverServices = async () => {
+      setMdnsStatus('Discovering services...');
+      
+      // Extract service names from mDNS service types
+      // MOUSE_SERVICE_TYPE = "_pymouse._tcp.local." -> service name is "pymouse"
+      // MAGNETO_SERVICE_TYPE = "_magneto._tcp.local." -> service name is "magneto"
+      const mouseServiceName = MOUSE_SERVICE_TYPE.split('_')[1].split('.')[0]; // "pymouse"
+      const magnetoServiceName = MAGNETO_SERVICE_TYPE.split('_')[1].split('.')[0]; // "magneto"
+      
+      // Try to discover services by querying common local network IPs
+      // We'll check the common local network ranges
+      const commonIPRanges = [
+        '172.20.10.3',  // Common hotspot IP
+        '192.168.1.1',  // Common router IP
+        '192.168.0.1',  // Alternative router IP
+        '10.0.0.1',     // Another common range
+      ];
+      
+      // Discovery ports for each service
+      const mouseDiscoveryPort = 8767; // HTTP discovery port for mouse service
+      const magnetoDiscoveryPort = 8768; // HTTP discovery port for magnetometer service
+      
+      let discoveredMouseUrl: string | null = null;
+      let discoveredMagnetoUrl: string | null = null;
+      
+      // Try each IP in the common ranges
+      for (const baseIP of commonIPRanges) {
+        try {
+          // Extract base IP (e.g., "192.168.1" from "192.168.1.1")
+          const ipParts = baseIP.split('.');
+          const base = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+          
+          // Scan a small range (e.g., .1 to .10)
+          for (let i = 1; i <= 10; i++) {
+            const testIP = `${base}.${i}`;
+            
+            // Try to discover mouse service
+            if (!discoveredMouseUrl) {
+              try {
+                const mouseDiscoveryUrl = `http://${testIP}:${mouseDiscoveryPort}/discover`;
+                const response = await fetch(mouseDiscoveryUrl, {
+                  method: 'GET',
+                  timeout: 1000, // 1 second timeout
+                } as any);
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.service === mouseServiceName && data.ws_url) {
+                    discoveredMouseUrl = data.ws_url;
+                    console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${discoveredMouseUrl}`);
+                  }
+                }
+              } catch (e) {
+                // Continue to next IP
+              }
+            }
+            
+            // Try to discover magnetometer service
+            if (!discoveredMagnetoUrl) {
+              try {
+                const magnetoDiscoveryUrl = `http://${testIP}:${magnetoDiscoveryPort}/discover`;
+                const response = await fetch(magnetoDiscoveryUrl, {
+                  method: 'GET',
+                  timeout: 1000, // 1 second timeout
+                } as any);
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.service === magnetoServiceName && data.ws_url) {
+                    discoveredMagnetoUrl = data.ws_url;
+                    console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${discoveredMagnetoUrl}`);
+                  }
+                }
+              } catch (e) {
+                // Continue to next IP
+              }
+            }
+            
+            // If we found both services, we can break early
+            if (discoveredMouseUrl && discoveredMagnetoUrl) break;
+          }
+          
+          // If we found both services, we can break early
+          if (discoveredMouseUrl && discoveredMagnetoUrl) break;
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      if (discoveredMouseUrl) {
+        setMouseWsUrl(discoveredMouseUrl);
+      } else {
+        setMouseWsUrl(FALLBACK_MOUSE_WS_URL);
+      }
+      
+      if (discoveredMagnetoUrl) {
+        setMagnetoWsUrl(discoveredMagnetoUrl);
+      } else {
+        setMagnetoWsUrl(FALLBACK_MAGNETO_WS_URL);
+      }
+      
+      if (discoveredMouseUrl || discoveredMagnetoUrl) {
+        const discoveredIP = discoveredMouseUrl 
+          ? discoveredMouseUrl.split(':')[1].slice(2)
+          : discoveredMagnetoUrl?.split(':')[1].slice(2) || 'unknown';
+        setMdnsStatus(`Discovered services at ${discoveredIP}`);
+      } else {
+        setMdnsStatus('Using fallback IPs (discovery failed)');
+      }
+    };
+    
+    discoverServices();
+  }, []);
 
   // Helper to kill all listeners
   const killAllListeners = () => {
@@ -1035,7 +1178,7 @@ export default function DevScreen() {
     }
 
     try {
-      const ws = new WebSocket(MAGNETO_WS_URL);
+      const ws = new WebSocket(magnetoWsUrl);
       ws.onopen = () => {
         console.log('[Magneto] WebSocket connected');
       };
@@ -1070,7 +1213,7 @@ export default function DevScreen() {
     }
 
     try {
-      const ws = new WebSocket(MOUSE_WS_URL);
+      const ws = new WebSocket(mouseWsUrl);
       ws.onopen = () => {
         console.log('[Mouse] WebSocket connected');
       };
@@ -1484,7 +1627,10 @@ export default function DevScreen() {
               </Text>
             </Pressable>
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              Streams magnetometer x / y / z over WebSocket to Python at {MAGNETO_WS_URL}.
+              Streams magnetometer x / y / z over WebSocket to Python at {magnetoWsUrl}.
+            </Text>
+            <Text style={{ color: '#666', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+              {mdnsStatus}
             </Text>
           </View>
 
@@ -1517,7 +1663,10 @@ export default function DevScreen() {
               </Text>
             </Pressable>
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              Control mouse via touchpad over WebSocket to Python at {MOUSE_WS_URL}.
+              Control mouse via touchpad over WebSocket to Python at {mouseWsUrl}.
+            </Text>
+            <Text style={{ color: '#666', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+              {mdnsStatus}
             </Text>
           </View>
 

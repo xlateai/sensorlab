@@ -2,10 +2,15 @@
 WebSocket server that receives touch events and controls the mouse.
 
 Requirements:
-    pip install websockets pyautogui
+    pip install websockets pyautogui zeroconf
 
 By default this listens on:
     ws://localhost:8766
+    http://localhost:8767/discover (for service discovery)
+
+The server advertises itself via mDNS as "_pymouse._tcp.local" and also
+provides an HTTP discovery endpoint at /discover so clients can discover
+it automatically without needing to know the IP address.
 
 The React Native dev screen sends coordinates at 30Hz. This server
 interpolates between received coordinates for smooth mouse movement.
@@ -70,22 +75,64 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 from typing import Any, Dict, Optional, Tuple
 
 import pyautogui
 import websockets
+from zeroconf import IPVersion, ServiceInfo, Zeroconf
 
 # Disable pyautogui failsafe for smoother control
 pyautogui.FAILSAFE = False
 
 HOST = "0.0.0.0"
 PORT = 8766
+DISCOVERY_PORT = 8767  # HTTP discovery endpoint port
+
+# mDNS service name
+SERVICE_TYPE = "_pymouse._tcp.local."
+SERVICE_NAME = "pymouse-server._pymouse._tcp.local."
 
 # Mouse movement settings
 MOVE_DURATION = 0.05  # Duration for smooth mouse movement (50ms for trackpad-like feel)
 # Mouse sensitivity (multiplier for normalized finger movement)
 SENSITIVITY = 1.0
+
+
+def get_local_ip() -> str:
+    """Get the local IP address for mDNS advertisement."""
+    try:
+        # Connect to a remote address to determine local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def register_mdns_service(port: int) -> tuple[Zeroconf, ServiceInfo]:
+    """Register the WebSocket service via mDNS."""
+    local_ip = get_local_ip()
+    print(f"[mDNS] Registering service at {local_ip}:{port}")
+    
+    info = ServiceInfo(
+        SERVICE_TYPE,
+        SERVICE_NAME,
+        addresses=[socket.inet_aton(local_ip)],
+        port=port,
+        properties={"version": "1.0"},
+    )
+    
+    zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+    zeroconf.register_service(info)
+    print(f"[mDNS] Service registered: {SERVICE_NAME} at {local_ip}:{port}")
+    
+    return zeroconf, info
 
 
 async def handle_touch(websocket) -> None:
@@ -413,13 +460,86 @@ async def handle_touch(websocket) -> None:
         print(f"[Mouse] Connection finished: {peer}")
 
 
+class DiscoveryHandler(BaseHTTPRequestHandler):
+    """HTTP handler for service discovery."""
+    
+    def do_GET(self):
+        if self.path == "/discover":
+            local_ip = get_local_ip()
+            response_data = json.dumps({
+                "service": "pymouse",
+                "ws_url": f"ws://{local_ip}:{PORT}",
+                "port": PORT,
+                "ip": local_ip,
+            })
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(response_data.encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def log_message(self, format, *args):
+        # Suppress default logging
+        pass
+
+
+def run_discovery_server() -> HTTPServer:
+    """Run HTTP discovery server in a separate thread."""
+    server = HTTPServer((HOST, DISCOVERY_PORT), DiscoveryHandler)
+    local_ip = get_local_ip()
+    print(f"[Discovery] HTTP discovery server at http://{local_ip}:{DISCOVERY_PORT}/discover")
+    
+    def serve():
+        server.serve_forever()
+    
+    thread = Thread(target=serve, daemon=True)
+    thread.start()
+    return server
+
+
 async def main() -> None:
     """
     Standalone server entrypoint for mouse control.
     """
     print(f"[Mouse] Listening on ws://{HOST}:{PORT}")
-    async with websockets.serve(handle_touch, HOST, PORT):
-        await asyncio.Future()  # run forever
+    
+    # Register mDNS service
+    zeroconf = None
+    service_info = None
+    try:
+        zeroconf, service_info = register_mdns_service(PORT)
+    except Exception as e:
+        print(f"[mDNS] Warning: Failed to register mDNS service: {e}")
+        print("[mDNS] Server will still work, but clients will need to know the IP address")
+    
+    # Start HTTP discovery server
+    discovery_server = None
+    try:
+        discovery_server = run_discovery_server()
+    except Exception as e:
+        print(f"[Discovery] Warning: Failed to start HTTP discovery server: {e}")
+    
+    try:
+        async with websockets.serve(handle_touch, HOST, PORT):
+            await asyncio.Future()  # run forever
+    finally:
+        # Unregister mDNS service on shutdown
+        if zeroconf and service_info:
+            try:
+                zeroconf.unregister_service(service_info)
+                zeroconf.close()
+                print("[mDNS] Service unregistered")
+            except Exception as e:
+                print(f"[mDNS] Error unregistering service: {e}")
+        # Shutdown discovery server
+        if discovery_server:
+            try:
+                discovery_server.shutdown()
+            except Exception as e:
+                print(f"[Discovery] Error shutting down discovery server: {e}")
 
 
 if __name__ == "__main__":
