@@ -177,7 +177,6 @@ function TouchpadComponent({
   const [isScrolling, setIsScrolling] = useState<'left' | 'right' | null>(null);
   const scrollOriginYRef = React.useRef<number | null>(null);
   const scrollCurrentYRef = React.useRef<number | null>(null);
-  const scrollIntervalRef = React.useRef<number | null>(null);
   const scrollAccumulatedRef = React.useRef<number>(0); // Accumulate fractional scrolls
   const scrollContentHeightRef = React.useRef<number>(5000); // Large content height for infinite scroll feel
   const scrollOffsetRef = React.useRef({ left: 0, right: 0 }); // Track scroll offset for wrapping
@@ -196,7 +195,7 @@ function TouchpadComponent({
     dragModeRef.current = isDragMode;
   }, [isDragMode]);
 
-  // Send coordinates at 30Hz (~33ms interval) when actively touching
+  // Send coordinates at 60Hz (~16ms interval) for smoother movement
   useEffect(() => {
     if (isTouching && currentTouch) {
       const isDrag = dragModeRef.current;
@@ -216,14 +215,17 @@ function TouchpadComponent({
         }
         lastSentRef.current = { x: currentTouch.x, y: currentTouch.y };
 
-        // Send drag move events at 30Hz
+        // Send drag move events at 60Hz for smoother dragging
         intervalRef.current = setInterval(() => {
           const touch = currentTouchRef.current;
           if (touch && lastSentRef.current) {
-            onDragEvent('move', touch.x, touch.y);
-            lastSentRef.current = { x: touch.x, y: touch.y };
+            // Only send if position actually changed
+            if (touch.x !== lastSentRef.current.x || touch.y !== lastSentRef.current.y) {
+              onDragEvent('move', touch.x, touch.y);
+              lastSentRef.current = { x: touch.x, y: touch.y };
+            }
           }
-        }, 33); // ~30Hz
+        }, 16); // ~60Hz for smoother movement
       } else {
         // Normal touch mode (or pending drag mode)
         // Clamp origin to 0-1 (origin must be within green square)
@@ -237,7 +239,7 @@ function TouchpadComponent({
         initialTouchRef.current = clampedOrigin;
         hasMovedRef.current = false;
 
-        // Then send coordinates at 30Hz for continuous updates
+        // Then send coordinates at 60Hz for continuous updates
         intervalRef.current = setInterval(() => {
           const touch = currentTouchRef.current;
           if (touch && lastSentRef.current && initialTouchRef.current) {
@@ -276,7 +278,7 @@ function TouchpadComponent({
               lastSentRef.current = { x: touch.x, y: touch.y };
             }
           }
-        }, 33); // ~30Hz
+        }, 16); // ~60Hz for smoother movement
       }
     } else {
       // Touch ended
@@ -371,17 +373,22 @@ function TouchpadComponent({
   const handleTouchMove = (evt: any) => {
     updateTouchPosition(evt);
     
-    // Send move events immediately for responsive mouse movement (trust higher precision)
-    if (isTouching && currentTouchRef.current && lastSentRef.current && initialTouchRef.current) {
+    // Send move events immediately for responsive mouse movement
+    if (isTouching && currentTouchRef.current && lastSentRef.current) {
       const touch = currentTouchRef.current;
-      // Reduced threshold for higher precision (0.001 instead of 0.02)
-      const dx = Math.abs(touch.x - initialTouchRef.current.x);
-      const dy = Math.abs(touch.y - initialTouchRef.current.y);
-      if (dx > 0.001 || dy > 0.001) {
-        hasMovedRef.current = true;
+      
+      // Always send if position changed (no threshold check for immediate response)
+      if (touch.x !== lastSentRef.current.x || touch.y !== lastSentRef.current.y) {
+        if (initialTouchRef.current) {
+          const dx = Math.abs(touch.x - initialTouchRef.current.x);
+          const dy = Math.abs(touch.y - initialTouchRef.current.y);
+          if (dx > 0.001 || dy > 0.001) {
+            hasMovedRef.current = true;
+          }
+        }
         
         // If pending drag mode and we've moved, activate drag mode
-        if (pendingDragModeRef.current && !dragModeRef.current) {
+        if (pendingDragModeRef.current && !dragModeRef.current && initialTouchRef.current) {
           setIsDragMode(true);
           pendingDragModeRef.current = false;
           // Send drag start and cancel the current touch
@@ -405,11 +412,6 @@ function TouchpadComponent({
         lastSentRef.current = { x: touch.x, y: touch.y };
       }
     }
-    
-    // If in drag mode and we start moving, ensure drag mode is active
-    if (dragModeRef.current && !isDragMode) {
-      setIsDragMode(true);
-    }
   };
 
   const handleTouchEnd = () => {
@@ -429,71 +431,125 @@ function TouchpadComponent({
   };
 
   // Scroll wheel handlers - using ScrollView's native scroll events
+  const lastScrollOffsetRef = React.useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
+  const scrollWrapInProgressRef = React.useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
+  const scrollIntervalRef = React.useRef<number | null>(null);
+  const scrollDeltaRef = React.useRef<{ left: number; right: number }>({ left: 0, right: 0 });
+  
   const handleScroll = (side: 'left' | 'right', event: any) => {
+    // Only process scroll events if we're actively scrolling (finger is down)
+    if (!isScrolling || isScrolling !== side) return;
+    
     const offsetY = event.nativeEvent.contentOffset.y;
     const scrollRef = side === 'left' ? leftScrollRef : rightScrollRef;
     
-    if (!scrollRef.current) return;
+    if (!scrollRef.current || scrollWrapInProgressRef.current[side]) return;
     
     // Track scroll offset
     scrollOffsetRef.current[side] = offsetY;
     
     // Calculate delta from last position
-    if (scrollOriginYRef.current !== null) {
-      const deltaY = scrollOriginYRef.current - offsetY;
-      
-      // Send scroll event if there's meaningful movement
-      if (Math.abs(deltaY) > 0.5) {
-        // Normalize and send scroll amount
-        const scrollAmount = deltaY * 0.1;
-        onScrollEvent(scrollAmount);
-        scrollOriginYRef.current = offsetY;
-      }
-    } else {
-      scrollOriginYRef.current = offsetY;
+    const lastOffset = lastScrollOffsetRef.current[side];
+    if (lastOffset !== null) {
+      const deltaY = lastOffset - offsetY;
+      // Accumulate delta for 60Hz packet sending
+      scrollDeltaRef.current[side] += deltaY;
     }
+    lastScrollOffsetRef.current[side] = offsetY;
     
     // Handle infinite scroll wrapping
     const contentHeight = scrollContentHeightRef.current;
     const viewportHeight = touchpadDimension;
-    const wrapThreshold = 100; // Distance from edges to trigger wrap
+    const wrapThreshold = 200; // Increased threshold to avoid premature wrapping
     
     // Wrap to bottom if near top
-    if (offsetY < wrapThreshold && scrollOffsetRef.current[side] < wrapThreshold) {
+    if (offsetY < wrapThreshold) {
+      scrollWrapInProgressRef.current[side] = true;
       setTimeout(() => {
         scrollRef.current?.scrollTo({
           y: contentHeight - viewportHeight - wrapThreshold,
           animated: false,
         });
         scrollOffsetRef.current[side] = contentHeight - viewportHeight - wrapThreshold;
-        scrollOriginYRef.current = scrollOffsetRef.current[side];
+        lastScrollOffsetRef.current[side] = scrollOffsetRef.current[side];
+        scrollWrapInProgressRef.current[side] = false;
       }, 0);
     }
     // Wrap to top if near bottom
-    else if (offsetY > contentHeight - viewportHeight - wrapThreshold && 
-             scrollOffsetRef.current[side] > contentHeight - viewportHeight - wrapThreshold) {
+    else if (offsetY > contentHeight - viewportHeight - wrapThreshold) {
+      scrollWrapInProgressRef.current[side] = true;
       setTimeout(() => {
         scrollRef.current?.scrollTo({
           y: wrapThreshold,
           animated: false,
         });
         scrollOffsetRef.current[side] = wrapThreshold;
-        scrollOriginYRef.current = scrollOffsetRef.current[side];
+        lastScrollOffsetRef.current[side] = scrollOffsetRef.current[side];
+        scrollWrapInProgressRef.current[side] = false;
       }, 0);
     }
   };
 
   const handleScrollBeginDrag = (side: 'left' | 'right') => {
     setIsScrolling(side);
-    // Initialize origin from current scroll offset
+    // Initialize last offset for delta calculation
     const currentOffset = scrollOffsetRef.current[side];
-    scrollOriginYRef.current = currentOffset;
+    lastScrollOffsetRef.current[side] = currentOffset;
+    scrollDeltaRef.current[side] = 0;
   };
 
   const handleScrollEndDrag = () => {
     setIsScrolling(null);
-    scrollOriginYRef.current = null;
+    // Stop all scroll events immediately when touch ends
+    // Reset last offset to prevent sending scroll events after touch ends
+    lastScrollOffsetRef.current.left = null;
+    lastScrollOffsetRef.current.right = null;
+    scrollDeltaRef.current.left = 0;
+    scrollDeltaRef.current.right = 0;
+    
+    // Clear scroll interval
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
   };
+
+  // Send scroll events at 60Hz while scrolling (similar to touch events)
+  useEffect(() => {
+    if (isScrolling) {
+      const side = isScrolling;
+      
+      // Send scroll events at 60Hz
+      scrollIntervalRef.current = setInterval(() => {
+        const accumulatedDelta = scrollDeltaRef.current[side];
+        
+        // Convert accumulated delta to discrete scroll amount: +1, 0, or -1
+        if (Math.abs(accumulatedDelta) >= 1.0) {
+          // Determine scroll direction and amount
+          const scrollAmount = accumulatedDelta > 0 ? 1 : -1;
+          onScrollEvent(scrollAmount);
+          
+          // Subtract the amount we just sent
+          scrollDeltaRef.current[side] -= scrollAmount;
+        } else {
+          // No scroll if delta is too small
+          onScrollEvent(0);
+        }
+      }, 16); // ~60Hz
+    } else {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+  }, [isScrolling, onScrollEvent]);
 
   // Initialize scroll positions to middle for infinite scroll
   useEffect(() => {
@@ -555,6 +611,8 @@ function TouchpadComponent({
           onMomentumScrollEnd={handleScrollEndDrag}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          decelerationRate={0}
+          bounces={false}
           style={{
             width: scrollWheelWidth,
             height: touchpadDimension,
@@ -597,6 +655,8 @@ function TouchpadComponent({
           onMomentumScrollEnd={handleScrollEndDrag}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          decelerationRate={0}
+          bounces={false}
           style={{
             width: scrollWheelWidth,
             height: touchpadDimension,

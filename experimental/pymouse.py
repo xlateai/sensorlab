@@ -97,7 +97,7 @@ SERVICE_TYPE = "_pymouse._tcp.local."
 SERVICE_NAME = "pymouse-server._pymouse._tcp.local."
 
 # Mouse movement settings
-MOVE_DURATION = 0.05  # Duration for smooth mouse movement (50ms for trackpad-like feel)
+MOVE_DURATION = 0.01  # Duration for smooth mouse movement (10ms for faster, more responsive feel)
 # Mouse sensitivity (multiplier for normalized finger movement)
 SENSITIVITY = 1.0
 
@@ -162,8 +162,6 @@ async def handle_touch(websocket) -> None:
     is_dragging: bool = False
     drag_origin_norm: Optional[Tuple[float, float]] = None
     drag_mouse_origin_pos: Optional[Tuple[int, int]] = None
-    # Scroll accumulator for smooth decimal scrolling
-    scroll_accumulator: float = 0.0
 
     try:
         async for message in websocket:
@@ -219,18 +217,16 @@ async def handle_touch(websocket) -> None:
             if msg_type == "scroll":
                 delta_y = data.get("deltaY", 0.0)
                 try:
-                    # Accumulate fractional scrolls for smooth decimal scrolling
+                    # Direct scroll execution - deltaY is already discrete: +1, 0, or -1
                     # Negative deltaY means scroll up, positive means scroll down
-                    # We accumulate fractional scrolls and only execute when >= 1.0
-                    # Increased sensitivity multiplier for better responsiveness
-                    scroll_accumulator += -delta_y * 3.0  # Scale factor for sensitivity (increased from 2.0)
-                    
-                    # Execute scroll when accumulated value >= 1.0 or <= -1.0
-                    if abs(scroll_accumulator) >= 1.0:
-                        scroll_clicks = int(scroll_accumulator)
-                        scroll_accumulator -= scroll_clicks  # Keep the remainder
-                        if scroll_clicks != 0:
-                            pyautogui.scroll(scroll_clicks)
+                    # Convert to integer scroll clicks (deltaY is already +1, 0, or -1)
+                    scroll_clicks = int(delta_y)
+                    print(f"[Mouse] Scroll event: deltaY={delta_y}, scroll_clicks={scroll_clicks}")
+                    if scroll_clicks != 0:
+                        pyautogui.scroll(scroll_clicks)
+                        print(f"[Mouse] Executed scroll: {scroll_clicks} clicks")
+                    else:
+                        print(f"[Mouse] Scroll skipped (deltaY=0)")
                 except Exception as e:
                     print(f"[Mouse] Failed to scroll: {e}")
                 continue
@@ -421,14 +417,14 @@ async def handle_touch(websocket) -> None:
                     except asyncio.CancelledError:
                         pass
 
-                # Use pyautogui's built-in smooth movement with easing
+                # Use direct movement for faster response (no easing for lower latency)
                 move_task = asyncio.create_task(
                     asyncio.to_thread(
                         pyautogui.moveTo,
                         target_x,
                         target_y,
                         duration=MOVE_DURATION,
-                        tween=pyautogui.easeInOutQuad,
+                        tween=pyautogui.easeOutQuad,  # Faster easing for more responsive feel
                     )
                 )
                 current_target = (target_x, target_y)
