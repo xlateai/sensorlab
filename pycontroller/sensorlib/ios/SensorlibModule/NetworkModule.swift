@@ -16,12 +16,27 @@ struct MdnsServiceInfo: Record {
   @Field var addresses: [String]  // All resolved IP addresses
 }
 
-enum MdnsError: Error {
+enum MdnsError: Error, LocalizedError {
   case invalidServiceType
   case timeout
   case cancelled
   case noServiceFound
-  case resolutionFailed
+  case resolutionFailed(String)
+  
+  var errorDescription: String? {
+    switch self {
+    case .invalidServiceType:
+      return "Invalid service type format"
+    case .timeout:
+      return "mDNS discovery timed out"
+    case .cancelled:
+      return "mDNS discovery was cancelled"
+    case .noServiceFound:
+      return "No mDNS service found"
+    case .resolutionFailed(let reason):
+      return "mDNS resolution failed: \(reason)"
+    }
+  }
 }
 
 final class NetworkModule {
@@ -192,11 +207,13 @@ private class NetworkModuleBrowserDelegate: NSObject, NetServiceBrowserDelegate,
     
     // Common iOS mDNS error -72008 means mDNS isn't available
     if errorCode == -72008 {
-      print("[NetworkModule] mDNS not available (error -72008) - network may not support mDNS")
-      onError(MdnsError.resolutionFailed)
+      let reason = "mDNS not available (error -72008) - network may not support mDNS or Local Network permission not granted"
+      print("[NetworkModule] \(reason)")
+      onError(MdnsError.resolutionFailed(reason))
     } else {
-      print("[NetworkModule] Browser error: \(errorCode)")
-      onError(NSError(domain: errorDomain, code: errorCode))
+      let reason = "Browser error code: \(errorCode)"
+      print("[NetworkModule] \(reason)")
+      onError(MdnsError.resolutionFailed(reason))
     }
   }
   
@@ -207,8 +224,9 @@ private class NetworkModuleBrowserDelegate: NSObject, NetServiceBrowserDelegate,
     
     // Extract hostname and port
     guard let hostname = sender.hostName else {
-      print("[NetworkModule] ERROR: Service resolved but hostName is nil")
-      onError(MdnsError.resolutionFailed)
+      let reason = "Service resolved but hostName is nil"
+      print("[NetworkModule] ERROR: \(reason)")
+      onError(MdnsError.resolutionFailed(reason))
       return
     }
     
@@ -269,8 +287,9 @@ private class NetworkModuleBrowserDelegate: NSObject, NetServiceBrowserDelegate,
       nextService.delegate = self
       nextService.resolve(withTimeout: 5.0)
     } else {
-      print("[NetworkModule] No more services to try, all resolution attempts failed")
-      onError(MdnsError.resolutionFailed)
+      let reason = "No more services to try, all resolution attempts failed (error code: \(errorCode))"
+      print("[NetworkModule] \(reason)")
+      onError(MdnsError.resolutionFailed(reason))
     }
   }
 }
