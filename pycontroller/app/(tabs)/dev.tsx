@@ -1139,6 +1139,13 @@ export default function DevScreen() {
       setMdnsStatus(`mDNS: Mouse service discovered at ${serviceInfo.host}:${serviceInfo.port}`);
     } catch (error: any) {
       console.warn('[mDNS] Discovery failed:', error);
+      console.warn('[mDNS] Error details:', {
+        message: error?.message,
+        code: error?.code,
+        domain: error?.domain,
+        userInfo: error?.userInfo,
+        error: String(error),
+      });
       const errorMessage = error?.message || String(error);
       if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
         setMdnsStatus('mDNS discovery timed out - try manual IP entry');

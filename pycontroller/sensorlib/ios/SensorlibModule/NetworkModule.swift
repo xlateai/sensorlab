@@ -35,12 +35,14 @@ final class NetworkModule {
   private init() {}
   
   func discoverService(input: MdnsDiscoveryInput) async throws -> MdnsServiceInfo {
+    print("[NetworkModule] discoverService called with serviceType=\(input.serviceType), domain=\(input.domain)")
     let serviceType = input.serviceType
     let domain = input.domain
     let timeout = input.timeout ?? 10.0
     
     // Validate service type format
     if !serviceType.contains("._tcp.") && !serviceType.contains("._udp.") {
+      print("[NetworkModule] ERROR: Invalid service type format")
       throw MdnsError.invalidServiceType
     }
     
@@ -73,6 +75,7 @@ final class NetworkModule {
           continuation.resume(returning: serviceInfo)
         },
         onError: { [weak self] error in
+          print("[NetworkModule] onError callback called with error: \(error)")
           // Remove from active tracking
           self?.discoveryContinuations.removeValue(forKey: requestKey)
           if let index = self?.activeBrowsers.firstIndex(where: { $0 === browser }) {
@@ -91,7 +94,9 @@ final class NetworkModule {
       
       // Start browsing
       print("[NetworkModule] Starting browser for serviceType=\(serviceType), domain=\(domain)")
+      print("[NetworkModule] Browser delegate set: \(browser.delegate != nil)")
       browser.searchForServices(ofType: serviceType, inDomain: domain)
+      print("[NetworkModule] searchForServices called, waiting for delegate callbacks...")
       
       // Set up timeout
       Task {
