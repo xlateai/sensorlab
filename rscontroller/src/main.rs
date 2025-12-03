@@ -533,7 +533,11 @@ async fn main() -> Result<()> {
 
     // Create TCP listener
     let listener = TcpListener::bind(format!("{}:{}", HOST, PORT)).await?;
+    let local_ip = get_local_ip().unwrap_or_else(|_| IpAddr::from([127, 0, 0, 1]));
     info!("[Mouse] Listening on ws://{}:{}", HOST, PORT);
+    info!("[Mouse] Server IP address: {}", local_ip);
+    info!("[Mouse] WebSocket URL: ws://{}:{}", local_ip, PORT);
+    info!("[Mouse] Discovery URL: http://{}:{}/discover", local_ip, DISCOVERY_PORT);
 
     // Accept connections
     loop {

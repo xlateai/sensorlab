@@ -1044,8 +1044,9 @@ export default function DevScreen() {
   // mDNS discovered URLs
   const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
   const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
-  const [mdnsStatus, setMdnsStatus] = useState<string>('Discovering...');
-  const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
+  const [mdnsStatus, setMdnsStatus] = useState<string>('Waiting for mDNS discovery...');
+  const [manualMouseIP, setManualMouseIP] = useState<string>(''); // Manual IP entry
+  const [showManualIPInput, setShowManualIPInput] = useState<boolean>(false);
   const zeroconfRef = useRef<any | null>(null);
   
   // Magnetometer -> Python streaming
@@ -1092,192 +1093,24 @@ export default function DevScreen() {
   const gyroSubRef = useRef<any>(null);
   const baroSubRef = useRef<any>(null);
   
-  // Service discovery using HTTP discovery endpoint
-  // The Python server provides an HTTP endpoint at /discover for service discovery
-  const discoverServices = React.useCallback(async () => {
-    // Don't discover if we already have the mouse service URL
-    if (mouseWsUrl) {
-      return;
+  // No IP brute force scanning - we rely entirely on mDNS discovery
+  // Manual IP entry is available as a fallback if mDNS doesn't work
+  
+  // Handle manual IP entry
+  const handleManualIPSubmit = () => {
+    if (manualMouseIP.trim()) {
+      // Validate IP format (basic check)
+      const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (ipPattern.test(manualMouseIP.trim())) {
+        const wsUrl = `ws://${manualMouseIP.trim()}:8766`;
+        setMouseWsUrl(wsUrl);
+        setMdnsStatus(`Using manual IP: ${manualMouseIP.trim()}`);
+        setShowManualIPInput(false);
+      } else {
+        setMdnsStatus('Invalid IP format. Use format: 192.168.1.100');
+      }
     }
-    
-    if (isDiscovering) return; // Prevent concurrent discoveries
-    
-    setIsDiscovering(true);
-    setMdnsStatus('Discovering services...');
-      
-      // Extract service names from mDNS service types
-      // MOUSE_SERVICE_TYPE = "_pymouse._tcp.local." -> service name is "pymouse"
-      // MAGNETO_SERVICE_TYPE = "_magneto._tcp.local." -> service name is "magneto"
-      const mouseServiceName = MOUSE_SERVICE_TYPE.split('_')[1].split('.')[0]; // "pymouse"
-      const magnetoServiceName = MAGNETO_SERVICE_TYPE.split('_')[1].split('.')[0]; // "magneto"
-      
-      // Discovery ports for each service
-      const mouseDiscoveryPort = 8767; // HTTP discovery port for mouse service
-      const magnetoDiscoveryPort = 8768; // HTTP discovery port for magnetometer service
-      
-      // Helper to try discovering a service at a specific IP
-      const tryDiscoverService = async (
-        ip: string,
-        port: number,
-        serviceName: string,
-        serviceType: string
-      ): Promise<string | null> => {
-        try {
-          const discoveryUrl = `http://${ip}:${port}/discover`;
-          const controller = new AbortController();
-          
-          // Faster timeout (500ms) for quicker discovery
-          const timeoutId = setTimeout(() => controller.abort(), 500);
-          
-          const response = await fetch(discoveryUrl, {
-            method: 'GET',
-            signal: controller.signal,
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.service === serviceName && data.ws_url) {
-              // Don't log here - let the caller log once
-              return data.ws_url;
-            }
-          }
-        } catch (e: any) {
-          // Silently fail - we'll try many IPs in parallel
-        }
-        return null;
-      };
-      
-      // Build list of IPs to try - optimized for speed
-      const ipsToTry: string[] = [];
-      
-      // First, try the most likely IP (previously in fallback)
-      const likelyIP = '172.20.10.3';
-      ipsToTry.push(likelyIP);
-      
-      // Then add a smaller set of common IP ranges (reduced for speed)
-      const commonIPRanges = [
-        '172.20.10.3',  // Common hotspot IP (already added)
-        '192.168.1.1',  // Common router IP
-        '192.168.0.1',  // Alternative router IP
-      ];
-      
-      for (const baseIP of commonIPRanges) {
-        const ipParts = baseIP.split('.');
-        const base = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-        // Scan only first 3 IPs per range for speed (reduced from 5)
-        for (let i = 1; i <= 3; i++) {
-          const testIP = `${base}.${i}`;
-          if (!ipsToTry.includes(testIP)) {
-            ipsToTry.push(testIP);
-          }
-        }
-      }
-      
-      let discoveredMouseUrl: string | null = null;
-      let discoveredMagnetoUrl: string | null = null;
-      let mouseLogged = false;
-      let magnetoLogged = false;
-      
-      // Try most likely IP first (fast path)
-      const [likelyMouse, likelyMagneto] = await Promise.all([
-        tryDiscoverService(likelyIP, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE),
-        tryDiscoverService(likelyIP, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE),
-      ]);
-      
-      if (likelyMouse) {
-        discoveredMouseUrl = likelyMouse;
-        if (!mouseLogged) {
-          console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${likelyMouse}`);
-          mouseLogged = true;
-        }
-      }
-      if (likelyMagneto) {
-        discoveredMagnetoUrl = likelyMagneto;
-        if (!magnetoLogged) {
-          console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${likelyMagneto}`);
-          magnetoLogged = true;
-        }
-      }
-      
-      // If we found both on the likely IP, we're done!
-      if (!discoveredMouseUrl || !discoveredMagnetoUrl) {
-        // Try remaining IPs in parallel with higher concurrency
-        // But only if we still need to find something
-        const remainingIPs = ipsToTry.filter(ip => ip !== likelyIP);
-        const MAX_CONCURRENT = 12; // Increased concurrency for faster scanning
-        
-        // Process in chunks so we can stop early if we find what we need
-        for (let i = 0; i < remainingIPs.length; i += MAX_CONCURRENT) {
-          const chunk = remainingIPs.slice(i, i + MAX_CONCURRENT);
-          
-          const promises = chunk.flatMap(ip => [
-            !discoveredMouseUrl 
-              ? tryDiscoverService(ip, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE)
-                  .then(url => { 
-                    if (url && !discoveredMouseUrl) {
-                      discoveredMouseUrl = url;
-                      if (!mouseLogged) {
-                        console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${url}`);
-                        mouseLogged = true;
-                      }
-                    }
-                    return url; 
-                  })
-              : Promise.resolve(null),
-            !discoveredMagnetoUrl
-              ? tryDiscoverService(ip, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE)
-                  .then(url => { 
-                    if (url && !discoveredMagnetoUrl) {
-                      discoveredMagnetoUrl = url;
-                      if (!magnetoLogged) {
-                        console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${url}`);
-                        magnetoLogged = true;
-                      }
-                    }
-                    return url; 
-                  })
-              : Promise.resolve(null),
-          ]);
-          
-          await Promise.all(promises);
-          
-          // Stop early if we found both services
-          if (discoveredMouseUrl && discoveredMagnetoUrl) {
-            break;
-          }
-        }
-      }
-      
-      if (discoveredMouseUrl) {
-        setMouseWsUrl(discoveredMouseUrl);
-      } else {
-        setMouseWsUrl(''); // No fallback for mouse service
-        console.warn('[Discovery] Mouse service not found after scanning', ipsToTry.length, 'IPs');
-      }
-      
-      if (discoveredMagnetoUrl) {
-        setMagnetoWsUrl(discoveredMagnetoUrl);
-      } else {
-        setMagnetoWsUrl(FALLBACK_MAGNETO_WS_URL);
-      }
-      
-      if (discoveredMouseUrl && discoveredMagnetoUrl) {
-        const discoveredIP = (discoveredMouseUrl as string).split(':')[1].slice(2);
-        setMdnsStatus(`Discovered services at ${discoveredIP}`);
-      } else if (discoveredMouseUrl) {
-        const discoveredIP = (discoveredMouseUrl as string).split(':')[1].slice(2);
-        setMdnsStatus(`Mouse service found at ${discoveredIP} (magneto using fallback)`);
-      } else if (discoveredMagnetoUrl) {
-        const discoveredIP = (discoveredMagnetoUrl as string).split(':')[1].slice(2);
-        setMdnsStatus(`Magneto service found at ${discoveredIP} (mouse not found)`);
-      } else {
-        setMdnsStatus('Mouse service not found - ensure pymouse.py is running');
-      }
-      
-      setIsDiscovering(false);
-  }, [isDiscovering, mouseWsUrl]);
+  };
 
   // mDNS discovery using native DNS-SD (react-native-zeroconf)
   useEffect(() => {
@@ -1310,7 +1143,8 @@ export default function DevScreen() {
           serviceType.includes('pymouse')
         ) {
           setMouseWsUrl((prev) => prev || wsUrl);
-          setMdnsStatus(`mDNS: Mouse service at ${host}:${port}`);
+          setMdnsStatus(`mDNS: Mouse service discovered at ${host}:${port}`);
+          console.log(`[mDNS] Discovered mouse service at ${host}:${port}`);
         }
 
         // Match magneto service
@@ -1319,7 +1153,8 @@ export default function DevScreen() {
           serviceType.includes('magneto')
         ) {
           setMagnetoWsUrl((prev) => prev || wsUrl);
-          setMdnsStatus(`mDNS: Magneto service at ${host}:${port}`);
+          setMdnsStatus(`mDNS: Magneto service discovered at ${host}:${port}`);
+          console.log(`[mDNS] Discovered magneto service at ${host}:${port}`);
         }
       } catch (e) {
         console.warn('[mDNS] Error handling resolved service', e);
@@ -1337,9 +1172,11 @@ export default function DevScreen() {
       // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp.local."
       zeroconf.scan('pymouse', 'tcp', 'local.');
       zeroconf.scan('magneto', 'tcp', 'local.');
-      setMdnsStatus('Discovering services via mDNS...');
+      setMdnsStatus('Discovering services via mDNS (Bonjour/Zeroconf)...');
+      console.log('[mDNS] Started scanning for pymouse and magneto services');
     } catch (e) {
       console.warn('[mDNS] Failed to start scan', e);
+      setMdnsStatus('mDNS scan failed - try manual IP entry');
     }
 
     return () => {
@@ -1355,12 +1192,8 @@ export default function DevScreen() {
     };
   }, []);
   
-  // Initial discovery on mount - only if we don't have mouse service yet
-  useEffect(() => {
-    if (!mouseWsUrl && !isDiscovering) {
-      discoverServices();
-    }
-  }, []); // Only run once on mount
+  // mDNS discovery happens automatically via the Zeroconf useEffect below
+  // No need for IP scanning - mDNS is the proper way to discover services
 
   // Helper to kill all listeners
   const killAllListeners = () => {
@@ -1422,6 +1255,7 @@ export default function DevScreen() {
   const connectMouseSocket = () => {
     if (!mouseWsUrl) {
       console.warn('[Mouse] No mouse service URL available - discovery may have failed');
+      setMdnsStatus('No mouse service URL - discovery failed or not set');
       return;
     }
     
@@ -1434,17 +1268,29 @@ export default function DevScreen() {
     try {
       const ws = new WebSocket(mouseWsUrl);
       ws.onopen = () => {
-        console.log('[Mouse] WebSocket connected');
+        console.log('[Mouse] WebSocket connected to', mouseWsUrl);
+        setMdnsStatus(`Connected to ${mouseWsUrl.split('://')[1]}`);
       };
       ws.onerror = (event) => {
         console.warn('[Mouse] WebSocket error', event);
+        const errorMsg = `Connection failed to ${mouseWsUrl.split('://')[1]}. On public WiFi, devices may be isolated.`;
+        setMdnsStatus(errorMsg);
+        // If connection fails, clear the URL so user can retry
+        if (mouseWsRef.current?.readyState === WebSocket.CLOSED) {
+          setMouseWsUrl('');
+          setManualMouseIP('');
+        }
       };
-      ws.onclose = () => {
-        console.log('[Mouse] WebSocket closed');
+      ws.onclose = (event) => {
+        console.log('[Mouse] WebSocket closed', event.code, event.reason);
+        if (event.code !== 1000) { // Not a normal closure
+          setMdnsStatus(`Connection closed (code: ${event.code}). Check if server is running.`);
+        }
       };
       mouseWsRef.current = ws;
     } catch (err) {
       console.warn('[Mouse] Failed to open WebSocket', err);
+      setMdnsStatus(`Failed to connect: ${err}`);
     }
   };
 
@@ -1889,26 +1735,83 @@ export default function DevScreen() {
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
               {mouseWsUrl ? `Control mouse via touchpad over WebSocket to Python at ${mouseWsUrl}.` : 'Mouse service discovery failed. Please ensure pymouse.py is running.'}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 8 }}>
+            <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 8 }}>
               <Text style={{ color: '#666', fontSize: 10, textAlign: 'center' }}>
                 {mdnsStatus}
               </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {!showManualIPInput ? (
+                  <Pressable
+                    onPress={() => setShowManualIPInput(true)}
+                    style={{
+                      backgroundColor: '#39ff14',
+                      paddingHorizontal: 12,
+                      paddingVertical: 4,
+                      borderRadius: 4,
+                    }}
+                  >
+                    <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
+                      Manual IP
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <TextInput
+                      value={manualMouseIP}
+                      onChangeText={setManualMouseIP}
+                      placeholder="192.168.1.100"
+                      placeholderTextColor="#666"
+                      style={{
+                        backgroundColor: '#222',
+                        color: '#fff',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: '#39ff14',
+                        fontSize: 10,
+                        minWidth: 100,
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="numeric"
+                    />
+                    <Pressable
+                      onPress={handleManualIPSubmit}
+                      style={{
+                        backgroundColor: '#39ff14',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
+                        Set
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setShowManualIPInput(false);
+                        setManualMouseIP('');
+                      }}
+                      style={{
+                        backgroundColor: '#666',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>
+                        Cancel
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
               {!mouseWsUrl && (
-                <Pressable
-                  onPress={discoverServices}
-                  disabled={isDiscovering}
-                  style={{
-                    backgroundColor: isDiscovering ? '#444' : '#39ff14',
-                    paddingHorizontal: 12,
-                    paddingVertical: 4,
-                    borderRadius: 4,
-                    opacity: isDiscovering ? 0.5 : 1,
-                  }}
-                >
-                  <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
-                    {isDiscovering ? 'Discovering...' : 'Retry'}
-                  </Text>
-                </Pressable>
+                <Text style={{ color: '#888', fontSize: 9, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
+                  Using mDNS (Bonjour) for discovery. If not found, devices may be isolated on public WiFi. Try manual IP entry or connect both devices to a personal hotspot.
+                </Text>
               )}
             </View>
           </View>
