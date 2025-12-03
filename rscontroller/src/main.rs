@@ -1,5 +1,5 @@
 use anyhow::Result;
-use enigo::{Enigo, MouseButton, MouseControllable};
+use enigo::{Button, Coordinate, Direction, Enigo, Mouse};
 use futures_util::{SinkExt, StreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
@@ -105,10 +105,23 @@ impl MouseState {
     }
 
     fn get_mouse_location(&mut self) -> (f64, f64) {
-        // Enigo does not provide a portable "get position"; we track the logical
-        // origin ourselves and fall back to screen center.
+        // Try to get the real OS cursor position from Enigo so that each new
+        // gesture starts from wherever the cursor currently is, instead of
+        // teleporting back to an internal logical origin.
+        //
+        // If this fails for any reason, fall back to our last known origin or
+        // the virtual screen center.
         let (sw, sh) = self.get_screen_size();
-        self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0))
+
+        match Enigo::new(&enigo::Settings::default()) {
+            Ok(mut enigo) => {
+                match enigo.location() {
+                    Ok((x, y)) => (x as f64, y as f64),
+                    Err(_) => self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0)),
+                }
+            }
+            Err(_) => self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0)),
+        }
     }
 
     fn handle_touch(&mut self, action: TouchAction, x: f64, y: f64) -> Result<()> {
@@ -168,8 +181,8 @@ impl MouseState {
                 // Move instantly to the new position.
                 let x = target_x.round().max(0.0) as i32;
                 let y = target_y.round().max(0.0) as i32;
-                let mut enigo = Enigo::new();
-                enigo.mouse_move_to(x, y);
+                let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                enigo.move_mouse(x, y, Coordinate::Abs);
             }
             TouchAction::End => {
                 self.touch_origin_norm = None;
@@ -182,17 +195,17 @@ impl MouseState {
 
     fn handle_click(&mut self, button: &str) -> Result<()> {
         let btn = match button {
-            "left" => MouseButton::Left,
-            "right" => MouseButton::Right,
-            "middle" => MouseButton::Middle,
+            "left" => Button::Left,
+            "right" => Button::Right,
+            "middle" => Button::Middle,
             _ => {
                 warn!("Unknown button type: {}, using left click", button);
-                MouseButton::Left
+                Button::Left
             }
         };
 
-        let mut enigo = Enigo::new();
-        enigo.mouse_click(btn);
+        let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+        enigo.button(btn, Direction::Click);
 
         let (x, y) = self.get_mouse_location();
         info!("{} click at ({:.1}, {:.1})", button, x, y);
@@ -206,8 +219,8 @@ impl MouseState {
             TouchAction::Start => {
                 let (mouse_x, mouse_y) = self.get_mouse_location();
                 // Mouse down at current position (left button)
-                let mut enigo = Enigo::new();
-                enigo.mouse_down(MouseButton::Left);
+                let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                enigo.button(Button::Left, Direction::Press);
                 self.is_dragging = true;
                 self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                 self.drag_origin_norm = Some((x, y));
@@ -223,8 +236,8 @@ impl MouseState {
                 {
                     // Start drag if not already started (mouse down + init state)
                     let (mouse_x, mouse_y) = self.get_mouse_location();
-                    let mut enigo = Enigo::new();
-                    enigo.mouse_down(MouseButton::Left);
+                    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                    enigo.button(Button::Left, Direction::Press);
                     self.is_dragging = true;
                     self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                     self.drag_origin_norm = Some((x, y));
@@ -265,14 +278,14 @@ impl MouseState {
                 // Move while the button is held down.
                 let x = target_x.round().max(0.0) as i32;
                 let y = target_y.round().max(0.0) as i32;
-                let mut enigo = Enigo::new();
-                enigo.mouse_move_to(x, y);
+                let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                enigo.move_mouse(x, y, Coordinate::Abs);
             }
             TouchAction::End => {
                 if self.is_dragging {
                     // Release mouse button when drag ends.
-                    let mut enigo = Enigo::new();
-                    enigo.mouse_up(MouseButton::Left);
+                    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                    enigo.button(Button::Left, Direction::Release);
                     self.is_dragging = false;
                 }
                 self.drag_origin_norm = None;
