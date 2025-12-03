@@ -433,7 +433,8 @@ function TouchpadComponent({
   // Scroll wheel handlers - using ScrollView's native scroll events
   const lastScrollOffsetRef = React.useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
   const scrollWrapInProgressRef = React.useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
-  const scrollDeltaRef = React.useRef<{ left: number; right: number }>({ left: 0, right: 0 });
+  const scrollInitialOffsetRef = React.useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
+  const scrollThreshold = 50; // Distance in pixels to trigger a scroll packet
   
   const handleScroll = (side: 'left' | 'right', event: any) => {
     // Only process scroll events if we're actively scrolling (finger is down)
@@ -447,14 +448,30 @@ function TouchpadComponent({
     // Track scroll offset
     scrollOffsetRef.current[side] = offsetY;
     
-    // Calculate delta from last position
-    const lastOffset = lastScrollOffsetRef.current[side];
-    if (lastOffset !== null) {
-      const deltaY = lastOffset - offsetY;
-      
-      // Accumulate delta (don't send yet - wait until scroll ends)
-      scrollDeltaRef.current[side] += deltaY;
+    // Get initial position for this scroll gesture
+    const initialOffset = scrollInitialOffsetRef.current[side];
+    if (initialOffset === null) {
+      // First scroll event - initialize the baseline
+      scrollInitialOffsetRef.current[side] = offsetY;
+      lastScrollOffsetRef.current[side] = offsetY;
+      return;
     }
+    
+    // Calculate distance from initial position
+    // Positive distance = scrolled down, Negative distance = scrolled up
+    const distanceFromInitial = initialOffset - offsetY;
+    
+    // Check if we've crossed a threshold
+    if (distanceFromInitial >= scrollThreshold) {
+      // Scrolled down enough - send +1 and reset baseline
+      onScrollEvent(1);
+      scrollInitialOffsetRef.current[side] = offsetY; // Reset baseline to current position
+    } else if (distanceFromInitial <= -scrollThreshold) {
+      // Scrolled up enough - send -1 and reset baseline
+      onScrollEvent(-1);
+      scrollInitialOffsetRef.current[side] = offsetY; // Reset baseline to current position
+    }
+    
     lastScrollOffsetRef.current[side] = offsetY;
     
     // Handle infinite scroll wrapping
@@ -466,12 +483,15 @@ function TouchpadComponent({
     if (offsetY < wrapThreshold) {
       scrollWrapInProgressRef.current[side] = true;
       setTimeout(() => {
+        const wrappedOffset = contentHeight - viewportHeight - wrapThreshold;
         scrollRef.current?.scrollTo({
-          y: contentHeight - viewportHeight - wrapThreshold,
+          y: wrappedOffset,
           animated: false,
         });
-        scrollOffsetRef.current[side] = contentHeight - viewportHeight - wrapThreshold;
-        lastScrollOffsetRef.current[side] = scrollOffsetRef.current[side];
+        scrollOffsetRef.current[side] = wrappedOffset;
+        lastScrollOffsetRef.current[side] = wrappedOffset;
+        // Reset initial offset to wrapped position so next scroll starts fresh
+        scrollInitialOffsetRef.current[side] = wrappedOffset;
         scrollWrapInProgressRef.current[side] = false;
       }, 0);
     }
@@ -479,12 +499,15 @@ function TouchpadComponent({
     else if (offsetY > contentHeight - viewportHeight - wrapThreshold) {
       scrollWrapInProgressRef.current[side] = true;
       setTimeout(() => {
+        const wrappedOffset = wrapThreshold;
         scrollRef.current?.scrollTo({
-          y: wrapThreshold,
+          y: wrappedOffset,
           animated: false,
         });
-        scrollOffsetRef.current[side] = wrapThreshold;
-        lastScrollOffsetRef.current[side] = scrollOffsetRef.current[side];
+        scrollOffsetRef.current[side] = wrappedOffset;
+        lastScrollOffsetRef.current[side] = wrappedOffset;
+        // Reset initial offset to wrapped position so next scroll starts fresh
+        scrollInitialOffsetRef.current[side] = wrappedOffset;
         scrollWrapInProgressRef.current[side] = false;
       }, 0);
     }
@@ -492,37 +515,21 @@ function TouchpadComponent({
 
   const handleScrollBeginDrag = (side: 'left' | 'right') => {
     setIsScrolling(side);
-    // Initialize last offset for delta calculation
+    // Initialize the baseline position for threshold-based scrolling
     const currentOffset = scrollOffsetRef.current[side];
+    scrollInitialOffsetRef.current[side] = currentOffset;
     lastScrollOffsetRef.current[side] = currentOffset;
-    scrollDeltaRef.current[side] = 0;
   };
 
   const handleScrollEndDrag = () => {
-    // Send one scroll packet based on accumulated delta for whichever side was scrolling
-    // Check both sides to determine which one has accumulated movement
-    const leftDelta = scrollDeltaRef.current.left;
-    const rightDelta = scrollDeltaRef.current.right;
-    
-    // Determine which side had the most movement (or use the active side if state is available)
-    const activeSide = isScrolling || (Math.abs(leftDelta) > Math.abs(rightDelta) ? 'left' : 'right');
-    const accumulatedDelta = activeSide === 'left' ? leftDelta : rightDelta;
-    
-    // Only send if there was meaningful scroll movement (threshold to avoid accidental scrolls)
-    if (Math.abs(accumulatedDelta) >= 0.1) {
-      // Send one packet: 1 for downward scroll, -1 for upward scroll
-      const scrollAmount = accumulatedDelta > 0 ? 1 : -1;
-      onScrollEvent(scrollAmount);
-    }
-    
     // Immediately stop all scrolling
     setIsScrolling(null);
     
     // Reset all scroll state to prevent any residual scrolling
     lastScrollOffsetRef.current.left = null;
     lastScrollOffsetRef.current.right = null;
-    scrollDeltaRef.current.left = 0;
-    scrollDeltaRef.current.right = 0;
+    scrollInitialOffsetRef.current.left = null;
+    scrollInitialOffsetRef.current.right = null;
   };
 
   // Initialize scroll positions to middle for infinite scroll
