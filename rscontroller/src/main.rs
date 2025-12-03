@@ -4,8 +4,8 @@ use futures_util::StreamExt;
 use libp2p::{
     core::upgrade,
     identity, noise,
-    swarm::{SwarmEvent, NetworkBehaviour, SwarmBuilder},
-    tcp, websocket, yamux, PeerId, Transport,
+    swarm::{SwarmEvent, NetworkBehaviour},
+    tcp, websocket, yamux, PeerId, Swarm, Transport,
 };
 use libp2p_mdns::tokio::Behaviour as MdnsBehaviour;
 use libp2p_mdns::Config as MdnsConfig;
@@ -390,8 +390,13 @@ async fn main() -> Result<()> {
     // Create network behaviour
     let behaviour = AppBehaviour { mdns };
 
-    // Create swarm using SwarmBuilder
-    let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
+    // Create swarm
+    let mut swarm = Swarm::new(
+        transport,
+        behaviour,
+        local_peer_id,
+        libp2p::swarm::Config::without_executor(),
+    );
 
     // Listen on all interfaces with TCP
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
