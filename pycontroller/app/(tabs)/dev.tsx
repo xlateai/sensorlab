@@ -15,25 +15,18 @@ import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 import SensorlibModule from 'sensorlib';
 
-// mDNS types (matching SensorlibModule types)
-type MdnsDiscoveryInput = {
-  serviceType: string;  // e.g., "_pymouse._tcp."
-  domain: string;       // e.g., "local."
+// BLE types (matching SensorlibModule types)
+type BleDiscoveryInput = {
+  serviceName?: string; // Optional filter by service name
   timeout?: number;     // Optional timeout in seconds (default: 10.0)
 };
 
-type MdnsServiceInfo = {
-  host: string;         // IP address (prefers IPv4)
+type BleServiceInfo = {
+  host: string;         // IP address
   port: number;         // Port number
-  name: string;         // Service name
-  type: string;         // Service type
-  domain: string;       // Domain
-  addresses: string[]; // All resolved IP addresses (IPv4 and IPv6)
+  name: string;         // Device name
+  deviceId: string;     // BLE device identifier
 };
-
-// mDNS service types
-const MOUSE_SERVICE_TYPE = '_pymouse._tcp.';
-const MOUSE_SERVICE_DOMAIN = 'local.';
 
 // Fallback URLs (used if mDNS discovery fails)
 const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
@@ -1108,38 +1101,36 @@ export default function DevScreen() {
   // No IP brute force scanning - we rely entirely on mDNS discovery
   // Manual IP entry is available as a fallback if mDNS doesn't work
   
-  // Function to discover mDNS service using native module
+  // Function to discover BLE service using native module
   const discoverMouseService = React.useCallback(async () => {
     if (Platform.OS === 'web') {
-      setMdnsStatus('mDNS discovery not available on web');
+      setMdnsStatus('BLE discovery not available on web');
       return;
     }
 
     if (mdnsDiscoveryInProgressRef.current) {
-      console.log('[mDNS] Discovery already in progress, skipping...');
+      console.log('[BLE] Discovery already in progress, skipping...');
       return;
     }
 
     mdnsDiscoveryInProgressRef.current = true;
-    setMdnsStatus('Discovering mouse service via mDNS...');
+    setMdnsStatus('Discovering mouse service via BLE...');
 
     try {
-      const input: MdnsDiscoveryInput = {
-        serviceType: MOUSE_SERVICE_TYPE,
-        domain: MOUSE_SERVICE_DOMAIN,
+      const input: BleDiscoveryInput = {
         timeout: 10.0,
       };
 
-      console.log('[mDNS] Starting discovery for', MOUSE_SERVICE_TYPE, 'in', MOUSE_SERVICE_DOMAIN);
-      const serviceInfo: MdnsServiceInfo = await SensorlibModule.discoverMdnsService(input);
+      console.log('[BLE] Starting BLE discovery...');
+      const serviceInfo: BleServiceInfo = await SensorlibModule.discoverBleService(input);
 
-      console.log('[mDNS] ✓ Service discovered:', serviceInfo);
+      console.log('[BLE] ✓ Service discovered:', serviceInfo);
       const wsUrl = `ws://${serviceInfo.host}:${serviceInfo.port}`;
       setMouseWsUrl(wsUrl);
-      setMdnsStatus(`mDNS: Mouse service discovered at ${serviceInfo.host}:${serviceInfo.port}`);
+      setMdnsStatus(`BLE: Mouse service discovered at ${serviceInfo.host}:${serviceInfo.port}`);
     } catch (error: any) {
-      console.warn('[mDNS] Discovery failed:', error);
-      console.warn('[mDNS] Error details:', {
+      console.warn('[BLE] Discovery failed:', error);
+      console.warn('[BLE] Error details:', {
         message: error?.message,
         code: error?.code,
         domain: error?.domain,
@@ -1148,18 +1139,18 @@ export default function DevScreen() {
       });
       const errorMessage = error?.message || String(error);
       if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
-        setMdnsStatus('mDNS discovery timed out - try manual IP entry');
-      } else if (errorMessage.includes('-72008') || errorMessage.includes('resolution')) {
-        setMdnsStatus('mDNS not available on this network - use manual IP entry');
+        setMdnsStatus('BLE discovery timed out - try manual IP entry');
+      } else if (errorMessage.includes('Bluetooth') || errorMessage.includes('bluetooth')) {
+        setMdnsStatus('Bluetooth not available or permission denied - use manual IP entry');
       } else {
-        setMdnsStatus(`mDNS discovery failed: ${errorMessage}`);
+        setMdnsStatus(`BLE discovery failed: ${errorMessage} - use manual IP entry`);
       }
     } finally {
       mdnsDiscoveryInProgressRef.current = false;
     }
   }, []);
 
-  // Function to restart mDNS discovery
+  // Function to restart BLE discovery
   const restartMdnsDiscovery = React.useCallback(() => {
     discoverMouseService();
   }, [discoverMouseService]);
@@ -1180,10 +1171,10 @@ export default function DevScreen() {
     }
   };
 
-  // mDNS discovery using native Swift module
+  // BLE discovery using native Swift module
   useEffect(() => {
     if (Platform.OS === 'web') {
-      setMdnsStatus('mDNS discovery not available on web');
+      setMdnsStatus('BLE discovery not available on web');
       return;
     }
 
@@ -1748,7 +1739,7 @@ export default function DevScreen() {
                       }}
                     >
                       <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
-                        Retry mDNS
+                        Retry BLE
                       </Text>
                     </Pressable>
                     <Pressable
@@ -1821,7 +1812,7 @@ export default function DevScreen() {
               </View>
               {!mouseWsUrl && (
                 <Text style={{ color: '#888', fontSize: 9, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
-                  mDNS discovery may not work on iOS. Check the server terminal for the IP address and use manual IP entry.
+                  BLE discovery requires Bluetooth to be enabled. If discovery fails, check the server terminal for the IP address and use manual IP entry.
                 </Text>
               )}
             </View>

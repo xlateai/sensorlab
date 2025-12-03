@@ -62,6 +62,11 @@ public class SensorlibModule: Module {
     AsyncFunction("discoverMdnsService") { (input: MdnsDiscoveryInput) in
       return try await discoverMdnsService(input: input)
     }
+    
+    // BLE discovery functions - delegates to BleDiscoveryModule
+    AsyncFunction("discoverBleService") { (input: BleDiscoveryInput) in
+      return try await discoverBleService(input: input)
+    }
 
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
     // view definition: Prop, Events.

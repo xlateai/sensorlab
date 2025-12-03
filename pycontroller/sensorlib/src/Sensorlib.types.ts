@@ -32,3 +32,15 @@ export type MdnsServiceInfo = {
   domain: string;       // Domain
   addresses: string[]; // All resolved IP addresses (IPv4 and IPv6)
 };
+
+export type BleDiscoveryInput = {
+  serviceName?: string; // Optional filter by service name
+  timeout?: number;     // Optional timeout in seconds (default: 10.0)
+};
+
+export type BleServiceInfo = {
+  host: string;         // IP address
+  port: number;         // Port number
+  name: string;         // Device name
+  deviceId: string;     // BLE device identifier
+};
