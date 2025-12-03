@@ -1,9 +1,9 @@
 use anyhow::Result;
+use enigo::{Enigo, MouseButton, MouseControllable};
 use futures_util::{SinkExt, StreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use rustautogui::RustAutoGui;
 use serde::Deserialize;
 use serde_json::json;
 use std::convert::Infallible;
@@ -22,7 +22,8 @@ const SERVICE_TYPE: &str = "_pymouse._tcp.local.";
 const SERVICE_NAME: &str = "pymouse-server._pymouse._tcp.local.";
 // Overall mouse movement gain; lower values = less cursor movement per unit finger delta.
 // This is the main knob to tune how "strong" the controller feels.
-const SENSITIVITY: f64 = 0.4;
+// Slightly higher than before to make motion feel a bit snappier.
+const SENSITIVITY: f64 = 0.45;
 // Inside this normalized radius around the touch origin, we apply a reduced gain so that
 // tiny finger movements in a small area don't cause large cursor drift.
 const FINE_RADIUS: f64 = 0.03; // 3% of the screen in normalized units
@@ -30,8 +31,7 @@ const FINE_SENSITIVITY_SCALE: f64 = 0.35; // fine control is ~35% of normal sens
 // For large sweeping movements, we gradually ramp the gain up so you can cover more distance
 // without losing the fine control near the origin.
 const MAX_GAIN_MULTIPLIER: f64 = 2.0; // at large radii, effective gain ~= SENSITIVITY * 2.0
-// Duration for smooth mouse movement (in seconds) – mirrors pymouse.py's 0.01s moves.
-const MOVE_DURATION_SECONDS: f32 = 0.01;
+// Enigo moves instantly; no duration parameter.
 
 // Message types matching the TypeScript client
 #[derive(Debug, Deserialize)]
@@ -78,7 +78,6 @@ enum TouchAction {
 
 // Mouse control state
 struct MouseState {
-    gui: RustAutoGui,
     // Touch state
     touch_origin_norm: Option<(f64, f64)>,
     mouse_origin_pos: Option<(f64, f64)>,
@@ -90,10 +89,7 @@ struct MouseState {
 
 impl MouseState {
     fn new() -> Result<Self> {
-        // `false` => debug mode off in rustautogui
-        let gui = RustAutoGui::new(false)?;
         Ok(Self {
-            gui,
             touch_origin_norm: None,
             mouse_origin_pos: None,
             is_dragging: false,
@@ -103,18 +99,16 @@ impl MouseState {
     }
 
     fn get_screen_size(&mut self) -> (f64, f64) {
-        let (w, h) = self.gui.get_screen_size();
-        (w as f64, h as f64)
+        // Enigo doesn't expose screen size; use a reasonable virtual desktop size.
+        // This only affects the relative gain scaling.
+        (1920.0, 1080.0)
     }
 
     fn get_mouse_location(&mut self) -> (f64, f64) {
-        if let Ok((x, y)) = self.gui.get_mouse_position() {
-            (x as f64, y as f64)
-        } else {
-            // Fallback to last known or center of screen if unavailable
-            let (sw, sh) = self.get_screen_size();
-            self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0))
-        }
+        // Enigo does not provide a portable "get position"; we track the logical
+        // origin ourselves and fall back to screen center.
+        let (sw, sh) = self.get_screen_size();
+        self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0))
     }
 
     fn handle_touch(&mut self, action: TouchAction, x: f64, y: f64) -> Result<()> {
@@ -171,13 +165,11 @@ impl MouseState {
                 let target_x = target_x.max(0.0).min(screen_width - 1.0);
                 let target_y = target_y.max(0.0).min(screen_height - 1.0);
 
-                // Ask rustautogui to animate to the new position over a short duration,
-                // similar to pyautogui.moveTo(..., duration=0.01).
-                let x = target_x.round().max(0.0) as u32;
-                let y = target_y.round().max(0.0) as u32;
-                if let Err(e) = self.gui.move_mouse_to_pos(x, y, MOVE_DURATION_SECONDS) {
-                    warn!("[Mouse] move_mouse_to_pos error: {:?}", e);
-                }
+                // Move instantly to the new position.
+                let x = target_x.round().max(0.0) as i32;
+                let y = target_y.round().max(0.0) as i32;
+                let mut enigo = Enigo::new();
+                enigo.mouse_move_to(x, y);
             }
             TouchAction::End => {
                 self.touch_origin_norm = None;
@@ -189,19 +181,18 @@ impl MouseState {
     }
 
     fn handle_click(&mut self, button: &str) -> Result<()> {
-        let res = match button {
-            "left" => self.gui.left_click(),
-            "right" => self.gui.right_click(),
-            "middle" => self.gui.middle_click(),
+        let btn = match button {
+            "left" => MouseButton::Left,
+            "right" => MouseButton::Right,
+            "middle" => MouseButton::Middle,
             _ => {
                 warn!("Unknown button type: {}, using left click", button);
-                self.gui.left_click()
+                MouseButton::Left
             }
         };
 
-        if let Err(e) = res {
-            warn!("[Mouse] click error: {:?}", e);
-        }
+        let mut enigo = Enigo::new();
+        enigo.mouse_click(btn);
 
         let (x, y) = self.get_mouse_location();
         info!("{} click at ({:.1}, {:.1})", button, x, y);
@@ -214,6 +205,9 @@ impl MouseState {
         match action {
             TouchAction::Start => {
                 let (mouse_x, mouse_y) = self.get_mouse_location();
+                // Mouse down at current position (left button)
+                let mut enigo = Enigo::new();
+                enigo.mouse_down(MouseButton::Left);
                 self.is_dragging = true;
                 self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                 self.drag_origin_norm = Some((x, y));
@@ -227,12 +221,17 @@ impl MouseState {
                     || self.drag_mouse_origin_pos.is_none()
                     || self.drag_origin_norm.is_none()
                 {
-                    // Start drag if not already started
+                    // Start drag if not already started (mouse down + init state)
                     let (mouse_x, mouse_y) = self.get_mouse_location();
+                    let mut enigo = Enigo::new();
+                    enigo.mouse_down(MouseButton::Left);
                     self.is_dragging = true;
                     self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                     self.drag_origin_norm = Some((x, y));
-                    return Ok(());
+                    info!(
+                        "Drag auto-started: mouse_origin=({:.1}, {:.1}), touch_norm=({:.3}, {:.3})",
+                        mouse_x, mouse_y, x, y
+                    );
                 }
 
                 let (mouse_x, mouse_y) = self.drag_mouse_origin_pos.unwrap();
@@ -263,15 +262,17 @@ impl MouseState {
                 let target_x = target_x.max(0.0).min(screen_width - 1.0);
                 let target_y = target_y.max(0.0).min(screen_height - 1.0);
 
-                // Ask rustautogui to animate the drag move over a short duration.
-                let x = target_x.round().max(0.0) as u32;
-                let y = target_y.round().max(0.0) as u32;
-                if let Err(e) = self.gui.drag_mouse_to_pos(x, y, MOVE_DURATION_SECONDS) {
-                    warn!("[Mouse] drag_mouse_to_pos error: {:?}", e);
-                }
+                // Move while the button is held down.
+                let x = target_x.round().max(0.0) as i32;
+                let y = target_y.round().max(0.0) as i32;
+                let mut enigo = Enigo::new();
+                enigo.mouse_move_to(x, y);
             }
             TouchAction::End => {
                 if self.is_dragging {
+                    // Release mouse button when drag ends.
+                    let mut enigo = Enigo::new();
+                    enigo.mouse_up(MouseButton::Left);
                     self.is_dragging = false;
                 }
                 self.drag_origin_norm = None;
