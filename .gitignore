@@ -15,3 +15,24 @@ node_modules/
 **/node_modules/**
 
 *.pyc
+
+
+# Rust build artifacts
+/target/
+
+# Cargo lock in libraries (RECOMMENDED to keep for binaries)
+# If this is a library that will be used by multiple platforms:
+# Cargo.lock
+
+# Backup files
+**/*.rs.bk
+
+# Rust analyzer / IDE
+/.idea/
+/.vscode/
+/*.code-workspace
+
+# Logs
+*.log
+
+**/target/**
