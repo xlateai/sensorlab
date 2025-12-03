@@ -25,6 +25,9 @@ const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
 const screenHeight = Dimensions.get('window').height;
 const screenWidth = Dimensions.get('window').width;
 
+// Scroll threshold - distance in pixels to trigger a scroll packet
+const SCROLL_THRESHOLD = 25; // Reduced from 50 for more sensitive scrolling
+
 // Blank popup component
 function BlankPopup({ visible, onClose, children }: {
   visible: boolean;
@@ -434,7 +437,6 @@ function TouchpadComponent({
   const lastScrollOffsetRef = React.useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
   const scrollWrapInProgressRef = React.useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   const scrollInitialOffsetRef = React.useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
-  const scrollThreshold = 50; // Distance in pixels to trigger a scroll packet
   
   const handleScroll = (side: 'left' | 'right', event: any) => {
     // Only process scroll events if we're actively scrolling (finger is down)
@@ -449,27 +451,37 @@ function TouchpadComponent({
     scrollOffsetRef.current[side] = offsetY;
     
     // Get initial position for this scroll gesture
-    const initialOffset = scrollInitialOffsetRef.current[side];
-    if (initialOffset === null) {
+    let currentBaseline = scrollInitialOffsetRef.current[side];
+    if (currentBaseline === null) {
       // First scroll event - initialize the baseline
       scrollInitialOffsetRef.current[side] = offsetY;
       lastScrollOffsetRef.current[side] = offsetY;
       return;
     }
     
-    // Calculate distance from initial position
+    // Calculate distance from current baseline
     // Positive distance = scrolled down, Negative distance = scrolled up
-    const distanceFromInitial = initialOffset - offsetY;
+    const distanceFromBaseline = currentBaseline - offsetY;
     
-    // Check if we've crossed a threshold
-    if (distanceFromInitial >= scrollThreshold) {
-      // Scrolled down enough - send +1 and reset baseline
-      onScrollEvent(1);
-      scrollInitialOffsetRef.current[side] = offsetY; // Reset baseline to current position
-    } else if (distanceFromInitial <= -scrollThreshold) {
-      // Scrolled up enough - send -1 and reset baseline
-      onScrollEvent(-1);
-      scrollInitialOffsetRef.current[side] = offsetY; // Reset baseline to current position
+    // Calculate how many thresholds we've crossed
+    if (distanceFromBaseline >= SCROLL_THRESHOLD) {
+      // Scrolled down - calculate how many packets to send
+      const thresholdsCrossed = Math.floor(distanceFromBaseline / SCROLL_THRESHOLD);
+      for (let i = 0; i < thresholdsCrossed; i++) {
+        onScrollEvent(1);
+      }
+      // Reset baseline to current position after sending all packets
+      // This preserves any remainder distance for the next scroll event
+      scrollInitialOffsetRef.current[side] = offsetY;
+    } else if (distanceFromBaseline <= -SCROLL_THRESHOLD) {
+      // Scrolled up - calculate how many packets to send
+      const thresholdsCrossed = Math.floor(Math.abs(distanceFromBaseline) / SCROLL_THRESHOLD);
+      for (let i = 0; i < thresholdsCrossed; i++) {
+        onScrollEvent(-1);
+      }
+      // Reset baseline to current position after sending all packets
+      // This preserves any remainder distance for the next scroll event
+      scrollInitialOffsetRef.current[side] = offsetY;
     }
     
     lastScrollOffsetRef.current[side] = offsetY;
