@@ -1,13 +1,17 @@
 use anyhow::Result;
+use futures_util::{SinkExt, StreamExt};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 use rdev::{Button, EventType};
 use serde::Deserialize;
+use serde_json::json;
+use std::convert::Infallible;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-use futures_util::{SinkExt, StreamExt};
 use tracing::{error, info, warn};
 
 // Constants
@@ -16,7 +20,6 @@ const PORT: u16 = 8766;
 const DISCOVERY_PORT: u16 = 8767;
 const SERVICE_TYPE: &str = "_pymouse._tcp.local.";
 const SERVICE_NAME: &str = "pymouse-server._pymouse._tcp.local.";
-const MOVE_DURATION_MS: u64 = 10; // 10ms for low latency
 const SENSITIVITY: f64 = 1.0;
 
 // Message types matching the TypeScript client
@@ -29,8 +32,10 @@ enum ClientMessage {
         action: TouchAction,
         x: f64,
         y: f64,
-        screen_width: Option<u32>,
-        screen_height: Option<u32>,
+        #[serde(rename = "screenWidth")]
+        _screen_width: Option<u32>,
+        #[serde(rename = "screenHeight")]
+        _screen_height: Option<u32>,
     },
     #[serde(rename = "click")]
     Click {
@@ -43,8 +48,10 @@ enum ClientMessage {
         action: TouchAction,
         x: f64,
         y: f64,
-        screen_width: Option<u32>,
-        screen_height: Option<u32>,
+        #[serde(rename = "screenWidth")]
+        _screen_width: Option<u32>,
+        #[serde(rename = "screenHeight")]
+        _screen_height: Option<u32>,
     },
 }
 
@@ -278,15 +285,16 @@ async fn handle_connection(
                 // Handle message based on type
                 let mut state = mouse_state.lock().await;
                 if let Err(e) = match message {
-                    ClientMessage::Touch {
-                        action, x, y, ..
-                    } => {
+                    ClientMessage::Touch { action, x, y, .. } => {
+                        info!("[Mouse] touch {:?} at ({:.3}, {:.3})", action, x, y);
                         state.handle_touch(action, x, y)
                     }
-                    ClientMessage::Click { button, .. } => state.handle_click(&button),
-                    ClientMessage::Drag {
-                        action, x, y, ..
-                    } => {
+                    ClientMessage::Click { button, .. } => {
+                        info!("[Mouse] click {}", button);
+                        state.handle_click(&button)
+                    }
+                    ClientMessage::Drag { action, x, y, .. } => {
+                        info!("[Mouse] drag {:?} at ({:.3}, {:.3})", action, x, y);
                         state.handle_drag(action, x, y)
                     }
                 } {
@@ -329,6 +337,57 @@ fn get_local_ip() -> Result<IpAddr> {
     Ok(local_addr.ip())
 }
 
+// HTTP discovery handler compatible with the existing React Native client
+async fn discovery_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    if req.method() == Method::GET && req.uri().path() == "/discover" {
+        info!("[Discovery] /discover request");
+        // Use the same JSON shape as the Python server
+        let local_ip = match get_local_ip() {
+            Ok(ip) => ip.to_string(),
+            Err(_) => "127.0.0.1".to_string(),
+        };
+        let body = json!({
+            "service": "pymouse",
+            "ws_url": format!("ws://{}:{}", local_ip, PORT),
+            "port": PORT,
+            "ip": local_ip,
+        })
+        .to_string();
+
+        let mut resp = Response::new(Body::from(body));
+        *resp.status_mut() = StatusCode::OK;
+        resp.headers_mut()
+            .insert("Content-Type", "application/json".parse().unwrap());
+        resp.headers_mut()
+            .insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+        return Ok(resp);
+    }
+
+    let mut not_found = Response::new(Body::empty());
+    *not_found.status_mut() = StatusCode::NOT_FOUND;
+    Ok(not_found)
+}
+
+// Start HTTP discovery server on DISCOVERY_PORT
+async fn start_discovery_server() -> Result<()> {
+    let addr = SocketAddr::from(([0, 0, 0, 0], DISCOVERY_PORT));
+    info!("[Discovery] Starting HTTP discovery server on {}", addr);
+
+    let make_svc = make_service_fn(|_conn| async {
+        Ok::<_, Infallible>(service_fn(|req| discovery_handler(req)))
+    });
+
+    let server = Server::bind(&addr).serve(make_svc);
+
+    tokio::spawn(async move {
+        if let Err(e) = server.await {
+            error!("[Discovery] server error: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
 // Register mDNS service
 fn register_mdns_service(port: u16) -> Result<ServiceDaemon> {
     let daemon = ServiceDaemon::new()?;
@@ -355,15 +414,18 @@ fn register_mdns_service(port: u16) -> Result<ServiceDaemon> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
+    // Initialize tracing with a sensible default so logs show up even if RUST_LOG isn't set
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(env_filter)
         .init();
 
     info!("[Mouse] Starting server on {}:{}", HOST, PORT);
 
     // Register mDNS service
-    let mdns_daemon = match register_mdns_service(PORT) {
+    let _mdns_daemon = match register_mdns_service(PORT) {
         Ok(daemon) => {
             info!("[mDNS] Service registered successfully");
             Some(daemon)
@@ -374,6 +436,11 @@ async fn main() -> Result<()> {
             None
         }
     };
+
+    // Start HTTP discovery server for React Native client
+    if let Err(e) = start_discovery_server().await {
+        warn!("[Discovery] Failed to start HTTP discovery server: {}", e);
+    }
 
     // Create shared mouse state
     let mouse_state = Arc::new(Mutex::new(MouseState::new()?));
