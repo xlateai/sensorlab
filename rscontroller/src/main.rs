@@ -4,8 +4,8 @@ use futures_util::StreamExt;
 use libp2p::{
     core::upgrade,
     identity, noise,
-    swarm::{SwarmEvent, NetworkBehaviour},
-    tcp, websocket, yamux, PeerId, Swarm, Transport,
+    swarm::{SwarmEvent, NetworkBehaviour, SwarmBuilder},
+    tcp, websocket, yamux, PeerId, Transport,
 };
 use libp2p_mdns::tokio::Behaviour as MdnsBehaviour;
 use libp2p_mdns::Config as MdnsConfig;
@@ -390,13 +390,8 @@ async fn main() -> Result<()> {
     // Create network behaviour
     let behaviour = AppBehaviour { mdns };
 
-    // Create swarm
-    let mut swarm = Swarm::new(
-        transport,
-        behaviour,
-        local_peer_id,
-        libp2p::swarm::Config::with_tokio_executor(),
-    );
+    // Create swarm using SwarmBuilder
+    let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
 
     // Listen on all interfaces with TCP
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
@@ -428,12 +423,12 @@ async fn main() -> Result<()> {
             }
             SwarmEvent::Behaviour(event) => {
                 match event {
-                    libp2p_mdns::Event::Discovered(list) => {
+                    AppBehaviourEvent::Mdns(libp2p_mdns::Event::Discovered(list)) => {
                         for (peer_id, multiaddr) in list {
                             info!("[Mouse] Discovered peer {} at {}", peer_id, multiaddr);
                         }
                     }
-                    libp2p_mdns::Event::Expired(list) => {
+                    AppBehaviourEvent::Mdns(libp2p_mdns::Event::Expired(list)) => {
                         for (peer_id, multiaddr) in list {
                             info!("[Mouse] Peer {} expired at {}", peer_id, multiaddr);
                         }
