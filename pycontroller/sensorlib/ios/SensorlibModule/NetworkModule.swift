@@ -90,13 +90,15 @@ final class NetworkModule {
       activeDelegates[browser] = delegate
       
       // Start browsing
+      print("[NetworkModule] Starting browser for serviceType=\(serviceType), domain=\(domain)")
       browser.searchForServices(ofType: serviceType, inDomain: domain)
       
       // Set up timeout
       Task {
         try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
         if discoveryContinuations[requestKey] != nil {
-          // Timeout occurred
+          // Timeout occurred - no service found
+          print("[NetworkModule] Discovery timeout after \(timeout) seconds")
           browser.stop()
           discoveryContinuations.removeValue(forKey: requestKey)
           if let index = activeBrowsers.firstIndex(where: { $0 === browser }) {
@@ -181,12 +183,14 @@ private class NetworkModuleBrowserDelegate: NSObject, NetServiceBrowserDelegate,
     let errorCode = errorDict[NetService.errorCode]?.intValue ?? 0
     // Error domain is typically a string key, but if it's NSNumber, we'll use a default
     let errorDomain = "NSNetServicesErrorDomain"
-    print("[NetworkModule] Browser error: code=\(errorCode), domain=\(errorDomain)")
+    print("[NetworkModule] Browser didNotSearch error: code=\(errorCode), domain=\(errorDomain), dict=\(errorDict)")
     
     // Common iOS mDNS error -72008 means mDNS isn't available
     if errorCode == -72008 {
+      print("[NetworkModule] mDNS not available (error -72008) - network may not support mDNS")
       onError(MdnsError.resolutionFailed)
     } else {
+      print("[NetworkModule] Browser error: \(errorCode)")
       onError(NSError(domain: errorDomain, code: errorCode))
     }
   }
@@ -194,10 +198,11 @@ private class NetworkModuleBrowserDelegate: NSObject, NetServiceBrowserDelegate,
   // MARK: - NetServiceDelegate
   
   func netServiceDidResolveAddress(_ sender: NetService) {
-    print("[NetworkModule] Service resolved: \(sender.name)")
+    print("[NetworkModule] Service resolved: \(sender.name), hostName=\(sender.hostName ?? "nil"), port=\(sender.port)")
     
     // Extract hostname and port
     guard let hostname = sender.hostName else {
+      print("[NetworkModule] ERROR: Service resolved but hostName is nil")
       onError(MdnsError.resolutionFailed)
       return
     }
@@ -247,17 +252,19 @@ private class NetworkModuleBrowserDelegate: NSObject, NetServiceBrowserDelegate,
     let errorCode = errorDict[NetService.errorCode]?.intValue ?? 0
     // Error domain is typically a string key, but if it's NSNumber, we'll use a default
     let errorDomain = "NSNetServicesErrorDomain"
-    print("[NetworkModule] Resolution error: code=\(errorCode), domain=\(errorDomain)")
+    print("[NetworkModule] Service didNotResolve error: service=\(sender.name), code=\(errorCode), foundServices.count=\(foundServices.count)")
     
     // Try the next service if available
     if let nextService = foundServices.first(where: { 
       !($0.name == sender.name && $0.type == sender.type && $0.domain == sender.domain) &&
       !(resolvedService != nil && $0.name == resolvedService!.name && $0.type == resolvedService!.type && $0.domain == resolvedService!.domain)
     }) {
+      print("[NetworkModule] Trying next service: \(nextService.name)")
       resolvedService = nextService
       nextService.delegate = self
       nextService.resolve(withTimeout: 5.0)
     } else {
+      print("[NetworkModule] No more services to try, all resolution attempts failed")
       onError(MdnsError.resolutionFailed)
     }
   }
