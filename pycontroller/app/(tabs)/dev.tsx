@@ -433,7 +433,6 @@ function TouchpadComponent({
   // Scroll wheel handlers - using ScrollView's native scroll events
   const lastScrollOffsetRef = React.useRef<{ left: number | null; right: number | null }>({ left: null, right: null });
   const scrollWrapInProgressRef = React.useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
-  const scrollIntervalRef = React.useRef<number | null>(null);
   const scrollDeltaRef = React.useRef<{ left: number; right: number }>({ left: 0, right: 0 });
   
   const handleScroll = (side: 'left' | 'right', event: any) => {
@@ -452,7 +451,8 @@ function TouchpadComponent({
     const lastOffset = lastScrollOffsetRef.current[side];
     if (lastOffset !== null) {
       const deltaY = lastOffset - offsetY;
-      // Accumulate delta for 60Hz packet sending
+      
+      // Accumulate delta (don't send yet - wait until scroll ends)
       scrollDeltaRef.current[side] += deltaY;
     }
     lastScrollOffsetRef.current[side] = offsetY;
@@ -499,57 +499,31 @@ function TouchpadComponent({
   };
 
   const handleScrollEndDrag = () => {
+    // Send one scroll packet based on accumulated delta for whichever side was scrolling
+    // Check both sides to determine which one has accumulated movement
+    const leftDelta = scrollDeltaRef.current.left;
+    const rightDelta = scrollDeltaRef.current.right;
+    
+    // Determine which side had the most movement (or use the active side if state is available)
+    const activeSide = isScrolling || (Math.abs(leftDelta) > Math.abs(rightDelta) ? 'left' : 'right');
+    const accumulatedDelta = activeSide === 'left' ? leftDelta : rightDelta;
+    
+    // Only send if there was meaningful scroll movement (threshold to avoid accidental scrolls)
+    if (Math.abs(accumulatedDelta) >= 0.1) {
+      // Send one packet: 1 for downward scroll, -1 for upward scroll
+      const scrollAmount = accumulatedDelta > 0 ? 1 : -1;
+      onScrollEvent(scrollAmount);
+    }
+    
+    // Immediately stop all scrolling
     setIsScrolling(null);
-    // Stop all scroll events immediately when touch ends
-    // Reset last offset to prevent sending scroll events after touch ends
+    
+    // Reset all scroll state to prevent any residual scrolling
     lastScrollOffsetRef.current.left = null;
     lastScrollOffsetRef.current.right = null;
     scrollDeltaRef.current.left = 0;
     scrollDeltaRef.current.right = 0;
-    
-    // Clear scroll interval
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-      scrollIntervalRef.current = null;
-    }
   };
-
-  // Send scroll events at 60Hz while scrolling (similar to touch events)
-  useEffect(() => {
-    if (isScrolling) {
-      const side = isScrolling;
-      
-      // Send scroll events at 60Hz
-      scrollIntervalRef.current = setInterval(() => {
-        const accumulatedDelta = scrollDeltaRef.current[side];
-        
-        // Convert accumulated delta to discrete scroll amount: +1, 0, or -1
-        if (Math.abs(accumulatedDelta) >= 1.0) {
-          // Determine scroll direction and amount
-          const scrollAmount = accumulatedDelta > 0 ? 1 : -1;
-          onScrollEvent(scrollAmount);
-          
-          // Subtract the amount we just sent
-          scrollDeltaRef.current[side] -= scrollAmount;
-        } else {
-          // No scroll if delta is too small
-          onScrollEvent(0);
-        }
-      }, 16); // ~60Hz
-    } else {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    };
-  }, [isScrolling, onScrollEvent]);
 
   // Initialize scroll positions to middle for infinite scroll
   useEffect(() => {
@@ -608,8 +582,7 @@ function TouchpadComponent({
           onScroll={(e) => handleScroll('left', e)}
           onScrollBeginDrag={() => handleScrollBeginDrag('left')}
           onScrollEndDrag={handleScrollEndDrag}
-          onMomentumScrollEnd={handleScrollEndDrag}
-          scrollEventThrottle={16}
+          scrollEventThrottle={1}
           showsVerticalScrollIndicator={false}
           decelerationRate={0}
           bounces={false}
@@ -652,8 +625,7 @@ function TouchpadComponent({
           onScroll={(e) => handleScroll('right', e)}
           onScrollBeginDrag={() => handleScrollBeginDrag('right')}
           onScrollEndDrag={handleScrollEndDrag}
-          onMomentumScrollEnd={handleScrollEndDrag}
-          scrollEventThrottle={16}
+          scrollEventThrottle={1}
           showsVerticalScrollIndicator={false}
           decelerationRate={0}
           bounces={false}
