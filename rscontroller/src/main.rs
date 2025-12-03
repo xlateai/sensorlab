@@ -3,7 +3,7 @@ use futures_util::{SinkExt, StreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use rdev::{Button, EventType};
+use rustautogui::RustAutoGui;
 use serde::Deserialize;
 use serde_json::json;
 use std::convert::Infallible;
@@ -20,7 +20,18 @@ const PORT: u16 = 8766;
 const DISCOVERY_PORT: u16 = 8767;
 const SERVICE_TYPE: &str = "_pymouse._tcp.local.";
 const SERVICE_NAME: &str = "pymouse-server._pymouse._tcp.local.";
-const SENSITIVITY: f64 = 1.0;
+// Overall mouse movement gain; lower values = less cursor movement per unit finger delta.
+// This is the main knob to tune how "strong" the controller feels.
+const SENSITIVITY: f64 = 0.4;
+// Inside this normalized radius around the touch origin, we apply a reduced gain so that
+// tiny finger movements in a small area don't cause large cursor drift.
+const FINE_RADIUS: f64 = 0.03; // 3% of the screen in normalized units
+const FINE_SENSITIVITY_SCALE: f64 = 0.35; // fine control is ~35% of normal sensitivity
+// For large sweeping movements, we gradually ramp the gain up so you can cover more distance
+// without losing the fine control near the origin.
+const MAX_GAIN_MULTIPLIER: f64 = 2.0; // at large radii, effective gain ~= SENSITIVITY * 2.0
+// Duration for smooth mouse movement (in seconds) – mirrors pymouse.py's 0.01s moves.
+const MOVE_DURATION_SECONDS: f32 = 0.01;
 
 // Message types matching the TypeScript client
 #[derive(Debug, Deserialize)]
@@ -67,6 +78,7 @@ enum TouchAction {
 
 // Mouse control state
 struct MouseState {
+    gui: RustAutoGui,
     // Touch state
     touch_origin_norm: Option<(f64, f64)>,
     mouse_origin_pos: Option<(f64, f64)>,
@@ -78,7 +90,10 @@ struct MouseState {
 
 impl MouseState {
     fn new() -> Result<Self> {
+        // `false` => debug mode off in rustautogui
+        let gui = RustAutoGui::new(false)?;
         Ok(Self {
+            gui,
             touch_origin_norm: None,
             mouse_origin_pos: None,
             is_dragging: false,
@@ -87,18 +102,19 @@ impl MouseState {
         })
     }
 
-    fn get_screen_size(&self) -> (f64, f64) {
-        // rdev doesn't provide screen size directly, so we use a reasonable default
-        // In a real implementation, you might want to use a crate like `screenshots` or `display-info`
-        // For now, we'll use common screen dimensions and allow the client to override
-        (1920.0, 1080.0) // Default, will be overridden by actual screen size if available
+    fn get_screen_size(&mut self) -> (f64, f64) {
+        let (w, h) = self.gui.get_screen_size();
+        (w as f64, h as f64)
     }
 
-    fn get_mouse_location(&self) -> (f64, f64) {
-        // rdev doesn't provide a direct way to get mouse position
-        // We'll track position manually based on moves we make
-        // For now, we'll use the stored origin or a default
-        self.mouse_origin_pos.unwrap_or((960.0, 540.0))
+    fn get_mouse_location(&mut self) -> (f64, f64) {
+        if let Ok((x, y)) = self.gui.get_mouse_position() {
+            (x as f64, y as f64)
+        } else {
+            // Fallback to last known or center of screen if unavailable
+            let (sw, sh) = self.get_screen_size();
+            self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0))
+        }
     }
 
     fn handle_touch(&mut self, action: TouchAction, x: f64, y: f64) -> Result<()> {
@@ -130,20 +146,38 @@ impl MouseState {
                 let dx_norm = x - origin_x;
                 let dy_norm = y - origin_y;
 
+                // Adjust gain based on how far from the origin you are:
+                // - very close to origin: reduced gain for precision (avoid drift)
+                // - further away: smoothly ramp up gain so big sweeps cover more distance
+                let r = (dx_norm * dx_norm + dy_norm * dy_norm).sqrt();
+                let gain = if r < FINE_RADIUS {
+                    SENSITIVITY * FINE_SENSITIVITY_SCALE
+                } else {
+                    // Map radius into [0, 1] for "farther from origin" and interpolate
+                    // between fine scale and a higher max multiplier.
+                    let max_r = 0.5; // ~half the pad in normalized units
+                    let t = ((r - FINE_RADIUS) / (max_r - FINE_RADIUS))
+                        .clamp(0.0, 1.0);
+                    let scale =
+                        FINE_SENSITIVITY_SCALE + (MAX_GAIN_MULTIPLIER - FINE_SENSITIVITY_SCALE) * t;
+                    SENSITIVITY * scale
+                };
+
                 // Apply sensitivity and map to screen coordinates
-                let target_x = mouse_x + dx_norm * SENSITIVITY * screen_width;
-                let target_y = mouse_y + dy_norm * SENSITIVITY * screen_height;
+                let target_x = mouse_x + dx_norm * gain * screen_width;
+                let target_y = mouse_y + dy_norm * gain * screen_height;
 
                 // Clamp to screen bounds
                 let target_x = target_x.max(0.0).min(screen_width - 1.0);
                 let target_y = target_y.max(0.0).min(screen_height - 1.0);
 
-                // Update tracked position
-                self.mouse_origin_pos = Some((target_x, target_y));
-
-                // Move mouse directly for low latency
-                rdev::simulate(&EventType::MouseMove { x: target_x, y: target_y })
-                    .map_err(|e| anyhow::anyhow!("Failed to move mouse: {:?}", e))?;
+                // Ask rustautogui to animate to the new position over a short duration,
+                // similar to pyautogui.moveTo(..., duration=0.01).
+                let x = target_x.round().max(0.0) as u32;
+                let y = target_y.round().max(0.0) as u32;
+                if let Err(e) = self.gui.move_mouse_to_pos(x, y, MOVE_DURATION_SECONDS) {
+                    warn!("[Mouse] move_mouse_to_pos error: {:?}", e);
+                }
             }
             TouchAction::End => {
                 self.touch_origin_norm = None;
@@ -155,21 +189,19 @@ impl MouseState {
     }
 
     fn handle_click(&mut self, button: &str) -> Result<()> {
-        let button_enum = match button {
-            "left" => Button::Left,
-            "right" => Button::Right,
-            "middle" => Button::Middle,
+        let res = match button {
+            "left" => self.gui.left_click(),
+            "right" => self.gui.right_click(),
+            "middle" => self.gui.middle_click(),
             _ => {
                 warn!("Unknown button type: {}, using left click", button);
-                Button::Left
+                self.gui.left_click()
             }
         };
 
-        // Simulate click (press and release)
-        rdev::simulate(&EventType::ButtonPress(button_enum))
-            .map_err(|e| anyhow::anyhow!("Failed to press button: {:?}", e))?;
-        rdev::simulate(&EventType::ButtonRelease(button_enum))
-            .map_err(|e| anyhow::anyhow!("Failed to release button: {:?}", e))?;
+        if let Err(e) = res {
+            warn!("[Mouse] click error: {:?}", e);
+        }
 
         let (x, y) = self.get_mouse_location();
         info!("{} click at ({:.1}, {:.1})", button, x, y);
@@ -182,8 +214,6 @@ impl MouseState {
         match action {
             TouchAction::Start => {
                 let (mouse_x, mouse_y) = self.get_mouse_location();
-                rdev::simulate(&EventType::ButtonPress(Button::Left))
-                    .map_err(|e| anyhow::anyhow!("Failed to press button: {:?}", e))?;
                 self.is_dragging = true;
                 self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                 self.drag_origin_norm = Some((x, y));
@@ -199,8 +229,6 @@ impl MouseState {
                 {
                     // Start drag if not already started
                     let (mouse_x, mouse_y) = self.get_mouse_location();
-                    rdev::simulate(&EventType::ButtonPress(Button::Left))
-                        .map_err(|e| anyhow::anyhow!("Failed to press button: {:?}", e))?;
                     self.is_dragging = true;
                     self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                     self.drag_origin_norm = Some((x, y));
@@ -214,25 +242,36 @@ impl MouseState {
                 let dx_norm = x - origin_x;
                 let dy_norm = y - origin_y;
 
+                // Same gain curve as touch move: precise near origin, ramping up for big sweeps.
+                let r = (dx_norm * dx_norm + dy_norm * dy_norm).sqrt();
+                let gain = if r < FINE_RADIUS {
+                    SENSITIVITY * FINE_SENSITIVITY_SCALE
+                } else {
+                    let max_r = 0.5;
+                    let t = ((r - FINE_RADIUS) / (max_r - FINE_RADIUS))
+                        .clamp(0.0, 1.0);
+                    let scale =
+                        FINE_SENSITIVITY_SCALE + (MAX_GAIN_MULTIPLIER - FINE_SENSITIVITY_SCALE) * t;
+                    SENSITIVITY * scale
+                };
+
                 // Apply sensitivity and map to screen coordinates
-                let target_x = mouse_x + dx_norm * SENSITIVITY * screen_width;
-                let target_y = mouse_y + dy_norm * SENSITIVITY * screen_height;
+                let target_x = mouse_x + dx_norm * gain * screen_width;
+                let target_y = mouse_y + dy_norm * gain * screen_height;
 
                 // Clamp to screen bounds
                 let target_x = target_x.max(0.0).min(screen_width - 1.0);
                 let target_y = target_y.max(0.0).min(screen_height - 1.0);
 
-                // Update tracked position
-                self.drag_mouse_origin_pos = Some((target_x, target_y));
-
-                // Move mouse while dragging
-                rdev::simulate(&EventType::MouseMove { x: target_x, y: target_y })
-                    .map_err(|e| anyhow::anyhow!("Failed to move mouse: {:?}", e))?;
+                // Ask rustautogui to animate the drag move over a short duration.
+                let x = target_x.round().max(0.0) as u32;
+                let y = target_y.round().max(0.0) as u32;
+                if let Err(e) = self.gui.drag_mouse_to_pos(x, y, MOVE_DURATION_SECONDS) {
+                    warn!("[Mouse] drag_mouse_to_pos error: {:?}", e);
+                }
             }
             TouchAction::End => {
                 if self.is_dragging {
-                    rdev::simulate(&EventType::ButtonRelease(Button::Left))
-                        .map_err(|e| anyhow::anyhow!("Failed to release button: {:?}", e))?;
                     self.is_dragging = false;
                 }
                 self.drag_origin_norm = None;
@@ -245,7 +284,6 @@ impl MouseState {
 
     fn cleanup(&mut self) {
         if self.is_dragging {
-            let _ = rdev::simulate(&EventType::ButtonRelease(Button::Left));
             self.is_dragging = false;
         }
     }
@@ -269,7 +307,7 @@ async fn handle_connection(
 
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
-    // Spawn a task to handle incoming messages
+    // Handle incoming messages.
     while let Some(msg) = ws_receiver.next().await {
         match msg {
             Ok(Message::Text(text)) => {
@@ -282,9 +320,10 @@ async fn handle_connection(
                     }
                 };
 
-                // Handle message based on type
+                // Directly handle mouse actions on this task.
+                // NOTE: This runs on the same Tokio task as the WebSocket handler.
                 let mut state = mouse_state.lock().await;
-                if let Err(e) = match message {
+                let res = match message {
                     ClientMessage::Touch { action, x, y, .. } => {
                         info!("[Mouse] touch {:?} at ({:.3}, {:.3})", action, x, y);
                         state.handle_touch(action, x, y)
@@ -297,8 +336,10 @@ async fn handle_connection(
                         info!("[Mouse] drag {:?} at ({:.3}, {:.3})", action, x, y);
                         state.handle_drag(action, x, y)
                     }
-                } {
-                    error!("[Mouse] Error handling message: {}", e);
+                };
+
+                if let Err(e) = res {
+                    error!("[Mouse] Error handling command: {}", e);
                 }
             }
             Ok(Message::Close(_)) => {
@@ -322,9 +363,6 @@ async fn handle_connection(
         }
     }
 
-    // Cleanup on disconnect
-    let mut state = mouse_state.lock().await;
-    state.cleanup();
     info!("[Mouse] Connection finished: {}", addr);
 }
 
@@ -442,7 +480,7 @@ async fn main() -> Result<()> {
         warn!("[Discovery] Failed to start HTTP discovery server: {}", e);
     }
 
-    // Create shared mouse state
+    // Create shared mouse state used directly by connection handlers
     let mouse_state = Arc::new(Mutex::new(MouseState::new()?));
 
     // Create TCP listener
@@ -453,9 +491,12 @@ async fn main() -> Result<()> {
     loop {
         match listener.accept().await {
             Ok((stream, addr)) => {
-                let mouse_state_clone = mouse_state.clone();
+                if let Err(e) = stream.set_nodelay(true) {
+                    warn!("[Mouse] Failed to set TCP_NODELAY: {}", e);
+                }
+                let state = mouse_state.clone();
                 tokio::spawn(async move {
-                    handle_connection(stream, addr, mouse_state_clone).await;
+                    handle_connection(stream, addr, state).await;
                 });
             }
             Err(e) => {
