@@ -213,7 +213,8 @@ async def handle_touch(websocket) -> None:
                     # Accumulate fractional scrolls for smooth decimal scrolling
                     # Negative deltaY means scroll up, positive means scroll down
                     # We accumulate fractional scrolls and only execute when >= 1.0
-                    scroll_accumulator += -delta_y * 2.0  # Scale factor for sensitivity
+                    # Increased sensitivity multiplier for better responsiveness
+                    scroll_accumulator += -delta_y * 3.0  # Scale factor for sensitivity (increased from 2.0)
                     
                     # Execute scroll when accumulated value >= 1.0 or <= -1.0
                     if abs(scroll_accumulator) >= 1.0:
