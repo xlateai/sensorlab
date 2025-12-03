@@ -13,15 +13,27 @@ import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
 import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
+import SensorlibModule from 'sensorlib';
 
-// mDNS / DNS-SD (native only; you'll need to install `react-native-zeroconf`)
-// On web this will be unused.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const Zeroconf: any = Platform.OS === 'web' ? null : require('react-native-zeroconf').default ?? require('react-native-zeroconf');
+// mDNS types (matching SensorlibModule types)
+type MdnsDiscoveryInput = {
+  serviceType: string;  // e.g., "_pymouse._tcp."
+  domain: string;       // e.g., "local."
+  timeout?: number;     // Optional timeout in seconds (default: 10.0)
+};
+
+type MdnsServiceInfo = {
+  host: string;         // IP address (prefers IPv4)
+  port: number;         // Port number
+  name: string;         // Service name
+  type: string;         // Service type
+  domain: string;       // Domain
+  addresses: string[]; // All resolved IP addresses (IPv4 and IPv6)
+};
 
 // mDNS service types
-const MAGNETO_SERVICE_TYPE = '_magneto._tcp.local.';
 const MOUSE_SERVICE_TYPE = '_pymouse._tcp.';
+const MOUSE_SERVICE_DOMAIN = 'local.';
 
 // Fallback URLs (used if mDNS discovery fails)
 const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
@@ -1047,8 +1059,7 @@ export default function DevScreen() {
   const [mdnsStatus, setMdnsStatus] = useState<string>('Waiting for mDNS discovery...');
   const [manualMouseIP, setManualMouseIP] = useState<string>(''); // Manual IP entry
   const [showManualIPInput, setShowManualIPInput] = useState<boolean>(false);
-  const zeroconfRef = useRef<any | null>(null);
-  const mdnsErrorLoggedRef = useRef<boolean>(false); // Track if we've logged the mDNS error
+  const mdnsDiscoveryInProgressRef = useRef<boolean>(false); // Track if discovery is in progress
   
   // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
@@ -1097,26 +1108,54 @@ export default function DevScreen() {
   // No IP brute force scanning - we rely entirely on mDNS discovery
   // Manual IP entry is available as a fallback if mDNS doesn't work
   
-  // Function to restart mDNS discovery
-  const restartMdnsDiscovery = React.useCallback(() => {
-    if (!Zeroconf || Platform.OS === 'web' || !zeroconfRef.current) {
+  // Function to discover mDNS service using native module
+  const discoverMouseService = React.useCallback(async () => {
+    if (Platform.OS === 'web') {
+      setMdnsStatus('mDNS discovery not available on web');
       return;
     }
-    
+
+    if (mdnsDiscoveryInProgressRef.current) {
+      console.log('[mDNS] Discovery already in progress, skipping...');
+      return;
+    }
+
+    mdnsDiscoveryInProgressRef.current = true;
+    setMdnsStatus('Discovering mouse service via mDNS...');
+
     try {
-      const zeroconf = zeroconfRef.current;
-      // Don't reset error logging - we know mDNS doesn't work, no need to spam again
-      // Stop existing scans
-      zeroconf.stop();
-      // Restart scanning (only for mouse service)
-      zeroconf.scan('pymouse', 'tcp', 'local.');
-      setMdnsStatus('Retrying mDNS discovery (errors will be suppressed)...');
-      console.log('[mDNS] Restarted scanning for pymouse service');
-    } catch (e) {
-      console.warn('[mDNS] Failed to restart scan', e);
-      setMdnsStatus('mDNS restart failed - try manual IP entry');
+      const input: MdnsDiscoveryInput = {
+        serviceType: MOUSE_SERVICE_TYPE,
+        domain: MOUSE_SERVICE_DOMAIN,
+        timeout: 10.0,
+      };
+
+      console.log('[mDNS] Starting discovery for', MOUSE_SERVICE_TYPE, 'in', MOUSE_SERVICE_DOMAIN);
+      const serviceInfo: MdnsServiceInfo = await SensorlibModule.discoverMdnsService(input);
+
+      console.log('[mDNS] ✓ Service discovered:', serviceInfo);
+      const wsUrl = `ws://${serviceInfo.host}:${serviceInfo.port}`;
+      setMouseWsUrl(wsUrl);
+      setMdnsStatus(`mDNS: Mouse service discovered at ${serviceInfo.host}:${serviceInfo.port}`);
+    } catch (error: any) {
+      console.warn('[mDNS] Discovery failed:', error);
+      const errorMessage = error?.message || String(error);
+      if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        setMdnsStatus('mDNS discovery timed out - try manual IP entry');
+      } else if (errorMessage.includes('-72008') || errorMessage.includes('resolution')) {
+        setMdnsStatus('mDNS not available on this network - use manual IP entry');
+      } else {
+        setMdnsStatus(`mDNS discovery failed: ${errorMessage}`);
+      }
+    } finally {
+      mdnsDiscoveryInProgressRef.current = false;
     }
   }, []);
+
+  // Function to restart mDNS discovery
+  const restartMdnsDiscovery = React.useCallback(() => {
+    discoverMouseService();
+  }, [discoverMouseService]);
   
   // Handle manual IP entry
   const handleManualIPSubmit = () => {
@@ -1134,120 +1173,16 @@ export default function DevScreen() {
     }
   };
 
-  // mDNS discovery using native DNS-SD (react-native-zeroconf)
+  // mDNS discovery using native Swift module
   useEffect(() => {
-    if (!Zeroconf || Platform.OS === 'web') {
+    if (Platform.OS === 'web') {
+      setMdnsStatus('mDNS discovery not available on web');
       return;
     }
 
-    const zeroconf = new Zeroconf();
-    zeroconfRef.current = zeroconf;
-    
-    // Use a closure variable to track if we've logged the error
-    // This is more reliable than a ref for this use case
-    let error72008Logged = false;
-
-    const handleResolved = (service: any) => {
-      try {
-        const serviceName = (service.name || '').toLowerCase();
-        const serviceType = (service.type || '').toLowerCase();
-        const host =
-          (service.addresses && service.addresses[0]) ||
-          service.host ||
-          '';
-        const port = service.port;
-
-        console.log(`[mDNS] Service resolved: name="${serviceName}", type="${serviceType}", host="${host}", port=${port}`);
-
-        if (!host || !port) {
-          console.warn(`[mDNS] Service resolved but missing host or port: host="${host}", port=${port}`);
-          return;
-        }
-
-        const wsUrl = `ws://${host}:${port}`;
-
-        // Match pymouse service
-        if (
-          serviceName.includes('pymouse') ||
-          serviceType.includes('pymouse')
-        ) {
-          console.log(`[mDNS] ✓ Matched pymouse service! Setting WebSocket URL: ${wsUrl}`);
-          setMouseWsUrl((prev) => prev || wsUrl);
-          setMdnsStatus(`mDNS: Mouse service discovered at ${host}:${port}`);
-        }
-
-        // Match magneto service
-        if (
-          serviceName.includes('magneto') ||
-          serviceType.includes('magneto')
-        ) {
-          console.log(`[mDNS] ✓ Matched magneto service! Setting WebSocket URL: ${wsUrl}`);
-          setMagnetoWsUrl((prev) => prev || wsUrl);
-          setMdnsStatus(`mDNS: Magneto service discovered at ${host}:${port}`);
-        }
-      } catch (e) {
-        console.warn('[mDNS] Error handling resolved service', e);
-      }
-    };
-
-    const handleError = (err: any) => {
-      // Error -72008 on iOS often means mDNS isn't available or network issue
-      // Don't spam errors - only log once using closure variable
-      const errorCode = err?.NSNetServicesErrorCode || err?.code || 'unknown';
-      if (errorCode === '-72008') {
-        // This is a common iOS mDNS error - network might not support mDNS
-        // Only log once to avoid spam
-        if (!error72008Logged) {
-          console.warn('[mDNS] iOS mDNS error -72008: mDNS/Bonjour not working on this device/network.');
-          console.warn('[mDNS] This is normal on iOS - use manual IP entry instead.');
-          setMdnsStatus('mDNS not available - use manual IP entry (server IP shown in terminal)');
-          error72008Logged = true;
-          mdnsErrorLoggedRef.current = true; // Also update ref for restart function
-        }
-        // Silently ignore subsequent -72008 errors - don't log anything
-        return;
-      } else {
-        // Log other errors (but only once)
-        if (!error72008Logged) {
-          console.warn('[mDNS] Zeroconf error', err);
-        }
-      }
-    };
-
-    zeroconf.on('resolved', handleResolved);
-    zeroconf.on('error', handleError);
-
-    try {
-      // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp."
-      // The library automatically adds the underscores and domain
-      // Only scan for mouse service since magneto might not be running
-      console.log('[mDNS] Starting scan for service type: pymouse._tcp.local.');
-      zeroconf.scan('pymouse', 'tcp', 'local.');
-      // Optionally scan for magneto (commented out since it's not always running)
-      // zeroconf.scan('magneto', 'tcp', 'local.');
-      setMdnsStatus('Discovering mouse service via mDNS (Bonjour/Zeroconf)...');
-      console.log('[mDNS] ✓ Scan started successfully for pymouse service');
-      console.log('[mDNS] Make sure Local Network permission is enabled in iOS Settings → xlate');
-    } catch (e) {
-      console.warn('[mDNS] Failed to start scan', e);
-      setMdnsStatus('mDNS scan failed - try manual IP entry');
-    }
-
-    return () => {
-      try {
-        zeroconf.removeListener('resolved', handleResolved);
-        zeroconf.removeListener('error', handleError);
-        zeroconf.stop();
-        zeroconf.close();
-      } catch {
-        // ignore
-      }
-      zeroconfRef.current = null;
-    };
-  }, []);
-  
-  // mDNS discovery happens automatically via the Zeroconf useEffect below
-  // No need for IP scanning - mDNS is the proper way to discover services
+    // Start discovery on mount
+    discoverMouseService();
+  }, [discoverMouseService]);
 
   // Helper to kill all listeners
   const killAllListeners = () => {

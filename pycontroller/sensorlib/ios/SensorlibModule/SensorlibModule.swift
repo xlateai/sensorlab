@@ -58,6 +58,11 @@ public class SensorlibModule: Module {
       stopListening()
     }
 
+    // Network/mDNS discovery functions - delegates to NetworkModule
+    AsyncFunction("discoverMdnsService") { (input: MdnsDiscoveryInput) in
+      return try await discoverMdnsService(input: input)
+    }
+
     // Enables the module to be used as a native view. Definition components that are accepted as part of the
     // view definition: Prop, Events.
     View(SensorlibView.self) {
