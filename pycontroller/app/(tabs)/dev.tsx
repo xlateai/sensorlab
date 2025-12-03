@@ -14,6 +14,11 @@ import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 
+// mDNS / DNS-SD (native only; you'll need to install `react-native-zeroconf`)
+// On web this will be unused.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Zeroconf: any = Platform.OS === 'web' ? null : require('react-native-zeroconf').default ?? require('react-native-zeroconf');
+
 // mDNS service types
 const MAGNETO_SERVICE_TYPE = '_magneto._tcp.local.';
 const MOUSE_SERVICE_TYPE = '_pymouse._tcp.local.';
@@ -1048,6 +1053,7 @@ export default function DevScreen() {
   const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
   const [mdnsStatus, setMdnsStatus] = useState<string>('Discovering...');
   const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
+  const zeroconfRef = useRef<any | null>(null);
   
   // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
@@ -1279,6 +1285,82 @@ export default function DevScreen() {
       
       setIsDiscovering(false);
   }, [isDiscovering, mouseWsUrl]);
+
+  // mDNS discovery using native DNS-SD (react-native-zeroconf)
+  useEffect(() => {
+    if (!Zeroconf || Platform.OS === 'web') {
+      return;
+    }
+
+    const zeroconf = new Zeroconf();
+    zeroconfRef.current = zeroconf;
+
+    const handleResolved = (service: any) => {
+      try {
+        const serviceName = (service.name || '').toLowerCase();
+        const serviceType = (service.type || '').toLowerCase();
+        const host =
+          (service.addresses && service.addresses[0]) ||
+          service.host ||
+          '';
+        const port = service.port;
+
+        if (!host || !port) {
+          return;
+        }
+
+        const wsUrl = `ws://${host}:${port}`;
+
+        // Match pymouse service
+        if (
+          serviceName.includes('pymouse') ||
+          serviceType.includes('pymouse')
+        ) {
+          setMouseWsUrl((prev) => prev || wsUrl);
+          setMdnsStatus(`mDNS: Mouse service at ${host}:${port}`);
+        }
+
+        // Match magneto service
+        if (
+          serviceName.includes('magneto') ||
+          serviceType.includes('magneto')
+        ) {
+          setMagnetoWsUrl((prev) => prev || wsUrl);
+          setMdnsStatus(`mDNS: Magneto service at ${host}:${port}`);
+        }
+      } catch (e) {
+        console.warn('[mDNS] Error handling resolved service', e);
+      }
+    };
+
+    const handleError = (err: any) => {
+      console.warn('[mDNS] Zeroconf error', err);
+    };
+
+    zeroconf.on('resolved', handleResolved);
+    zeroconf.on('error', handleError);
+
+    try {
+      // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp.local."
+      zeroconf.scan('pymouse', 'tcp', 'local.');
+      zeroconf.scan('magneto', 'tcp', 'local.');
+      setMdnsStatus('Discovering services via mDNS...');
+    } catch (e) {
+      console.warn('[mDNS] Failed to start scan', e);
+    }
+
+    return () => {
+      try {
+        zeroconf.removeListener('resolved', handleResolved);
+        zeroconf.removeListener('error', handleError);
+        zeroconf.stop();
+        zeroconf.close();
+      } catch {
+        // ignore
+      }
+      zeroconfRef.current = null;
+    };
+  }, []);
   
   // Initial discovery on mount - only if we don't have mouse service yet
   useEffect(() => {
