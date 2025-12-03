@@ -4,7 +4,7 @@ use futures_util::StreamExt;
 use libp2p::{
     core::upgrade,
     identity, noise,
-    swarm::{NetworkBehaviour, SwarmEvent},
+    swarm::{SwarmEvent, NetworkBehaviour},
     tcp, websocket, yamux, PeerId, Swarm, Transport,
 };
 use libp2p_mdns::tokio::Behaviour as MdnsBehaviour;
@@ -12,8 +12,7 @@ use libp2p_mdns::Config as MdnsConfig;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 // Constants
 const SENSITIVITY: f64 = 0.1;
@@ -422,19 +421,7 @@ async fn main() -> Result<()> {
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 info!("[Mouse] Connection established with {}", peer_id);
                 // When a connection is established, we'll handle streams through
-                // the NewStream event or by opening streams manually
-            }
-            SwarmEvent::NewStream { peer_id, .. } => {
-                info!("[Mouse] New stream from peer {}", peer_id);
-                // Handle new streams - read JSON messages from them
-                let mouse_state_clone = mouse_state.clone();
-                let peer_id_clone = peer_id;
-                tokio::spawn(async move {
-                    // Note: To actually read from the stream, we would need to access
-                    // it through the swarm's connection handler. For now, this is a
-                    // placeholder that shows where stream handling would go.
-                    info!("[Mouse] Would handle stream from peer {}", peer_id_clone);
-                });
+                // connection handler events or by opening streams manually
             }
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 info!("[Mouse] Connection closed with {}", peer_id);
@@ -458,10 +445,10 @@ async fn main() -> Result<()> {
                     info!("[Mouse] Dialing peer {}", peer_id);
                 }
             }
-            SwarmEvent::ListenerClosed { addresses, reason } => {
+            SwarmEvent::ListenerClosed { addresses, reason, listener_id: _ } => {
                 warn!("[Mouse] Listener closed: {:?}, reason: {:?}", addresses, reason);
             }
-            SwarmEvent::ListenerError { error } => {
+            SwarmEvent::ListenerError { error, listener_id: _ } => {
                 warn!("[Mouse] Listener error: {}", error);
             }
             SwarmEvent::IncomingConnection { .. } => {

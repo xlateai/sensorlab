@@ -12,7 +12,7 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures-util = "0.3"
-libp2p = { version = "0.56", features = ["tcp", "websocket", "mdns", "noise", "yamux"] }
+libp2p = { version = "0.56", features = ["tcp", "websocket", "mdns", "noise", "yamux", "macros"] }
 libp2p-websocket = "0.45.1"
 libp2p-mdns = { version = "0.48.0", features = ["tokio"] }
 libp2p-noise = "0.46.1"
