@@ -81,6 +81,8 @@ struct MouseState {
     drag_mouse_origin_pos: Option<(f64, f64)>,
     // Track last sent position to avoid redundant OS calls
     last_sent_pos: Option<(i32, i32)>,
+    // Reusable Enigo instance to avoid repeated permission checks
+    enigo: Option<Enigo>,
 }
 
 impl MouseState {
@@ -92,7 +94,16 @@ impl MouseState {
             drag_origin_norm: None,
             drag_mouse_origin_pos: None,
             last_sent_pos: None,
+            enigo: None,
         })
+    }
+
+    /// Get or create the Enigo instance (lazy initialization)
+    fn get_enigo(&mut self) -> Result<&mut Enigo> {
+        if self.enigo.is_none() {
+            self.enigo = Some(Enigo::new(&enigo::Settings::default())?);
+        }
+        Ok(self.enigo.as_mut().unwrap())
     }
 
     /// Calculate continuously variable gain based on distance from origin.
@@ -115,7 +126,7 @@ impl MouseState {
         SENSITIVITY * gain_scale
     }
 
-    fn get_screen_size(&mut self) -> (f64, f64) {
+    fn get_screen_size(&self) -> (f64, f64) {
         // Enigo doesn't expose screen size; use a reasonable virtual desktop size.
         // This only affects the relative gain scaling.
         (1920.0, 1080.0)
@@ -130,8 +141,8 @@ impl MouseState {
         // the virtual screen center.
         let (sw, sh) = self.get_screen_size();
 
-        match Enigo::new(&enigo::Settings::default()) {
-            Ok(mut enigo) => {
+        match self.get_enigo() {
+            Ok(enigo) => {
                 match enigo.location() {
                     Ok((x, y)) => (x as f64, y as f64),
                     Err(_) => self.mouse_origin_pos.unwrap_or((sw / 2.0, sh / 2.0)),
@@ -195,7 +206,7 @@ impl MouseState {
                     }
                 }
                 
-                let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                let enigo = self.get_enigo()?;
                 let _ = enigo.move_mouse(x, y, Coordinate::Abs);
                 self.last_sent_pos = Some((x, y));
             }
@@ -221,7 +232,7 @@ impl MouseState {
             }
         };
 
-        let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+        let enigo = self.get_enigo()?;
         let _ = enigo.button(btn, Direction::Click);
 
         let (x, y) = self.get_mouse_location();
@@ -236,7 +247,7 @@ impl MouseState {
             TouchAction::Start => {
                 let (mouse_x, mouse_y) = self.get_mouse_location();
                 // Mouse down at current position (left button)
-                let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                let enigo = self.get_enigo()?;
                 let _ = enigo.button(Button::Left, Direction::Press);
                 self.is_dragging = true;
                 self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
@@ -255,7 +266,7 @@ impl MouseState {
                 {
                     // Start drag if not already started (mouse down + init state)
                     let (mouse_x, mouse_y) = self.get_mouse_location();
-                    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                    let enigo = self.get_enigo()?;
                     let _ = enigo.button(Button::Left, Direction::Press);
                     self.is_dragging = true;
                     self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
@@ -298,14 +309,14 @@ impl MouseState {
                     }
                 }
                 
-                let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                let enigo = self.get_enigo()?;
                 let _ = enigo.move_mouse(x, y, Coordinate::Abs);
                 self.last_sent_pos = Some((x, y));
             }
             TouchAction::End => {
                 if self.is_dragging {
                     // Release mouse button when drag ends.
-                    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+                    let enigo = self.get_enigo()?;
                     let _ = enigo.button(Button::Left, Direction::Release);
                     self.is_dragging = false;
                 }
