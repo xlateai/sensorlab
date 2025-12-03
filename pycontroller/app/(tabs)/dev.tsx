@@ -234,11 +234,9 @@ function TouchpadComponent({
         intervalRef.current = setInterval(() => {
           const touch = currentTouchRef.current;
           if (touch && lastSentRef.current) {
-            // Only send if position actually changed
-            if (touch.x !== lastSentRef.current.x || touch.y !== lastSentRef.current.y) {
-              onDragEvent('move', touch.x, touch.y);
-              lastSentRef.current = { x: touch.x, y: touch.y };
-            }
+            // Always send packets while holding tap, even if position hasn't moved
+            onDragEvent('move', touch.x, touch.y);
+            lastSentRef.current = { x: touch.x, y: touch.y };
           }
         }, 16); // ~60Hz for smoother movement
       } else {
@@ -281,17 +279,15 @@ function TouchpadComponent({
               }
             }
             
-            // Send events based on current mode (only if position changed to avoid duplicates)
-            if (touch.x !== lastSentRef.current.x || touch.y !== lastSentRef.current.y) {
-              if (dragModeRef.current) {
-                // Now in drag mode, send drag move
-                onDragEvent('move', touch.x, touch.y);
-              } else {
-                // Still in normal touch mode
-                onTouchEvent('move', touch.x, touch.y);
-              }
-              lastSentRef.current = { x: touch.x, y: touch.y };
+            // Always send events based on current mode while holding tap, even if position hasn't moved
+            if (dragModeRef.current) {
+              // Now in drag mode, send drag move
+              onDragEvent('move', touch.x, touch.y);
+            } else {
+              // Still in normal touch mode
+              onTouchEvent('move', touch.x, touch.y);
             }
+            lastSentRef.current = { x: touch.x, y: touch.y };
           }
         }, 16); // ~60Hz for smoother movement
       }
@@ -392,40 +388,37 @@ function TouchpadComponent({
     if (isTouching && currentTouchRef.current && lastSentRef.current) {
       const touch = currentTouchRef.current;
       
-      // Always send if position changed (no threshold check for immediate response)
-      if (touch.x !== lastSentRef.current.x || touch.y !== lastSentRef.current.y) {
-        if (initialTouchRef.current) {
-          const dx = Math.abs(touch.x - initialTouchRef.current.x);
-          const dy = Math.abs(touch.y - initialTouchRef.current.y);
-          if (dx > 0.001 || dy > 0.001) {
-            hasMovedRef.current = true;
-          }
+      if (initialTouchRef.current) {
+        const dx = Math.abs(touch.x - initialTouchRef.current.x);
+        const dy = Math.abs(touch.y - initialTouchRef.current.y);
+        if (dx > 0.001 || dy > 0.001) {
+          hasMovedRef.current = true;
         }
-        
-        // If pending drag mode and we've moved, activate drag mode
-        if (pendingDragModeRef.current && !dragModeRef.current && initialTouchRef.current) {
-          setIsDragMode(true);
-          pendingDragModeRef.current = false;
-          // Send drag start and cancel the current touch
-          onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
-          // Clamp origin to 0-1 (origin must be within green square)
-          const clampedOrigin = { 
-            x: Math.max(0, Math.min(1, touch.x)), 
-            y: Math.max(0, Math.min(1, touch.y)) 
-          };
-          onDragEvent('start', clampedOrigin.x, clampedOrigin.y);
-          lastSentRef.current = { x: touch.x, y: touch.y };
-          initialTouchRef.current = clampedOrigin;
-        }
-        
-        // Send move event immediately based on current mode
-        if (dragModeRef.current) {
-          onDragEvent('move', touch.x, touch.y);
-        } else {
-          onTouchEvent('move', touch.x, touch.y);
-        }
-        lastSentRef.current = { x: touch.x, y: touch.y };
       }
+      
+      // If pending drag mode and we've moved, activate drag mode
+      if (pendingDragModeRef.current && !dragModeRef.current && initialTouchRef.current) {
+        setIsDragMode(true);
+        pendingDragModeRef.current = false;
+        // Send drag start and cancel the current touch
+        onTouchEvent('end', lastSentRef.current.x, lastSentRef.current.y);
+        // Clamp origin to 0-1 (origin must be within green square)
+        const clampedOrigin = { 
+          x: Math.max(0, Math.min(1, touch.x)), 
+          y: Math.max(0, Math.min(1, touch.y)) 
+        };
+        onDragEvent('start', clampedOrigin.x, clampedOrigin.y);
+        lastSentRef.current = { x: touch.x, y: touch.y };
+        initialTouchRef.current = clampedOrigin;
+      }
+      
+      // Always send move event immediately based on current mode while holding tap
+      if (dragModeRef.current) {
+        onDragEvent('move', touch.x, touch.y);
+      } else {
+        onTouchEvent('move', touch.x, touch.y);
+      }
+      lastSentRef.current = { x: touch.x, y: touch.y };
     }
   };
 

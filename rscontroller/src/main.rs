@@ -79,6 +79,8 @@ struct MouseState {
     is_dragging: bool,
     drag_origin_norm: Option<(f64, f64)>,
     drag_mouse_origin_pos: Option<(f64, f64)>,
+    // Track last sent position to avoid redundant OS calls
+    last_sent_pos: Option<(i32, i32)>,
 }
 
 impl MouseState {
@@ -89,6 +91,7 @@ impl MouseState {
             is_dragging: false,
             drag_origin_norm: None,
             drag_mouse_origin_pos: None,
+            last_sent_pos: None,
         })
     }
 
@@ -146,6 +149,8 @@ impl MouseState {
                 let (mouse_x, mouse_y) = self.get_mouse_location();
                 self.mouse_origin_pos = Some((mouse_x, mouse_y));
                 self.touch_origin_norm = Some((x, y));
+                // Reset last sent position on new touch
+                self.last_sent_pos = None;
                 info!(
                     "Touch started: mouse_origin=({:.1}, {:.1}), touch_norm=({:.3}, {:.3})",
                     mouse_x, mouse_y, x, y
@@ -179,14 +184,25 @@ impl MouseState {
                 let target_x = target_x.max(0.0).min(screen_width - 1.0);
                 let target_y = target_y.max(0.0).min(screen_height - 1.0);
 
-                // Move instantly to the new position.
+                // Move instantly to the new position, but only if it's different from last sent position
                 let x = target_x.round().max(0.0) as i32;
                 let y = target_y.round().max(0.0) as i32;
+                
+                // Skip redundant moves to avoid OS call overhead
+                if let Some((last_x, last_y)) = self.last_sent_pos {
+                    if last_x == x && last_y == y {
+                        return Ok(());
+                    }
+                }
+                
                 let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
                 let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+                self.last_sent_pos = Some((x, y));
             }
             TouchAction::End => {
                 self.touch_origin_norm = None;
+                // Reset last sent position on touch end
+                self.last_sent_pos = None;
                 // Keep mouse_origin_pos for next touch
                 info!("Touch ended");
             }
@@ -225,6 +241,8 @@ impl MouseState {
                 self.is_dragging = true;
                 self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                 self.drag_origin_norm = Some((x, y));
+                // Reset last sent position on new drag
+                self.last_sent_pos = None;
                 info!(
                     "Drag started: mouse_origin=({:.1}, {:.1}), touch_norm=({:.3}, {:.3})",
                     mouse_x, mouse_y, x, y
@@ -242,6 +260,8 @@ impl MouseState {
                     self.is_dragging = true;
                     self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                     self.drag_origin_norm = Some((x, y));
+                    // Reset last sent position on auto-start drag
+                    self.last_sent_pos = None;
                     info!(
                         "Drag auto-started: mouse_origin=({:.1}, {:.1}), touch_norm=({:.3}, {:.3})",
                         mouse_x, mouse_y, x, y
@@ -267,11 +287,20 @@ impl MouseState {
                 let target_x = target_x.max(0.0).min(screen_width - 1.0);
                 let target_y = target_y.max(0.0).min(screen_height - 1.0);
 
-                // Move while the button is held down.
+                // Move while the button is held down, but only if position changed
                 let x = target_x.round().max(0.0) as i32;
                 let y = target_y.round().max(0.0) as i32;
+                
+                // Skip redundant moves to avoid OS call overhead
+                if let Some((last_x, last_y)) = self.last_sent_pos {
+                    if last_x == x && last_y == y {
+                        return Ok(());
+                    }
+                }
+                
                 let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
                 let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+                self.last_sent_pos = Some((x, y));
             }
             TouchAction::End => {
                 if self.is_dragging {
@@ -282,6 +311,8 @@ impl MouseState {
                 }
                 self.drag_origin_norm = None;
                 self.drag_mouse_origin_pos = None;
+                // Reset last sent position on drag end
+                self.last_sent_pos = None;
                 info!("Drag ended");
             }
         }
