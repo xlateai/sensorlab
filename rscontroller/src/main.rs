@@ -18,8 +18,8 @@ use tracing::{error, info, warn};
 const HOST: &str = "0.0.0.0";
 const PORT: u16 = 8766;
 const DISCOVERY_PORT: u16 = 8767;
-const SERVICE_TYPE: &str = "_pymouse._tcp.local.";
-const SERVICE_NAME: &str = "pymouse-server._pymouse._tcp.local.";
+const SERVICE_TYPE: &str = "_pymouse._tcp.";
+const SERVICE_NAME: &str = "pymouse-server._pymouse._pymouse._tcp.";
 const SENSITIVITY: f64 = 0.1;
 // Smoothing parameters for continuously variable gain
 const MIN_GAIN_SCALE: f64 = 0.3; // Minimum gain multiplier (at origin) for fine control
@@ -480,20 +480,29 @@ fn register_mdns_service(port: u16) -> Result<ServiceDaemon> {
     let local_ip = get_local_ip()?;
     info!("[mDNS] Registering service at {}:{}", local_ip, port);
 
-    let hostname = format!("{}.local.", local_ip.to_string().replace(".", "-"));
+    // Use a simple, static hostname - mDNS will resolve it
+    // The hostname should not include .local suffix (library handles that)
+    let hostname = "pymouse-server";
+    
+    // Addresses should be the IP address as a string
     let addrs = &[local_ip.to_string()][..];
     let txt_records = &[("version", "1.0")][..];
+    
+    info!("[mDNS] Creating service with hostname: {}, addresses: {:?}", hostname, addrs);
+    info!("[mDNS] Service type: {}, Service name: {}", SERVICE_TYPE, SERVICE_NAME);
+    
     let service_info = ServiceInfo::new(
         SERVICE_TYPE,
         SERVICE_NAME,
-        &hostname,
-        addrs,        // IPv4 addresses
+        hostname,
+        addrs,        // IPv4 addresses as strings
         port,         // port
         txt_records,  // TXT properties
     )?;
 
     daemon.register(service_info)?;
     info!("[mDNS] Service registered: {} at {}:{}", SERVICE_NAME, local_ip, port);
+    info!("[mDNS] Service should be discoverable as: {}.{}", SERVICE_NAME, SERVICE_TYPE);
 
     Ok(daemon)
 }

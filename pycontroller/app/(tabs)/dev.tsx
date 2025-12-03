@@ -21,7 +21,7 @@ const Zeroconf: any = Platform.OS === 'web' ? null : require('react-native-zeroc
 
 // mDNS service types
 const MAGNETO_SERVICE_TYPE = '_magneto._tcp.local.';
-const MOUSE_SERVICE_TYPE = '_pymouse._tcp.local.';
+const MOUSE_SERVICE_TYPE = '_pymouse._tcp.';
 
 // Fallback URLs (used if mDNS discovery fails)
 const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
@@ -1048,6 +1048,7 @@ export default function DevScreen() {
   const [manualMouseIP, setManualMouseIP] = useState<string>(''); // Manual IP entry
   const [showManualIPInput, setShowManualIPInput] = useState<boolean>(false);
   const zeroconfRef = useRef<any | null>(null);
+  const mdnsErrorLoggedRef = useRef<boolean>(false); // Track if we've logged the mDNS error
   
   // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
@@ -1096,6 +1097,27 @@ export default function DevScreen() {
   // No IP brute force scanning - we rely entirely on mDNS discovery
   // Manual IP entry is available as a fallback if mDNS doesn't work
   
+  // Function to restart mDNS discovery
+  const restartMdnsDiscovery = React.useCallback(() => {
+    if (!Zeroconf || Platform.OS === 'web' || !zeroconfRef.current) {
+      return;
+    }
+    
+    try {
+      const zeroconf = zeroconfRef.current;
+      // Don't reset error logging - we know mDNS doesn't work, no need to spam again
+      // Stop existing scans
+      zeroconf.stop();
+      // Restart scanning (only for mouse service)
+      zeroconf.scan('pymouse', 'tcp', 'local.');
+      setMdnsStatus('Retrying mDNS discovery (errors will be suppressed)...');
+      console.log('[mDNS] Restarted scanning for pymouse service');
+    } catch (e) {
+      console.warn('[mDNS] Failed to restart scan', e);
+      setMdnsStatus('mDNS restart failed - try manual IP entry');
+    }
+  }, []);
+  
   // Handle manual IP entry
   const handleManualIPSubmit = () => {
     if (manualMouseIP.trim()) {
@@ -1120,6 +1142,10 @@ export default function DevScreen() {
 
     const zeroconf = new Zeroconf();
     zeroconfRef.current = zeroconf;
+    
+    // Use a closure variable to track if we've logged the error
+    // This is more reliable than a ref for this use case
+    let error72008Logged = false;
 
     const handleResolved = (service: any) => {
       try {
@@ -1131,7 +1157,10 @@ export default function DevScreen() {
           '';
         const port = service.port;
 
+        console.log(`[mDNS] Service resolved: name="${serviceName}", type="${serviceType}", host="${host}", port=${port}`);
+
         if (!host || !port) {
+          console.warn(`[mDNS] Service resolved but missing host or port: host="${host}", port=${port}`);
           return;
         }
 
@@ -1142,9 +1171,9 @@ export default function DevScreen() {
           serviceName.includes('pymouse') ||
           serviceType.includes('pymouse')
         ) {
+          console.log(`[mDNS] ✓ Matched pymouse service! Setting WebSocket URL: ${wsUrl}`);
           setMouseWsUrl((prev) => prev || wsUrl);
           setMdnsStatus(`mDNS: Mouse service discovered at ${host}:${port}`);
-          console.log(`[mDNS] Discovered mouse service at ${host}:${port}`);
         }
 
         // Match magneto service
@@ -1152,9 +1181,9 @@ export default function DevScreen() {
           serviceName.includes('magneto') ||
           serviceType.includes('magneto')
         ) {
+          console.log(`[mDNS] ✓ Matched magneto service! Setting WebSocket URL: ${wsUrl}`);
           setMagnetoWsUrl((prev) => prev || wsUrl);
           setMdnsStatus(`mDNS: Magneto service discovered at ${host}:${port}`);
-          console.log(`[mDNS] Discovered magneto service at ${host}:${port}`);
         }
       } catch (e) {
         console.warn('[mDNS] Error handling resolved service', e);
@@ -1162,18 +1191,43 @@ export default function DevScreen() {
     };
 
     const handleError = (err: any) => {
-      console.warn('[mDNS] Zeroconf error', err);
+      // Error -72008 on iOS often means mDNS isn't available or network issue
+      // Don't spam errors - only log once using closure variable
+      const errorCode = err?.NSNetServicesErrorCode || err?.code || 'unknown';
+      if (errorCode === '-72008') {
+        // This is a common iOS mDNS error - network might not support mDNS
+        // Only log once to avoid spam
+        if (!error72008Logged) {
+          console.warn('[mDNS] iOS mDNS error -72008: mDNS/Bonjour not working on this device/network.');
+          console.warn('[mDNS] This is normal on iOS - use manual IP entry instead.');
+          setMdnsStatus('mDNS not available - use manual IP entry (server IP shown in terminal)');
+          error72008Logged = true;
+          mdnsErrorLoggedRef.current = true; // Also update ref for restart function
+        }
+        // Silently ignore subsequent -72008 errors - don't log anything
+        return;
+      } else {
+        // Log other errors (but only once)
+        if (!error72008Logged) {
+          console.warn('[mDNS] Zeroconf error', err);
+        }
+      }
     };
 
     zeroconf.on('resolved', handleResolved);
     zeroconf.on('error', handleError);
 
     try {
-      // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp.local."
+      // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp."
+      // The library automatically adds the underscores and domain
+      // Only scan for mouse service since magneto might not be running
+      console.log('[mDNS] Starting scan for service type: pymouse._tcp.local.');
       zeroconf.scan('pymouse', 'tcp', 'local.');
-      zeroconf.scan('magneto', 'tcp', 'local.');
-      setMdnsStatus('Discovering services via mDNS (Bonjour/Zeroconf)...');
-      console.log('[mDNS] Started scanning for pymouse and magneto services');
+      // Optionally scan for magneto (commented out since it's not always running)
+      // zeroconf.scan('magneto', 'tcp', 'local.');
+      setMdnsStatus('Discovering mouse service via mDNS (Bonjour/Zeroconf)...');
+      console.log('[mDNS] ✓ Scan started successfully for pymouse service');
+      console.log('[mDNS] Make sure Local Network permission is enabled in iOS Settings → xlate');
     } catch (e) {
       console.warn('[mDNS] Failed to start scan', e);
       setMdnsStatus('mDNS scan failed - try manual IP entry');
@@ -1741,19 +1795,34 @@ export default function DevScreen() {
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {!showManualIPInput ? (
-                  <Pressable
-                    onPress={() => setShowManualIPInput(true)}
-                    style={{
-                      backgroundColor: '#39ff14',
-                      paddingHorizontal: 12,
-                      paddingVertical: 4,
-                      borderRadius: 4,
-                    }}
-                  >
-                    <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
-                      Manual IP
-                    </Text>
-                  </Pressable>
+                  <>
+                    <Pressable
+                      onPress={restartMdnsDiscovery}
+                      style={{
+                        backgroundColor: '#39ff14',
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
+                        Retry mDNS
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setShowManualIPInput(true)}
+                      style={{
+                        backgroundColor: '#39ff14',
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
+                        Manual IP
+                      </Text>
+                    </Pressable>
+                  </>
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <TextInput
@@ -1810,7 +1879,7 @@ export default function DevScreen() {
               </View>
               {!mouseWsUrl && (
                 <Text style={{ color: '#888', fontSize: 9, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
-                  Using mDNS (Bonjour) for discovery. If not found, devices may be isolated on public WiFi. Try manual IP entry or connect both devices to a personal hotspot.
+                  mDNS discovery may not work on iOS. Check the server terminal for the IP address and use manual IP entry.
                 </Text>
               )}
             </View>

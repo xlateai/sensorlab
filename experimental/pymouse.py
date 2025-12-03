@@ -93,8 +93,8 @@ PORT = 8766
 DISCOVERY_PORT = 8767  # HTTP discovery endpoint port
 
 # mDNS service name
-SERVICE_TYPE = "_pymouse._tcp.local."
-SERVICE_NAME = "pymouse-server._pymouse._tcp.local."
+SERVICE_TYPE = "_pymouse._tcp."
+SERVICE_NAME = "pymouse-server._pymouse._tcp."
 
 # Mouse movement settings
 MOVE_DURATION = 0.01  # Duration for smooth mouse movement (10ms for faster, more responsive feel)

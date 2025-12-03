@@ -13,7 +13,13 @@
       "bundleIdentifier": "com.dyllan.xlate",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record and visualize audio waveforms."
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record and visualize audio waveforms.",
+        "NSLocalNetworkUsageDescription": "This app needs access to your local network to discover and connect to the mouse controller server on your computer.",
+        "NSBonjourServices": [
+          "_pymouse._tcp",
+          "_magneto._tcp",
+          "_http._tcp"
+        ]
       }
     },
     "android": {
