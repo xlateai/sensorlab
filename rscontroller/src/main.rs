@@ -20,10 +20,10 @@ const PORT: u16 = 8766;
 const DISCOVERY_PORT: u16 = 8767;
 const SERVICE_TYPE: &str = "_pymouse._tcp.local.";
 const SERVICE_NAME: &str = "pymouse-server._pymouse._tcp.local.";
-const SENSITIVITY: f64 = 0.45;
+const SENSITIVITY: f64 = 0.1;
 // Smoothing parameters for continuously variable gain
 const MIN_GAIN_SCALE: f64 = 0.3; // Minimum gain multiplier (at origin) for fine control
-const MAX_GAIN_SCALE: f64 = 2.0; // Maximum gain multiplier (at large distances)
+const MAX_GAIN_SCALE: f64 = 5.0; // Maximum gain multiplier (at large distances)
 const GAIN_CURVE_STEEPNESS: f64 = 8.0; // Controls how quickly gain ramps up (higher = steeper)
 const GAIN_CURVE_CENTER: f64 = 0.15; // Normalized distance where gain is halfway between min and max
 
