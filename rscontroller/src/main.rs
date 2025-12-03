@@ -20,18 +20,12 @@ const PORT: u16 = 8766;
 const DISCOVERY_PORT: u16 = 8767;
 const SERVICE_TYPE: &str = "_pymouse._tcp.local.";
 const SERVICE_NAME: &str = "pymouse-server._pymouse._tcp.local.";
-// Overall mouse movement gain; lower values = less cursor movement per unit finger delta.
-// This is the main knob to tune how "strong" the controller feels.
-// Slightly higher than before to make motion feel a bit snappier.
 const SENSITIVITY: f64 = 0.45;
-// Inside this normalized radius around the touch origin, we apply a reduced gain so that
-// tiny finger movements in a small area don't cause large cursor drift.
-const FINE_RADIUS: f64 = 0.03; // 3% of the screen in normalized units
-const FINE_SENSITIVITY_SCALE: f64 = 0.35; // fine control is ~35% of normal sensitivity
-// For large sweeping movements, we gradually ramp the gain up so you can cover more distance
-// without losing the fine control near the origin.
-const MAX_GAIN_MULTIPLIER: f64 = 2.0; // at large radii, effective gain ~= SENSITIVITY * 2.0
-// Enigo moves instantly; no duration parameter.
+// Smoothing parameters for continuously variable gain
+const MIN_GAIN_SCALE: f64 = 0.3; // Minimum gain multiplier (at origin) for fine control
+const MAX_GAIN_SCALE: f64 = 2.0; // Maximum gain multiplier (at large distances)
+const GAIN_CURVE_STEEPNESS: f64 = 8.0; // Controls how quickly gain ramps up (higher = steeper)
+const GAIN_CURVE_CENTER: f64 = 0.15; // Normalized distance where gain is halfway between min and max
 
 // Message types matching the TypeScript client
 #[derive(Debug, Deserialize)]
@@ -98,6 +92,26 @@ impl MouseState {
         })
     }
 
+    /// Calculate continuously variable gain based on distance from origin.
+    /// Uses a smooth sigmoid-like curve that provides:
+    /// - Lower sensitivity near origin (for precision)
+    /// - Gradually increasing sensitivity as distance increases (for larger sweeps)
+    /// - Smooth, continuous transitions (no abrupt changes)
+    fn calculate_gain(&self, distance_norm: f64) -> f64 {
+        // Normalize distance to a 0-1 range for the sigmoid curve
+        // The curve is centered at GAIN_CURVE_CENTER and has steepness GAIN_CURVE_STEEPNESS
+        let normalized = (distance_norm - GAIN_CURVE_CENTER) * GAIN_CURVE_STEEPNESS;
+        
+        // Apply sigmoid function: 1 / (1 + e^(-x))
+        // This gives a smooth S-curve from 0 to 1
+        let sigmoid = 1.0 / (1.0 + (-normalized).exp());
+        
+        // Map sigmoid output (0-1) to gain range (MIN_GAIN_SCALE to MAX_GAIN_SCALE)
+        let gain_scale = MIN_GAIN_SCALE + (MAX_GAIN_SCALE - MIN_GAIN_SCALE) * sigmoid;
+        
+        SENSITIVITY * gain_scale
+    }
+
     fn get_screen_size(&mut self) -> (f64, f64) {
         // Enigo doesn't expose screen size; use a reasonable virtual desktop size.
         // This only affects the relative gain scaling.
@@ -153,24 +167,11 @@ impl MouseState {
                 let dx_norm = x - origin_x;
                 let dy_norm = y - origin_y;
 
-                // Adjust gain based on how far from the origin you are:
-                // - very close to origin: reduced gain for precision (avoid drift)
-                // - further away: smoothly ramp up gain so big sweeps cover more distance
-                let r = (dx_norm * dx_norm + dy_norm * dy_norm).sqrt();
-                let gain = if r < FINE_RADIUS {
-                    SENSITIVITY * FINE_SENSITIVITY_SCALE
-                } else {
-                    // Map radius into [0, 1] for "farther from origin" and interpolate
-                    // between fine scale and a higher max multiplier.
-                    let max_r = 0.5; // ~half the pad in normalized units
-                    let t = ((r - FINE_RADIUS) / (max_r - FINE_RADIUS))
-                        .clamp(0.0, 1.0);
-                    let scale =
-                        FINE_SENSITIVITY_SCALE + (MAX_GAIN_MULTIPLIER - FINE_SENSITIVITY_SCALE) * t;
-                    SENSITIVITY * scale
-                };
+                // Calculate distance from origin for continuously variable gain
+                let distance_norm = (dx_norm * dx_norm + dy_norm * dy_norm).sqrt();
+                let gain = self.calculate_gain(distance_norm);
 
-                // Apply sensitivity and map to screen coordinates
+                // Apply continuously variable gain and map to screen coordinates
                 let target_x = mouse_x + dx_norm * gain * screen_width;
                 let target_y = mouse_y + dy_norm * gain * screen_height;
 
@@ -182,7 +183,7 @@ impl MouseState {
                 let x = target_x.round().max(0.0) as i32;
                 let y = target_y.round().max(0.0) as i32;
                 let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-                enigo.move_mouse(x, y, Coordinate::Abs);
+                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
             }
             TouchAction::End => {
                 self.touch_origin_norm = None;
@@ -205,7 +206,7 @@ impl MouseState {
         };
 
         let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-        enigo.button(btn, Direction::Click);
+        let _ = enigo.button(btn, Direction::Click);
 
         let (x, y) = self.get_mouse_location();
         info!("{} click at ({:.1}, {:.1})", button, x, y);
@@ -220,7 +221,7 @@ impl MouseState {
                 let (mouse_x, mouse_y) = self.get_mouse_location();
                 // Mouse down at current position (left button)
                 let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-                enigo.button(Button::Left, Direction::Press);
+                let _ = enigo.button(Button::Left, Direction::Press);
                 self.is_dragging = true;
                 self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                 self.drag_origin_norm = Some((x, y));
@@ -237,7 +238,7 @@ impl MouseState {
                     // Start drag if not already started (mouse down + init state)
                     let (mouse_x, mouse_y) = self.get_mouse_location();
                     let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-                    enigo.button(Button::Left, Direction::Press);
+                    let _ = enigo.button(Button::Left, Direction::Press);
                     self.is_dragging = true;
                     self.drag_mouse_origin_pos = Some((mouse_x, mouse_y));
                     self.drag_origin_norm = Some((x, y));
@@ -254,20 +255,11 @@ impl MouseState {
                 let dx_norm = x - origin_x;
                 let dy_norm = y - origin_y;
 
-                // Same gain curve as touch move: precise near origin, ramping up for big sweeps.
-                let r = (dx_norm * dx_norm + dy_norm * dy_norm).sqrt();
-                let gain = if r < FINE_RADIUS {
-                    SENSITIVITY * FINE_SENSITIVITY_SCALE
-                } else {
-                    let max_r = 0.5;
-                    let t = ((r - FINE_RADIUS) / (max_r - FINE_RADIUS))
-                        .clamp(0.0, 1.0);
-                    let scale =
-                        FINE_SENSITIVITY_SCALE + (MAX_GAIN_MULTIPLIER - FINE_SENSITIVITY_SCALE) * t;
-                    SENSITIVITY * scale
-                };
+                // Calculate distance from origin for continuously variable gain
+                let distance_norm = (dx_norm * dx_norm + dy_norm * dy_norm).sqrt();
+                let gain = self.calculate_gain(distance_norm);
 
-                // Apply sensitivity and map to screen coordinates
+                // Apply continuously variable gain and map to screen coordinates
                 let target_x = mouse_x + dx_norm * gain * screen_width;
                 let target_y = mouse_y + dy_norm * gain * screen_height;
 
@@ -279,13 +271,13 @@ impl MouseState {
                 let x = target_x.round().max(0.0) as i32;
                 let y = target_y.round().max(0.0) as i32;
                 let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-                enigo.move_mouse(x, y, Coordinate::Abs);
+                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
             }
             TouchAction::End => {
                 if self.is_dragging {
                     // Release mouse button when drag ends.
                     let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-                    enigo.button(Button::Left, Direction::Release);
+                    let _ = enigo.button(Button::Left, Direction::Release);
                     self.is_dragging = false;
                 }
                 self.drag_origin_norm = None;
