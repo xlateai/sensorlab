@@ -947,6 +947,7 @@ export default function DevScreen() {
   const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
   const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
   const [mdnsStatus, setMdnsStatus] = useState<string>('Discovering...');
+  const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
   
   // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
@@ -994,9 +995,16 @@ export default function DevScreen() {
   
   // Service discovery using HTTP discovery endpoint
   // The Python server provides an HTTP endpoint at /discover for service discovery
-  useEffect(() => {
-    const discoverServices = async () => {
-      setMdnsStatus('Discovering services...');
+  const discoverServices = React.useCallback(async () => {
+    // Don't discover if we already have the mouse service URL
+    if (mouseWsUrl) {
+      return;
+    }
+    
+    if (isDiscovering) return; // Prevent concurrent discoveries
+    
+    setIsDiscovering(true);
+    setMdnsStatus('Discovering services...');
       
       // Extract service names from mDNS service types
       // MOUSE_SERVICE_TYPE = "_pymouse._tcp.local." -> service name is "pymouse"
@@ -1019,8 +1027,8 @@ export default function DevScreen() {
           const discoveryUrl = `http://${ip}:${port}/discover`;
           const controller = new AbortController();
           
-          // Set a reasonable timeout (3 seconds) to avoid hanging
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          // Faster timeout (500ms) for quicker discovery
+          const timeoutId = setTimeout(() => controller.abort(), 500);
           
           const response = await fetch(discoveryUrl, {
             method: 'GET',
@@ -1032,39 +1040,35 @@ export default function DevScreen() {
           if (response.ok) {
             const data = await response.json();
             if (data.service === serviceName && data.ws_url) {
-              console.log(`[Discovery] Found ${serviceType} service at ${data.ws_url}`);
+              // Don't log here - let the caller log once
               return data.ws_url;
             }
           }
         } catch (e: any) {
-          // Log errors for debugging (but don't spam)
-          if (e.name !== 'AbortError') {
-            console.log(`[Discovery] Failed to connect to ${ip}:${port} - ${e.message}`);
-          }
+          // Silently fail - we'll try many IPs in parallel
         }
         return null;
       };
       
-      // Build list of IPs to try - start with most likely IPs first
+      // Build list of IPs to try - optimized for speed
       const ipsToTry: string[] = [];
       
-      // First, try the IP that was previously in the fallback (most likely to work)
+      // First, try the most likely IP (previously in fallback)
       const likelyIP = '172.20.10.3';
       ipsToTry.push(likelyIP);
       
-      // Then add common IP ranges
+      // Then add a smaller set of common IP ranges (reduced for speed)
       const commonIPRanges = [
         '172.20.10.3',  // Common hotspot IP (already added)
         '192.168.1.1',  // Common router IP
         '192.168.0.1',  // Alternative router IP
-        '10.0.0.1',     // Another common range
       ];
       
       for (const baseIP of commonIPRanges) {
         const ipParts = baseIP.split('.');
         const base = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-        // Scan a small range (e.g., .1 to .5 for speed)
-        for (let i = 1; i <= 5; i++) {
+        // Scan only first 3 IPs per range for speed (reduced from 5)
+        for (let i = 1; i <= 3; i++) {
           const testIP = `${base}.${i}`;
           if (!ipsToTry.includes(testIP)) {
             ipsToTry.push(testIP);
@@ -1074,31 +1078,77 @@ export default function DevScreen() {
       
       let discoveredMouseUrl: string | null = null;
       let discoveredMagnetoUrl: string | null = null;
+      let mouseLogged = false;
+      let magnetoLogged = false;
       
-      // Try all IPs in parallel (but limit concurrency)
-      const MAX_CONCURRENT = 8;
-      const chunks: string[][] = [];
-      for (let i = 0; i < ipsToTry.length; i += MAX_CONCURRENT) {
-        chunks.push(ipsToTry.slice(i, i + MAX_CONCURRENT));
+      // Try most likely IP first (fast path)
+      const [likelyMouse, likelyMagneto] = await Promise.all([
+        tryDiscoverService(likelyIP, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE),
+        tryDiscoverService(likelyIP, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE),
+      ]);
+      
+      if (likelyMouse) {
+        discoveredMouseUrl = likelyMouse;
+        if (!mouseLogged) {
+          console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${likelyMouse}`);
+          mouseLogged = true;
+        }
+      }
+      if (likelyMagneto) {
+        discoveredMagnetoUrl = likelyMagneto;
+        if (!magnetoLogged) {
+          console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${likelyMagneto}`);
+          magnetoLogged = true;
+        }
       }
       
-      for (const chunk of chunks) {
-        // Try all IPs in this chunk in parallel
-        const promises = chunk.flatMap(ip => [
-          !discoveredMouseUrl 
-            ? tryDiscoverService(ip, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE)
-                .then(url => { if (url) discoveredMouseUrl = url; return url; })
-            : Promise.resolve(null),
-          !discoveredMagnetoUrl
-            ? tryDiscoverService(ip, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE)
-                .then(url => { if (url) discoveredMagnetoUrl = url; return url; })
-            : Promise.resolve(null),
-        ]);
+      // If we found both on the likely IP, we're done!
+      if (!discoveredMouseUrl || !discoveredMagnetoUrl) {
+        // Try remaining IPs in parallel with higher concurrency
+        // But only if we still need to find something
+        const remainingIPs = ipsToTry.filter(ip => ip !== likelyIP);
+        const MAX_CONCURRENT = 12; // Increased concurrency for faster scanning
         
-        await Promise.all(promises);
-        
-        // If we found both, we're done
-        if (discoveredMouseUrl && discoveredMagnetoUrl) break;
+        // Process in chunks so we can stop early if we find what we need
+        for (let i = 0; i < remainingIPs.length; i += MAX_CONCURRENT) {
+          const chunk = remainingIPs.slice(i, i + MAX_CONCURRENT);
+          
+          const promises = chunk.flatMap(ip => [
+            !discoveredMouseUrl 
+              ? tryDiscoverService(ip, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE)
+                  .then(url => { 
+                    if (url && !discoveredMouseUrl) {
+                      discoveredMouseUrl = url;
+                      if (!mouseLogged) {
+                        console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${url}`);
+                        mouseLogged = true;
+                      }
+                    }
+                    return url; 
+                  })
+              : Promise.resolve(null),
+            !discoveredMagnetoUrl
+              ? tryDiscoverService(ip, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE)
+                  .then(url => { 
+                    if (url && !discoveredMagnetoUrl) {
+                      discoveredMagnetoUrl = url;
+                      if (!magnetoLogged) {
+                        console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${url}`);
+                        magnetoLogged = true;
+                      }
+                    }
+                    return url; 
+                  })
+              : Promise.resolve(null),
+          ]);
+          
+          await Promise.all(promises);
+          
+          // Stop early if we found both services
+          if (discoveredMouseUrl && discoveredMagnetoUrl) {
+            break;
+          }
+        }
       }
       
       if (discoveredMouseUrl) {
@@ -1126,10 +1176,16 @@ export default function DevScreen() {
       } else {
         setMdnsStatus('Mouse service not found - ensure pymouse.py is running');
       }
-    };
-    
-    discoverServices();
-  }, []);
+      
+      setIsDiscovering(false);
+  }, [isDiscovering, mouseWsUrl]);
+  
+  // Initial discovery on mount - only if we don't have mouse service yet
+  useEffect(() => {
+    if (!mouseWsUrl && !isDiscovering) {
+      discoverServices();
+    }
+  }, []); // Only run once on mount
 
   // Helper to kill all listeners
   const killAllListeners = () => {
@@ -1658,9 +1714,28 @@ export default function DevScreen() {
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
               {mouseWsUrl ? `Control mouse via touchpad over WebSocket to Python at ${mouseWsUrl}.` : 'Mouse service discovery failed. Please ensure pymouse.py is running.'}
             </Text>
-            <Text style={{ color: '#666', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
-              {mdnsStatus}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 8 }}>
+              <Text style={{ color: '#666', fontSize: 10, textAlign: 'center' }}>
+                {mdnsStatus}
+              </Text>
+              {!mouseWsUrl && (
+                <Pressable
+                  onPress={discoverServices}
+                  disabled={isDiscovering}
+                  style={{
+                    backgroundColor: isDiscovering ? '#444' : '#39ff14',
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: 4,
+                    opacity: isDiscovering ? 0.5 : 1,
+                  }}
+                >
+                  <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
+                    {isDiscovering ? 'Discovering...' : 'Retry'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
         </View>

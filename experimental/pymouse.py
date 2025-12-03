@@ -132,6 +132,15 @@ def register_mdns_service(port: int) -> tuple[Zeroconf, ServiceInfo]:
     zeroconf.register_service(info)
     print(f"[mDNS] Service registered: {SERVICE_NAME} at {local_ip}:{port}")
     
+    # Force immediate announcement by updating the service
+    # This helps with faster discovery on iOS
+    try:
+        # Re-register to force immediate announcement
+        zeroconf.update_service(info)
+    except Exception as e:
+        # If update fails, that's okay - the initial registration should work
+        pass
+    
     return zeroconf, info
 
 
