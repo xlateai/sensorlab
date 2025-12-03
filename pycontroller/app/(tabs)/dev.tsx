@@ -20,7 +20,7 @@ const MOUSE_SERVICE_TYPE = '_pymouse._tcp.local.';
 
 // Fallback URLs (used if mDNS discovery fails)
 const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
-const FALLBACK_MOUSE_WS_URL = 'ws://172.20.10.3:8766';
+// No fallback for mouse service - must be discovered
 
 const screenHeight = Dimensions.get('window').height;
 const screenWidth = Dimensions.get('window').width;
@@ -158,6 +158,7 @@ function TouchpadComponent({
   const inputAccessoryViewID = React.useRef(`keyboardAccessory-${Date.now()}-${Math.random()}`).current;
   const [isMainInputFocused, setIsMainInputFocused] = useState(false);
   const [isAccessoryInputFocused, setIsAccessoryInputFocused] = useState(false);
+  const shouldPreventRefocusRef = React.useRef<boolean>(false);
   const intervalRef = React.useRef<number | null>(null);
   const lastSentRef = React.useRef<{ x: number; y: number } | null>(null);
   const currentTouchRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -684,12 +685,18 @@ function TouchpadComponent({
               onSendKey('enter');
             }}
             onFocus={() => {
+              if (shouldPreventRefocusRef.current) {
+                keyboardInputRef.current?.blur();
+                return;
+              }
               setIsMainInputFocused(true);
               // On iOS, when main input is focused, also focus the accessory input
               // so the text appears in the accessory view
               if (Platform.OS === 'ios') {
                 setTimeout(() => {
-                  keyboardInputAccessoryRef.current?.focus();
+                  if (!shouldPreventRefocusRef.current) {
+                    keyboardInputAccessoryRef.current?.focus();
+                  }
                 }, 50);
               }
             }}
@@ -748,6 +755,10 @@ function TouchpadComponent({
                       }
                     }}
                     onFocus={() => {
+                      if (shouldPreventRefocusRef.current) {
+                        keyboardInputAccessoryRef.current?.blur();
+                        return;
+                      }
                       setIsAccessoryInputFocused(true);
                     }}
                     onBlur={() => {
@@ -794,34 +805,20 @@ function TouchpadComponent({
                   {/* Dismiss button - hugging right */}
                   <Pressable
                     onPress={() => {
-                      // First, blur the currently focused input (accessory view input on iOS)
-                      if (isAccessoryInputFocused && keyboardInputAccessoryRef.current) {
-                        keyboardInputAccessoryRef.current.blur();
-                      } else if (isMainInputFocused && keyboardInputRef.current) {
-                        keyboardInputRef.current.blur();
-                      } else {
-                        // Blur both if we're not sure which is focused
-                        keyboardInputAccessoryRef.current?.blur();
-                        keyboardInputRef.current?.blur();
-                      }
+                      // Prevent refocusing temporarily
+                      shouldPreventRefocusRef.current = true;
                       
-                      // Dismiss keyboard - call multiple times with delays
+                      // Blur all inputs
+                      keyboardInputAccessoryRef.current?.blur();
+                      keyboardInputRef.current?.blur();
+                      
+                      // Dismiss keyboard
                       Keyboard.dismiss();
                       
-                      // Additional attempts to ensure keyboard closes
+                      // Re-enable refocusing after a short delay
                       setTimeout(() => {
-                        Keyboard.dismiss();
-                        keyboardInputAccessoryRef.current?.blur();
-                        keyboardInputRef.current?.blur();
-                      }, 10);
-                      
-                      setTimeout(() => {
-                        Keyboard.dismiss();
-                      }, 100);
-                      
-                      setTimeout(() => {
-                        Keyboard.dismiss();
-                      }, 200);
+                        shouldPreventRefocusRef.current = false;
+                      }, 500);
                     }}
                     style={{
                       backgroundColor: '#39ff14',
@@ -919,19 +916,19 @@ function TouchpadComponent({
                 {/* Dismiss button - hugging right */}
                 <Pressable
                   onPress={() => {
-                    // Force blur input with multiple attempts
-                    if (keyboardInputRef.current) {
-                      keyboardInputRef.current.blur();
-                      keyboardInputRef.current.setNativeProps({ editable: false });
-                      setTimeout(() => {
-                        keyboardInputRef.current?.setNativeProps({ editable: true });
-                      }, 100);
-                    }
-                    // Dismiss keyboard with multiple attempts
+                    // Prevent refocusing temporarily
+                    shouldPreventRefocusRef.current = true;
+                    
+                    // Blur input
+                    keyboardInputRef.current?.blur();
+                    
+                    // Dismiss keyboard
                     Keyboard.dismiss();
-                    setTimeout(() => Keyboard.dismiss(), 50);
-                    setTimeout(() => Keyboard.dismiss(), 150);
-                    setTimeout(() => Keyboard.dismiss(), 300);
+                    
+                    // Re-enable refocusing after a short delay
+                    setTimeout(() => {
+                      shouldPreventRefocusRef.current = false;
+                    }, 500);
                   }}
                   style={{
                     backgroundColor: '#39ff14',
@@ -984,7 +981,7 @@ export default function DevScreen() {
 
   // mDNS discovered URLs
   const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
-  const [mouseWsUrl, setMouseWsUrl] = useState<string>(FALLBACK_MOUSE_WS_URL);
+  const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
   const [mdnsStatus, setMdnsStatus] = useState<string>('Discovering...');
   
   // Magnetometer -> Python streaming
@@ -1043,90 +1040,108 @@ export default function DevScreen() {
       const mouseServiceName = MOUSE_SERVICE_TYPE.split('_')[1].split('.')[0]; // "pymouse"
       const magnetoServiceName = MAGNETO_SERVICE_TYPE.split('_')[1].split('.')[0]; // "magneto"
       
-      // Try to discover services by querying common local network IPs
-      // We'll check the common local network ranges
+      // Discovery ports for each service
+      const mouseDiscoveryPort = 8767; // HTTP discovery port for mouse service
+      const magnetoDiscoveryPort = 8768; // HTTP discovery port for magnetometer service
+      
+      // Helper to try discovering a service at a specific IP
+      const tryDiscoverService = async (
+        ip: string,
+        port: number,
+        serviceName: string,
+        serviceType: string
+      ): Promise<string | null> => {
+        try {
+          const discoveryUrl = `http://${ip}:${port}/discover`;
+          const controller = new AbortController();
+          
+          // Set a reasonable timeout (3 seconds) to avoid hanging
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          const response = await fetch(discoveryUrl, {
+            method: 'GET',
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.service === serviceName && data.ws_url) {
+              console.log(`[Discovery] Found ${serviceType} service at ${data.ws_url}`);
+              return data.ws_url;
+            }
+          }
+        } catch (e: any) {
+          // Log errors for debugging (but don't spam)
+          if (e.name !== 'AbortError') {
+            console.log(`[Discovery] Failed to connect to ${ip}:${port} - ${e.message}`);
+          }
+        }
+        return null;
+      };
+      
+      // Build list of IPs to try - start with most likely IPs first
+      const ipsToTry: string[] = [];
+      
+      // First, try the IP that was previously in the fallback (most likely to work)
+      const likelyIP = '172.20.10.3';
+      ipsToTry.push(likelyIP);
+      
+      // Then add common IP ranges
       const commonIPRanges = [
-        '172.20.10.3',  // Common hotspot IP
+        '172.20.10.3',  // Common hotspot IP (already added)
         '192.168.1.1',  // Common router IP
         '192.168.0.1',  // Alternative router IP
         '10.0.0.1',     // Another common range
       ];
       
-      // Discovery ports for each service
-      const mouseDiscoveryPort = 8767; // HTTP discovery port for mouse service
-      const magnetoDiscoveryPort = 8768; // HTTP discovery port for magnetometer service
+      for (const baseIP of commonIPRanges) {
+        const ipParts = baseIP.split('.');
+        const base = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+        // Scan a small range (e.g., .1 to .5 for speed)
+        for (let i = 1; i <= 5; i++) {
+          const testIP = `${base}.${i}`;
+          if (!ipsToTry.includes(testIP)) {
+            ipsToTry.push(testIP);
+          }
+        }
+      }
       
       let discoveredMouseUrl: string | null = null;
       let discoveredMagnetoUrl: string | null = null;
       
-      // Try each IP in the common ranges
-      for (const baseIP of commonIPRanges) {
-        try {
-          // Extract base IP (e.g., "192.168.1" from "192.168.1.1")
-          const ipParts = baseIP.split('.');
-          const base = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-          
-          // Scan a small range (e.g., .1 to .10)
-          for (let i = 1; i <= 10; i++) {
-            const testIP = `${base}.${i}`;
-            
-            // Try to discover mouse service
-            if (!discoveredMouseUrl) {
-              try {
-                const mouseDiscoveryUrl = `http://${testIP}:${mouseDiscoveryPort}/discover`;
-                const response = await fetch(mouseDiscoveryUrl, {
-                  method: 'GET',
-                  timeout: 1000, // 1 second timeout
-                } as any);
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.service === mouseServiceName && data.ws_url) {
-                    discoveredMouseUrl = data.ws_url;
-                    console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${discoveredMouseUrl}`);
-                  }
-                }
-              } catch (e) {
-                // Continue to next IP
-              }
-            }
-            
-            // Try to discover magnetometer service
-            if (!discoveredMagnetoUrl) {
-              try {
-                const magnetoDiscoveryUrl = `http://${testIP}:${magnetoDiscoveryPort}/discover`;
-                const response = await fetch(magnetoDiscoveryUrl, {
-                  method: 'GET',
-                  timeout: 1000, // 1 second timeout
-                } as any);
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.service === magnetoServiceName && data.ws_url) {
-                    discoveredMagnetoUrl = data.ws_url;
-                    console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${discoveredMagnetoUrl}`);
-                  }
-                }
-              } catch (e) {
-                // Continue to next IP
-              }
-            }
-            
-            // If we found both services, we can break early
-            if (discoveredMouseUrl && discoveredMagnetoUrl) break;
-          }
-          
-          // If we found both services, we can break early
-          if (discoveredMouseUrl && discoveredMagnetoUrl) break;
-        } catch (e) {
-          continue;
-        }
+      // Try all IPs in parallel (but limit concurrency)
+      const MAX_CONCURRENT = 8;
+      const chunks: string[][] = [];
+      for (let i = 0; i < ipsToTry.length; i += MAX_CONCURRENT) {
+        chunks.push(ipsToTry.slice(i, i + MAX_CONCURRENT));
+      }
+      
+      for (const chunk of chunks) {
+        // Try all IPs in this chunk in parallel
+        const promises = chunk.flatMap(ip => [
+          !discoveredMouseUrl 
+            ? tryDiscoverService(ip, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE)
+                .then(url => { if (url) discoveredMouseUrl = url; return url; })
+            : Promise.resolve(null),
+          !discoveredMagnetoUrl
+            ? tryDiscoverService(ip, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE)
+                .then(url => { if (url) discoveredMagnetoUrl = url; return url; })
+            : Promise.resolve(null),
+        ]);
+        
+        await Promise.all(promises);
+        
+        // If we found both, we're done
+        if (discoveredMouseUrl && discoveredMagnetoUrl) break;
       }
       
       if (discoveredMouseUrl) {
         setMouseWsUrl(discoveredMouseUrl);
       } else {
-        setMouseWsUrl(FALLBACK_MOUSE_WS_URL);
+        setMouseWsUrl(''); // No fallback for mouse service
+        console.warn('[Discovery] Mouse service not found after scanning', ipsToTry.length, 'IPs');
       }
       
       if (discoveredMagnetoUrl) {
@@ -1135,13 +1150,17 @@ export default function DevScreen() {
         setMagnetoWsUrl(FALLBACK_MAGNETO_WS_URL);
       }
       
-      if (discoveredMouseUrl || discoveredMagnetoUrl) {
-        const discoveredIP = discoveredMouseUrl 
-          ? discoveredMouseUrl.split(':')[1].slice(2)
-          : discoveredMagnetoUrl?.split(':')[1].slice(2) || 'unknown';
+      if (discoveredMouseUrl && discoveredMagnetoUrl) {
+        const discoveredIP = (discoveredMouseUrl as string).split(':')[1].slice(2);
         setMdnsStatus(`Discovered services at ${discoveredIP}`);
+      } else if (discoveredMouseUrl) {
+        const discoveredIP = (discoveredMouseUrl as string).split(':')[1].slice(2);
+        setMdnsStatus(`Mouse service found at ${discoveredIP} (magneto using fallback)`);
+      } else if (discoveredMagnetoUrl) {
+        const discoveredIP = (discoveredMagnetoUrl as string).split(':')[1].slice(2);
+        setMdnsStatus(`Magneto service found at ${discoveredIP} (mouse not found)`);
       } else {
-        setMdnsStatus('Using fallback IPs (discovery failed)');
+        setMdnsStatus('Mouse service not found - ensure pymouse.py is running');
       }
     };
     
@@ -1206,6 +1225,11 @@ export default function DevScreen() {
   };
 
   const connectMouseSocket = () => {
+    if (!mouseWsUrl) {
+      console.warn('[Mouse] No mouse service URL available - discovery may have failed');
+      return;
+    }
+    
     if (mouseWsRef.current && 
       (mouseWsRef.current.readyState === WebSocket.OPEN || 
        mouseWsRef.current.readyState === WebSocket.CONNECTING)) {
@@ -1638,6 +1662,10 @@ export default function DevScreen() {
             <Pressable
               onPress={() => {
                 if (!mouseControlActive) {
+                  if (!mouseWsUrl) {
+                    setMdnsStatus('Mouse service not found - cannot start');
+                    return;
+                  }
                   setMouseControlActive(true);
                   setTouchpadVisible(true);
                 } else {
@@ -1646,7 +1674,7 @@ export default function DevScreen() {
                 }
               }}
               style={{
-                backgroundColor: mouseControlActive ? '#43a047' : '#222',
+                backgroundColor: mouseControlActive ? '#43a047' : (!mouseWsUrl ? '#666' : '#222'),
                 paddingHorizontal: 36,
                 paddingVertical: 14,
                 borderRadius: 32,
@@ -1656,14 +1684,15 @@ export default function DevScreen() {
                 shadowRadius: 4,
                 elevation: 2,
                 marginBottom: 4,
+                opacity: !mouseWsUrl ? 0.5 : 1,
               }}
             >
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
-                {mouseControlActive ? 'Stop Mouse Control' : 'Start Mouse Control'}
+                {mouseControlActive ? 'Stop Mouse Control' : (!mouseWsUrl ? 'Mouse Service Not Found' : 'Start Mouse Control')}
               </Text>
             </Pressable>
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              Control mouse via touchpad over WebSocket to Python at {mouseWsUrl}.
+              {mouseWsUrl ? `Control mouse via touchpad over WebSocket to Python at ${mouseWsUrl}.` : 'Mouse service discovery failed. Please ensure pymouse.py is running.'}
             </Text>
             <Text style={{ color: '#666', fontSize: 10, marginTop: 2, textAlign: 'center' }}>
               {mdnsStatus}
