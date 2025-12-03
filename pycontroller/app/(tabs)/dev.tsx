@@ -20,7 +20,6 @@ import { webSockets } from '@libp2p/websockets';
 import { mdns } from '@libp2p/mdns';
 import { noise } from '@libp2p/noise';
 import { mplex } from '@libp2p/mplex';
-import { requestResponse } from '@libp2p/request-response';
 import { peerIdFromString } from '@libp2p/peer-id';
 import type { Libp2p } from 'libp2p';
 
@@ -1136,13 +1135,8 @@ export default function DevScreen() {
               interval: 10000, // Discover peers every 10 seconds
             }),
           ],
-          connectionEncryption: [noise()],
+          connectionEncrypters: [noise()],
           streamMuxers: [mplex()],
-          services: {
-            requestResponse: requestResponse({
-              protocol: PROTOCOL_NAME,
-            }),
-          },
         });
 
         libp2pRef.current = node;
@@ -1243,7 +1237,7 @@ export default function DevScreen() {
     }
   };
 
-  // Send message via libp2p request-response
+  // Send message via libp2p stream
   const sendMouseMessage = async (message: any) => {
     if (!libp2pRef.current || !discoveredPeerId) {
       console.warn('[Mouse] libp2p not ready or no peer discovered');
@@ -1254,14 +1248,14 @@ export default function DevScreen() {
       const peerId = peerIdFromString(discoveredPeerId);
       const payload = new TextEncoder().encode(JSON.stringify(message));
       
-      // Use the request-response service to send the request
-      const response = await libp2pRef.current.services.requestResponse.sendRequest(peerId, {
-        protocol: PROTOCOL_NAME,
-        request: payload,
-        signal: new AbortController().signal,
-      });
+      // Open a stream to the peer using our protocol
+      const stream = await libp2pRef.current.dialProtocol(peerId, PROTOCOL_NAME);
+      
+      // Send the message over the stream
+      await stream.write(payload);
 
-      // Response is handled, but we don't need to do anything with it
+      // Close the stream after sending
+      await stream.close();
       console.log('[Mouse] Message sent successfully');
     } catch (err) {
       console.warn('[Mouse] Failed to send message via libp2p:', err);
