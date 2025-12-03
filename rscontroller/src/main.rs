@@ -1,31 +1,29 @@
 use anyhow::Result;
 use enigo::{Button, Coordinate, Direction, Enigo, Mouse};
-use futures_util::{SinkExt, StreamExt};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use mdns_sd::{ServiceDaemon, ServiceInfo};
+use futures_util::StreamExt;
+use libp2p::{
+    core::upgrade,
+    identity, noise,
+    request_response::{self, ProtocolSupport},
+    swarm::{NetworkBehaviour, SwarmEvent},
+    tcp, websocket, yamux, PeerId, Swarm,
+};
+use libp2p_mdns::tokio::Behaviour as MdnsBehaviour;
 use serde::Deserialize;
-use serde_json::json;
-use std::convert::Infallible;
-use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use tokio_tungstenite::{accept_async, tungstenite::Message};
 use tracing::{error, info, warn};
 
 // Constants
-const HOST: &str = "0.0.0.0";
-const PORT: u16 = 8766;
-const DISCOVERY_PORT: u16 = 8767;
-const SERVICE_TYPE: &str = "_pymouse._tcp.";
-const SERVICE_NAME: &str = "pymouse-server._pymouse._pymouse._tcp.";
 const SENSITIVITY: f64 = 0.1;
 // Smoothing parameters for continuously variable gain
 const MIN_GAIN_SCALE: f64 = 0.3; // Minimum gain multiplier (at origin) for fine control
 const MAX_GAIN_SCALE: f64 = 5.0; // Maximum gain multiplier (at large distances)
 const GAIN_CURVE_STEEPNESS: f64 = 8.0; // Controls how quickly gain ramps up (higher = steeper)
 const GAIN_CURVE_CENTER: f64 = 0.15; // Normalized distance where gain is halfway between min and max
+
+// Protocol name for our mouse control protocol
+const PROTOCOL_NAME: &str = "/mouse-control/1.0.0";
 
 // Message types matching the TypeScript client
 #[derive(Debug, Deserialize)]
@@ -337,174 +335,11 @@ impl MouseState {
     }
 }
 
-// Handle a WebSocket connection
-async fn handle_connection(
-    stream: tokio::net::TcpStream,
-    addr: SocketAddr,
-    mouse_state: Arc<Mutex<MouseState>>,
-) {
-    info!("[Mouse] Client connected: {}", addr);
-
-    let ws_stream = match accept_async(stream).await {
-        Ok(ws) => ws,
-        Err(e) => {
-            error!("[Mouse] Failed to accept WebSocket: {}", e);
-            return;
-        }
-    };
-
-    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-
-    // Handle incoming messages.
-    while let Some(msg) = ws_receiver.next().await {
-        match msg {
-            Ok(Message::Text(text)) => {
-                // Parse JSON message
-                let message: ClientMessage = match serde_json::from_str(&text) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        warn!("[Mouse] Failed to parse message: {} - {}", e, text);
-                        continue;
-                    }
-                };
-
-                // Directly handle mouse actions on this task.
-                // NOTE: This runs on the same Tokio task as the WebSocket handler.
-                let mut state = mouse_state.lock().await;
-                let res = match message {
-                    ClientMessage::Touch { action, x, y, .. } => {
-                        info!("[Mouse] touch {:?} at ({:.3}, {:.3})", action, x, y);
-                        state.handle_touch(action, x, y)
-                    }
-                    ClientMessage::Click { button, .. } => {
-                        info!("[Mouse] click {}", button);
-                        state.handle_click(&button)
-                    }
-                    ClientMessage::Drag { action, x, y, .. } => {
-                        info!("[Mouse] drag {:?} at ({:.3}, {:.3})", action, x, y);
-                        state.handle_drag(action, x, y)
-                    }
-                };
-
-                if let Err(e) = res {
-                    error!("[Mouse] Error handling command: {}", e);
-                }
-            }
-            Ok(Message::Close(_)) => {
-                info!("[Mouse] Client closed connection: {}", addr);
-                break;
-            }
-            Ok(Message::Ping(data)) => {
-                // Respond to ping with pong
-                if let Err(e) = ws_sender.send(Message::Pong(data)).await {
-                    error!("[Mouse] Failed to send pong: {}", e);
-                    break;
-                }
-            }
-            Err(e) => {
-                error!("[Mouse] WebSocket error: {}", e);
-                break;
-            }
-            _ => {
-                // Ignore other message types
-            }
-        }
-    }
-
-    info!("[Mouse] Connection finished: {}", addr);
-}
-
-// Get local IP address
-fn get_local_ip() -> Result<IpAddr> {
-    // Try to connect to a remote address to determine local IP
-    let socket = std::net::UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect("8.8.8.8:80")?;
-    let local_addr = socket.local_addr()?;
-    Ok(local_addr.ip())
-}
-
-// HTTP discovery handler compatible with the existing React Native client
-async fn discovery_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    if req.method() == Method::GET && req.uri().path() == "/discover" {
-        info!("[Discovery] /discover request");
-        // Use the same JSON shape as the Python server
-        let local_ip = match get_local_ip() {
-            Ok(ip) => ip.to_string(),
-            Err(_) => "127.0.0.1".to_string(),
-        };
-        let body = json!({
-            "service": "pymouse",
-            "ws_url": format!("ws://{}:{}", local_ip, PORT),
-            "port": PORT,
-            "ip": local_ip,
-        })
-        .to_string();
-
-        let mut resp = Response::new(Body::from(body));
-        *resp.status_mut() = StatusCode::OK;
-        resp.headers_mut()
-            .insert("Content-Type", "application/json".parse().unwrap());
-        resp.headers_mut()
-            .insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-        return Ok(resp);
-    }
-
-    let mut not_found = Response::new(Body::empty());
-    *not_found.status_mut() = StatusCode::NOT_FOUND;
-    Ok(not_found)
-}
-
-// Start HTTP discovery server on DISCOVERY_PORT
-async fn start_discovery_server() -> Result<()> {
-    let addr = SocketAddr::from(([0, 0, 0, 0], DISCOVERY_PORT));
-    info!("[Discovery] Starting HTTP discovery server on {}", addr);
-
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(service_fn(|req| discovery_handler(req)))
-    });
-
-    let server = Server::bind(&addr).serve(make_svc);
-
-    tokio::spawn(async move {
-        if let Err(e) = server.await {
-            error!("[Discovery] server error: {}", e);
-        }
-    });
-
-    Ok(())
-}
-
-// Register mDNS service
-fn register_mdns_service(port: u16) -> Result<ServiceDaemon> {
-    let daemon = ServiceDaemon::new()?;
-    let local_ip = get_local_ip()?;
-    info!("[mDNS] Registering service at {}:{}", local_ip, port);
-
-    // Use a simple, static hostname - mDNS will resolve it
-    // The hostname should not include .local suffix (library handles that)
-    let hostname = "pymouse-server";
-    
-    // Addresses should be the IP address as a string
-    let addrs = &[local_ip.to_string()][..];
-    let txt_records = &[("version", "1.0")][..];
-    
-    info!("[mDNS] Creating service with hostname: {}, addresses: {:?}", hostname, addrs);
-    info!("[mDNS] Service type: {}, Service name: {}", SERVICE_TYPE, SERVICE_NAME);
-    
-    let service_info = ServiceInfo::new(
-        SERVICE_TYPE,
-        SERVICE_NAME,
-        hostname,
-        addrs,        // IPv4 addresses as strings
-        port,         // port
-        txt_records,  // TXT properties
-    )?;
-
-    daemon.register(service_info)?;
-    info!("[mDNS] Service registered: {} at {}:{}", SERVICE_NAME, local_ip, port);
-    info!("[mDNS] Service should be discoverable as: {}.{}", SERVICE_NAME, SERVICE_TYPE);
-
-    Ok(daemon)
+// libp2p NetworkBehaviour for our application protocol
+#[derive(NetworkBehaviour)]
+struct AppBehaviour {
+    mdns: MdnsBehaviour,
+    request_response: request_response::Behaviour,
 }
 
 #[tokio::main]
@@ -517,52 +352,174 @@ async fn main() -> Result<()> {
         .with_env_filter(env_filter)
         .init();
 
-    info!("[Mouse] Starting server on {}:{}", HOST, PORT);
+    info!("[Mouse] Starting libp2p server");
 
-    // Register mDNS service
-    let _mdns_daemon = match register_mdns_service(PORT) {
-        Ok(daemon) => {
-            info!("[mDNS] Service registered successfully");
-            Some(daemon)
-        }
-        Err(e) => {
-            warn!("[mDNS] Failed to register mDNS service: {}", e);
-            warn!("[mDNS] Server will still work, but clients will need to know the IP address");
-            None
-        }
-    };
+    // Create a random PeerId
+    let local_key = identity::Keypair::generate_ed25519();
+    let local_peer_id = PeerId::from(local_key.public());
+    info!("[Mouse] Local peer id: {}", local_peer_id);
 
-    // Start HTTP discovery server for React Native client
-    if let Err(e) = start_discovery_server().await {
-        warn!("[Discovery] Failed to start HTTP discovery server: {}", e);
-    }
+    // Set up transport: TCP with WebSocket upgrade
+    let tcp_transport = tcp::tokio::Transport::default();
+    
+    let tcp_transport = tcp_transport
+        .upgrade(upgrade::Version::V1)
+        .authenticate(noise::Config::new(&local_key)?)
+        .multiplex(yamux::Config::default())
+        .boxed();
 
-    // Create shared mouse state used directly by connection handlers
+    // Add WebSocket transport
+    let ws_transport = websocket::Config::default();
+    let ws_transport = ws_transport.with_tcp_transport(tcp::tokio::Transport::default());
+    let ws_transport = ws_transport
+        .upgrade(upgrade::Version::V1)
+        .authenticate(noise::Config::new(&local_key)?)
+        .multiplex(yamux::Config::default())
+        .boxed();
+
+    // Combine transports
+    let transport = libp2p::core::transport::OrTransport::new(ws_transport, tcp_transport)
+        .map(|either, _| match either {
+            libp2p::core::Either::Left((peer_id, muxer)) => (peer_id, libp2p::core::muxing::StreamMuxerBox::new(muxer)),
+            libp2p::core::Either::Right((peer_id, muxer)) => (peer_id, libp2p::core::muxing::StreamMuxerBox::new(muxer)),
+        })
+        .boxed();
+
+    // Create request-response behaviour with default codec (Vec<u8>)
+    let request_response = request_response::Behaviour::new(
+        [(PROTOCOL_NAME.parse()?, ProtocolSupport::Full)],
+        request_response::Config::default(),
+    );
+
+    // Create mDNS behaviour for discovery
+    let mdns = MdnsBehaviour::new(local_peer_id)?;
+
+    // Create network behaviour
+    let behaviour = AppBehaviour { mdns, request_response };
+
+    // Create swarm
+    let mut swarm = Swarm::new(
+        transport,
+        behaviour,
+        local_peer_id,
+        libp2p::swarm::Config::with_executor(tokio::runtime::Handle::current()),
+    );
+
+    // Listen on all interfaces with TCP
+    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+    
+    // Also listen on WebSocket
+    swarm.listen_on("/ip4/0.0.0.0/tcp/0/ws".parse()?)?;
+
+    // Create shared mouse state
     let mouse_state = Arc::new(Mutex::new(MouseState::new()?));
 
-    // Create TCP listener
-    let listener = TcpListener::bind(format!("{}:{}", HOST, PORT)).await?;
-    let local_ip = get_local_ip().unwrap_or_else(|_| IpAddr::from([127, 0, 0, 1]));
-    info!("[Mouse] Listening on ws://{}:{}", HOST, PORT);
-    info!("[Mouse] Server IP address: {}", local_ip);
-    info!("[Mouse] WebSocket URL: ws://{}:{}", local_ip, PORT);
-    info!("[Mouse] Discovery URL: http://{}:{}/discover", local_ip, DISCOVERY_PORT);
+    info!("[Mouse] Listening for connections...");
+    info!("[Mouse] Peer ID: {}", local_peer_id);
+    info!("[Mouse] Protocol: {}", PROTOCOL_NAME);
+    info!("[Mouse] mDNS discovery enabled - peers will discover this service automatically");
 
-    // Accept connections
+    // Event loop
     loop {
-        match listener.accept().await {
-            Ok((stream, addr)) => {
-                if let Err(e) = stream.set_nodelay(true) {
-                    warn!("[Mouse] Failed to set TCP_NODELAY: {}", e);
+        match swarm.select_next_some().await {
+            SwarmEvent::NewListenAddr { address, .. } => {
+                info!("[Mouse] Listening on {}", address);
+            }
+            SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                info!("[Mouse] Connection established with {}", peer_id);
+            }
+            SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                info!("[Mouse] Connection closed with {}", peer_id);
+            }
+            SwarmEvent::Behaviour(event) => {
+                match event {
+                    libp2p_mdns::Event::Discovered(list) => {
+                        for (peer_id, multiaddr) in list {
+                            info!("[Mouse] Discovered peer {} at {}", peer_id, multiaddr);
+                        }
+                    }
+                    libp2p_mdns::Event::Expired(list) => {
+                        for (peer_id, multiaddr) in list {
+                            info!("[Mouse] Peer {} expired at {}", peer_id, multiaddr);
+                        }
+                    }
+                    libp2p::request_response::Event::Message { message, .. } => {
+                        match message {
+                            request_response::Message::Request { request, channel, .. } => {
+                                // Handle incoming request (request is Vec<u8>)
+                                let text = match String::from_utf8(request) {
+                                    Ok(t) => t,
+                                    Err(e) => {
+                                        warn!("[Mouse] Invalid UTF-8: {}", e);
+                                        let _ = channel.send_response(Vec::new());
+                                        continue;
+                                    }
+                                };
+
+                                // Parse JSON message
+                                let message: ClientMessage = match serde_json::from_str(&text) {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        warn!("[Mouse] Failed to parse message: {} - {}", e, text);
+                                        let _ = channel.send_response(Vec::new());
+                                        continue;
+                                    }
+                                };
+
+                                // Handle mouse actions
+                                let mouse_state_clone = mouse_state.clone();
+                                tokio::spawn(async move {
+                                    let mut state = mouse_state_clone.lock().await;
+                                    let res = match message {
+                                        ClientMessage::Touch { action, x, y, .. } => {
+                                            info!("[Mouse] touch {:?} at ({:.3}, {:.3})", action, x, y);
+                                            state.handle_touch(action, x, y)
+                                        }
+                                        ClientMessage::Click { button, .. } => {
+                                            info!("[Mouse] click {}", button);
+                                            state.handle_click(&button)
+                                        }
+                                        ClientMessage::Drag { action, x, y, .. } => {
+                                            info!("[Mouse] drag {:?} at ({:.3}, {:.3})", action, x, y);
+                                            state.handle_drag(action, x, y)
+                                        }
+                                    };
+
+                                    if let Err(e) = res {
+                                        error!("[Mouse] Error handling command: {}", e);
+                                    }
+
+                                    // Send response (empty for now)
+                                    let _ = channel.send_response(Vec::new());
+                                });
+                            }
+                            request_response::Message::Response { .. } => {
+                                // We don't send requests, so ignore responses
+                            }
+                        }
+                    }
+                    libp2p::request_response::Event::OutboundFailure { error, .. } => {
+                        warn!("[Mouse] Request-response outbound failure: {}", error);
+                    }
+                    libp2p::request_response::Event::InboundFailure { error, .. } => {
+                        warn!("[Mouse] Request-response inbound failure: {}", error);
+                    }
                 }
-                let state = mouse_state.clone();
-                tokio::spawn(async move {
-                    handle_connection(stream, addr, state).await;
-                });
             }
-            Err(e) => {
-                error!("[Mouse] Failed to accept connection: {}", e);
+            SwarmEvent::IncomingConnection { .. } => {
+                info!("[Mouse] Incoming connection");
             }
+            SwarmEvent::IncomingConnectionError { error, .. } => {
+                warn!("[Mouse] Incoming connection error: {}", error);
+            }
+            SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
+                if let Some(peer_id) = peer_id {
+                    warn!("[Mouse] Outgoing connection error to {}: {}", peer_id, error);
+                } else {
+                    warn!("[Mouse] Outgoing connection error: {}", error);
+                }
+            }
+            _ => {}
         }
     }
 }

@@ -14,18 +14,18 @@ import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 
-// mDNS / DNS-SD (native only; you'll need to install `react-native-zeroconf`)
-// On web this will be unused.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const Zeroconf: any = Platform.OS === 'web' ? null : require('react-native-zeroconf').default ?? require('react-native-zeroconf');
+// libp2p imports
+import { createLibp2p } from 'libp2p';
+import { webSockets } from '@libp2p/websockets';
+import { mdns } from '@libp2p/mdns';
+import { noise } from '@libp2p/noise';
+import { mplex } from '@libp2p/mplex';
+import { requestResponse } from '@libp2p/request-response';
+import { peerIdFromString } from '@libp2p/peer-id';
+import type { Libp2p } from 'libp2p';
 
-// mDNS service types
-const MAGNETO_SERVICE_TYPE = '_magneto._tcp.local.';
-const MOUSE_SERVICE_TYPE = '_pymouse._tcp.';
-
-// Fallback URLs (used if mDNS discovery fails)
-const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
-// No fallback for mouse service - must be discovered
+// Protocol name for mouse control
+const PROTOCOL_NAME = '/mouse-control/1.0.0';
 
 const screenHeight = Dimensions.get('window').height;
 const screenWidth = Dimensions.get('window').width;
@@ -1041,21 +1041,18 @@ export default function DevScreen() {
   const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
   const [paused, setPaused] = useState(true); // default to paused
 
-  // mDNS discovered URLs
-  const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
-  const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
-  const [mdnsStatus, setMdnsStatus] = useState<string>('Waiting for mDNS discovery...');
+  // libp2p node
+  const libp2pRef = useRef<Libp2p | null>(null);
+  const [discoveredPeerId, setDiscoveredPeerId] = useState<string>('');
+  const [mdnsStatus, setMdnsStatus] = useState<string>('Initializing libp2p...');
   const [manualMouseIP, setManualMouseIP] = useState<string>(''); // Manual IP entry
   const [showManualIPInput, setShowManualIPInput] = useState<boolean>(false);
-  const zeroconfRef = useRef<any | null>(null);
-  const mdnsErrorLoggedRef = useRef<boolean>(false); // Track if we've logged the mDNS error
   
-  // Magnetometer -> Python streaming
+  // Magnetometer -> Python streaming (keeping WebSocket for now, can be migrated later)
   const magnetoWsRef = useRef<WebSocket | null>(null);
   const [magnetoStreaming, setMagnetoStreaming] = useState(false);
   
-  // Mouse control -> Python streaming
-  const mouseWsRef = useRef<WebSocket | null>(null);
+  // Mouse control -> libp2p
   const [mouseControlActive, setMouseControlActive] = useState(false);
   const [touchpadVisible, setTouchpadVisible] = useState(false);
   
@@ -1099,34 +1096,21 @@ export default function DevScreen() {
   
   // Function to restart mDNS discovery
   const restartMdnsDiscovery = React.useCallback(() => {
-    if (!Zeroconf || Platform.OS === 'web' || !zeroconfRef.current) {
-      return;
-    }
-    
-    try {
-      const zeroconf = zeroconfRef.current;
-      // Don't reset error logging - we know mDNS doesn't work, no need to spam again
-      // Stop existing scans
-      zeroconf.stop();
-      // Restart scanning (only for mouse service)
-      zeroconf.scan('pymouse', 'tcp', 'local.');
-      setMdnsStatus('Retrying mDNS discovery (errors will be suppressed)...');
-      console.log('[mDNS] Restarted scanning for pymouse service');
-    } catch (e) {
-      console.warn('[mDNS] Failed to restart scan', e);
-      setMdnsStatus('mDNS restart failed - try manual IP entry');
+    if (libp2pRef.current) {
+      setMdnsStatus('mDNS discovery is running...');
+      console.log('[libp2p] mDNS discovery is active');
     }
   }, []);
   
-  // Handle manual IP entry
+  // Handle manual IP entry (for libp2p, we'd need to dial the peer directly)
   const handleManualIPSubmit = () => {
     if (manualMouseIP.trim()) {
       // Validate IP format (basic check)
       const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
       if (ipPattern.test(manualMouseIP.trim())) {
-        const wsUrl = `ws://${manualMouseIP.trim()}:8766`;
-        setMouseWsUrl(wsUrl);
-        setMdnsStatus(`Using manual IP: ${manualMouseIP.trim()}`);
+        // For libp2p, we'd dial the peer at this IP
+        // This is a simplified version - in practice you'd need the peer ID
+        setMdnsStatus(`Manual IP entry not fully supported with libp2p. Use discovery instead.`);
         setShowManualIPInput(false);
       } else {
         setMdnsStatus('Invalid IP format. Use format: 192.168.1.100');
@@ -1134,115 +1118,68 @@ export default function DevScreen() {
     }
   };
 
-  // mDNS discovery using native DNS-SD (react-native-zeroconf)
+  // libp2p initialization and mDNS discovery
   useEffect(() => {
-    if (!Zeroconf || Platform.OS === 'web') {
+    if (Platform.OS === 'web') {
+      setMdnsStatus('libp2p not fully supported on web - use native app');
       return;
     }
 
-    const zeroconf = new Zeroconf();
-    zeroconfRef.current = zeroconf;
-    
-    // Use a closure variable to track if we've logged the error
-    // This is more reliable than a ref for this use case
-    let error72008Logged = false;
+    let mounted = true;
 
-    const handleResolved = (service: any) => {
+    const initLibp2p = async () => {
       try {
-        const serviceName = (service.name || '').toLowerCase();
-        const serviceType = (service.type || '').toLowerCase();
-        const host =
-          (service.addresses && service.addresses[0]) ||
-          service.host ||
-          '';
-        const port = service.port;
+        const node = await createLibp2p({
+          transports: [webSockets()],
+          peerDiscovery: [
+            mdns({
+              interval: 10000, // Discover peers every 10 seconds
+            }),
+          ],
+          connectionEncryption: [noise()],
+          streamMuxers: [mplex()],
+          services: {
+            requestResponse: requestResponse({
+              protocol: PROTOCOL_NAME,
+            }),
+          },
+        });
 
-        console.log(`[mDNS] Service resolved: name="${serviceName}", type="${serviceType}", host="${host}", port=${port}`);
+        libp2pRef.current = node;
 
-        if (!host || !port) {
-          console.warn(`[mDNS] Service resolved but missing host or port: host="${host}", port=${port}`);
-          return;
+        // Listen for peer discovery events
+        node.addEventListener('peer:discovery', (evt) => {
+          const peerId = evt.detail.id.toString();
+          console.log('[libp2p] Discovered peer:', peerId);
+          if (mounted) {
+            setDiscoveredPeerId(peerId);
+            setMdnsStatus(`Discovered peer: ${peerId.substring(0, 8)}...`);
+          }
+        });
+
+        // Start the node
+        await node.start();
+        console.log('[libp2p] Node started with peer ID:', node.peerId.toString());
+        
+        if (mounted) {
+          setMdnsStatus(`libp2p ready. Peer ID: ${node.peerId.toString().substring(0, 8)}...`);
         }
-
-        const wsUrl = `ws://${host}:${port}`;
-
-        // Match pymouse service
-        if (
-          serviceName.includes('pymouse') ||
-          serviceType.includes('pymouse')
-        ) {
-          console.log(`[mDNS] ✓ Matched pymouse service! Setting WebSocket URL: ${wsUrl}`);
-          setMouseWsUrl((prev) => prev || wsUrl);
-          setMdnsStatus(`mDNS: Mouse service discovered at ${host}:${port}`);
-        }
-
-        // Match magneto service
-        if (
-          serviceName.includes('magneto') ||
-          serviceType.includes('magneto')
-        ) {
-          console.log(`[mDNS] ✓ Matched magneto service! Setting WebSocket URL: ${wsUrl}`);
-          setMagnetoWsUrl((prev) => prev || wsUrl);
-          setMdnsStatus(`mDNS: Magneto service discovered at ${host}:${port}`);
-        }
-      } catch (e) {
-        console.warn('[mDNS] Error handling resolved service', e);
-      }
-    };
-
-    const handleError = (err: any) => {
-      // Error -72008 on iOS often means mDNS isn't available or network issue
-      // Don't spam errors - only log once using closure variable
-      const errorCode = err?.NSNetServicesErrorCode || err?.code || 'unknown';
-      if (errorCode === '-72008') {
-        // This is a common iOS mDNS error - network might not support mDNS
-        // Only log once to avoid spam
-        if (!error72008Logged) {
-          console.warn('[mDNS] iOS mDNS error -72008: mDNS/Bonjour not working on this device/network.');
-          console.warn('[mDNS] This is normal on iOS - use manual IP entry instead.');
-          setMdnsStatus('mDNS not available - use manual IP entry (server IP shown in terminal)');
-          error72008Logged = true;
-          mdnsErrorLoggedRef.current = true; // Also update ref for restart function
-        }
-        // Silently ignore subsequent -72008 errors - don't log anything
-        return;
-      } else {
-        // Log other errors (but only once)
-        if (!error72008Logged) {
-          console.warn('[mDNS] Zeroconf error', err);
+      } catch (err) {
+        console.error('[libp2p] Failed to initialize:', err);
+        if (mounted) {
+          setMdnsStatus(`libp2p initialization failed: ${err}`);
         }
       }
     };
 
-    zeroconf.on('resolved', handleResolved);
-    zeroconf.on('error', handleError);
-
-    try {
-      // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp."
-      // The library automatically adds the underscores and domain
-      // Only scan for mouse service since magneto might not be running
-      console.log('[mDNS] Starting scan for service type: pymouse._tcp.local.');
-      zeroconf.scan('pymouse', 'tcp', 'local.');
-      // Optionally scan for magneto (commented out since it's not always running)
-      // zeroconf.scan('magneto', 'tcp', 'local.');
-      setMdnsStatus('Discovering mouse service via mDNS (Bonjour/Zeroconf)...');
-      console.log('[mDNS] ✓ Scan started successfully for pymouse service');
-      console.log('[mDNS] Make sure Local Network permission is enabled in iOS Settings → xlate');
-    } catch (e) {
-      console.warn('[mDNS] Failed to start scan', e);
-      setMdnsStatus('mDNS scan failed - try manual IP entry');
-    }
+    initLibp2p();
 
     return () => {
-      try {
-        zeroconf.removeListener('resolved', handleResolved);
-        zeroconf.removeListener('error', handleError);
-        zeroconf.stop();
-        zeroconf.close();
-      } catch {
-        // ignore
+      mounted = false;
+      if (libp2pRef.current) {
+        libp2pRef.current.stop().catch(console.error);
+        libp2pRef.current = null;
       }
-      zeroconfRef.current = null;
     };
   }, []);
   
@@ -1306,69 +1243,29 @@ export default function DevScreen() {
     }
   };
 
-  const connectMouseSocket = () => {
-    if (!mouseWsUrl) {
-      console.warn('[Mouse] No mouse service URL available - discovery may have failed');
-      setMdnsStatus('No mouse service URL - discovery failed or not set');
-      return;
-    }
-    
-    if (mouseWsRef.current && 
-      (mouseWsRef.current.readyState === WebSocket.OPEN || 
-       mouseWsRef.current.readyState === WebSocket.CONNECTING)) {
+  // Send message via libp2p request-response
+  const sendMouseMessage = async (message: any) => {
+    if (!libp2pRef.current || !discoveredPeerId) {
+      console.warn('[Mouse] libp2p not ready or no peer discovered');
       return;
     }
 
     try {
-      const ws = new WebSocket(mouseWsUrl);
-      ws.onopen = () => {
-        console.log('[Mouse] WebSocket connected to', mouseWsUrl);
-        setMdnsStatus(`Connected to ${mouseWsUrl.split('://')[1]}`);
-      };
-      ws.onerror = (event) => {
-        console.warn('[Mouse] WebSocket error', event);
-        const errorMsg = `Connection failed to ${mouseWsUrl.split('://')[1]}. On public WiFi, devices may be isolated.`;
-        setMdnsStatus(errorMsg);
-        // If connection fails, clear the URL so user can retry
-        if (mouseWsRef.current?.readyState === WebSocket.CLOSED) {
-          setMouseWsUrl('');
-          setManualMouseIP('');
-        }
-      };
-      ws.onclose = (event) => {
-        console.log('[Mouse] WebSocket closed', event.code, event.reason);
-        if (event.code !== 1000) { // Not a normal closure
-          setMdnsStatus(`Connection closed (code: ${event.code}). Check if server is running.`);
-        }
-      };
-      mouseWsRef.current = ws;
-    } catch (err) {
-      console.warn('[Mouse] Failed to open WebSocket', err);
-      setMdnsStatus(`Failed to connect: ${err}`);
-    }
-  };
+      const peerId = peerIdFromString(discoveredPeerId);
+      const payload = new TextEncoder().encode(JSON.stringify(message));
+      
+      // Use the request-response service to send the request
+      const response = await libp2pRef.current.services.requestResponse.sendRequest(peerId, {
+        protocol: PROTOCOL_NAME,
+        request: payload,
+        signal: new AbortController().signal,
+      });
 
-  const disconnectMouseSocket = () => {
-    if (mouseWsRef.current) {
-      try {
-        // Send end event before closing to reset mouse tracking
-        if (mouseWsRef.current.readyState === WebSocket.OPEN) {
-          const payload = JSON.stringify({
-            type: 'touch',
-            t: Date.now(),
-            action: 'end',
-            x: 0,
-            y: 0,
-            screenWidth: Math.round(screenWidth),
-            screenHeight: Math.round(screenHeight),
-          });
-          mouseWsRef.current.send(payload);
-        }
-        mouseWsRef.current.close();
-      } catch (err) {
-        console.warn('[Mouse] Error closing WebSocket', err);
-      }
-      mouseWsRef.current = null;
+      // Response is handled, but we don't need to do anything with it
+      console.log('[Mouse] Message sent successfully');
+    } catch (err) {
+      console.warn('[Mouse] Failed to send message via libp2p:', err);
+      setMdnsStatus(`Failed to send: ${err}`);
     }
   };
 
@@ -1458,19 +1355,31 @@ export default function DevScreen() {
     };
   }, [magnetoStreaming]);
 
-  // Open / close WebSocket when mouse control toggled
+  // Handle mouse control activation
   useEffect(() => {
     if (mouseControlActive) {
-      connectMouseSocket();
+      if (!discoveredPeerId) {
+        setMdnsStatus('No peer discovered yet - waiting for discovery...');
+        setMouseControlActive(false);
+      } else {
+        setMdnsStatus(`Connected to peer: ${discoveredPeerId.substring(0, 8)}...`);
+      }
     } else {
-      disconnectMouseSocket();
       setTouchpadVisible(false);
+      // Send end event when deactivating
+      if (discoveredPeerId) {
+        sendMouseMessage({
+          type: 'touch',
+          t: Date.now(),
+          action: 'end',
+          x: 0,
+          y: 0,
+          screenWidth: Math.round(screenWidth),
+          screenHeight: Math.round(screenHeight),
+        }).catch(console.error);
+      }
     }
-
-    return () => {
-      disconnectMouseSocket();
-    };
-  }, [mouseControlActive]);
+  }, [mouseControlActive, discoveredPeerId]);
 
   // Push latest magnetometer readings over WebSocket
   useEffect(() => {
@@ -1757,8 +1666,8 @@ export default function DevScreen() {
             <Pressable
               onPress={() => {
                 if (!mouseControlActive) {
-                  if (!mouseWsUrl) {
-                    setMdnsStatus('Mouse service not found - cannot start');
+                  if (!discoveredPeerId) {
+                    setMdnsStatus('Peer not discovered yet - cannot start');
                     return;
                   }
                   setMouseControlActive(true);
@@ -1769,7 +1678,7 @@ export default function DevScreen() {
                 }
               }}
               style={{
-                backgroundColor: mouseControlActive ? '#43a047' : (!mouseWsUrl ? '#666' : '#222'),
+                backgroundColor: mouseControlActive ? '#43a047' : (!discoveredPeerId ? '#666' : '#222'),
                 paddingHorizontal: 36,
                 paddingVertical: 14,
                 borderRadius: 32,
@@ -1779,15 +1688,15 @@ export default function DevScreen() {
                 shadowRadius: 4,
                 elevation: 2,
                 marginBottom: 4,
-                opacity: !mouseWsUrl ? 0.5 : 1,
+                opacity: !discoveredPeerId ? 0.5 : 1,
               }}
             >
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
-                {mouseControlActive ? 'Stop Mouse Control' : (!mouseWsUrl ? 'Mouse Service Not Found' : 'Start Mouse Control')}
+                {mouseControlActive ? 'Stop Mouse Control' : (!discoveredPeerId ? 'Peer Not Discovered' : 'Start Mouse Control')}
               </Text>
             </Pressable>
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              {mouseWsUrl ? `Control mouse via touchpad over WebSocket to Python at ${mouseWsUrl}.` : 'Mouse service discovery failed. Please ensure pymouse.py is running.'}
+              {discoveredPeerId ? `Control mouse via touchpad over libp2p.` : 'Waiting for peer discovery via mDNS...'}
             </Text>
             <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 8 }}>
               <Text style={{ color: '#666', fontSize: 10, textAlign: 'center' }}>
@@ -1877,9 +1786,9 @@ export default function DevScreen() {
                   </View>
                 )}
               </View>
-              {!mouseWsUrl && (
+              {!discoveredPeerId && (
                 <Text style={{ color: '#888', fontSize: 9, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
-                  mDNS discovery may not work on iOS. Check the server terminal for the IP address and use manual IP entry.
+                  libp2p mDNS discovery is running. Make sure the Rust server is running and on the same network.
                 </Text>
               )}
             </View>
@@ -1895,21 +1804,16 @@ export default function DevScreen() {
         animationType="fade"
         onRequestClose={() => {
           // Send end event before closing
-          if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-            try {
-              const payload = JSON.stringify({
-                type: 'touch',
-                t: Date.now(),
-                action: 'end',
-                x: 0,
-                y: 0,
-                screenWidth: Math.round(screenWidth),
-                screenHeight: Math.round(screenHeight),
-              });
-              mouseWsRef.current.send(payload);
-            } catch (err) {
-              console.warn('[Mouse] Failed to send end event', err);
-            }
+          if (mouseControlActive && discoveredPeerId) {
+            sendMouseMessage({
+              type: 'touch',
+              t: Date.now(),
+              action: 'end',
+              x: 0,
+              y: 0,
+              screenWidth: Math.round(screenWidth),
+              screenHeight: Math.round(screenHeight),
+            }).catch(console.error);
           }
           setTouchpadVisible(false);
           setMouseControlActive(false);
@@ -1919,87 +1823,62 @@ export default function DevScreen() {
           <TouchpadComponent
             onDismiss={() => {
               // Send end event before closing
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'touch',
-                    t: Date.now(),
-                    action: 'end',
-                    x: 0,
-                    y: 0,
-                    screenWidth: Math.round(screenWidth),
-                    screenHeight: Math.round(screenHeight),
-                  });
-                  mouseWsRef.current.send(payload);
-                } catch (err) {
-                  console.warn('[Mouse] Failed to send end event', err);
-                }
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'touch',
+                  t: Date.now(),
+                  action: 'end',
+                  x: 0,
+                  y: 0,
+                  screenWidth: Math.round(screenWidth),
+                  screenHeight: Math.round(screenHeight),
+                }).catch(console.error);
               }
               setTouchpadVisible(false);
               setMouseControlActive(false);
             }}
             onTouchEvent={(action, x, y) => {
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'touch',
-                    t: Date.now(),
-                    action,
-                    x,
-                    y,
-                    screenWidth: Math.round(screenWidth),
-                    screenHeight: Math.round(screenHeight),
-                  });
-                  mouseWsRef.current.send(payload);
-                } catch (err) {
-                  console.warn('[Mouse] Failed to send touch event', err);
-                }
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'touch',
+                  t: Date.now(),
+                  action,
+                  x,
+                  y,
+                  screenWidth: Math.round(screenWidth),
+                  screenHeight: Math.round(screenHeight),
+                }).catch(console.error);
               }
             }}
             onClick={(x, y) => {
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'click',
-                    t: Date.now(),
-                    button: 'left',
-                  });
-                  mouseWsRef.current.send(payload);
-                } catch (err) {
-                  console.warn('[Mouse] Failed to send click event', err);
-                }
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'click',
+                  t: Date.now(),
+                  button: 'left',
+                }).catch(console.error);
               }
             }}
             onDragEvent={(action, x, y) => {
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'drag',
-                    t: Date.now(),
-                    action,
-                    x,
-                    y,
-                    screenWidth: Math.round(screenWidth),
-                    screenHeight: Math.round(screenHeight),
-                  });
-                  mouseWsRef.current.send(payload);
-                } catch (err) {
-                  console.warn('[Mouse] Failed to send drag event', err);
-                }
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'drag',
+                  t: Date.now(),
+                  action,
+                  x,
+                  y,
+                  screenWidth: Math.round(screenWidth),
+                  screenHeight: Math.round(screenHeight),
+                }).catch(console.error);
               }
             }}
             onScrollEvent={(deltaY) => {
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'scroll',
-                    t: Date.now(),
-                    deltaY,
-                  });
-                  mouseWsRef.current.send(payload);
-                } catch (err) {
-                  console.warn('[Mouse] Failed to send scroll event', err);
-                }
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'scroll',
+                  t: Date.now(),
+                  deltaY,
+                }).catch(console.error);
               }
             }}
             keyboardText={keyboardText}
@@ -2013,29 +1892,27 @@ export default function DevScreen() {
                 setKeyboardText(newText);
                 lastKeyboardTextRef.current = newText;
                 
-                if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                if (mouseControlActive && discoveredPeerId) {
                   try {
                     if (newText.length > oldText.length) {
                       // Text was added - send new characters
                       const addedChars = newText.slice(oldText.length);
                       for (const char of addedChars) {
-                        const payload = JSON.stringify({
+                        sendMouseMessage({
                           type: 'key',
                           t: Date.now(),
                           key: char,
-                        });
-                        mouseWsRef.current.send(payload);
+                        }).catch(console.error);
                       }
                     } else if (newText.length < oldText.length) {
                       // Text was deleted - send backspace
                       const deletedCount = oldText.length - newText.length;
                       for (let i = 0; i < deletedCount; i++) {
-                        const payload = JSON.stringify({
+                        sendMouseMessage({
                           type: 'key',
                           t: Date.now(),
                           key: 'backspace',
-                        });
-                        mouseWsRef.current.send(payload);
+                        }).catch(console.error);
                       }
                     } else if (newText !== oldText) {
                       // Text was modified in place
@@ -2047,21 +1924,19 @@ export default function DevScreen() {
                       
                       // Send backspaces for deleted characters
                       for (let j = 0; j < deletedFromPos; j++) {
-                        const payload = JSON.stringify({
+                        sendMouseMessage({
                           type: 'key',
                           t: Date.now(),
                           key: 'backspace',
-                        });
-                        mouseWsRef.current.send(payload);
+                        }).catch(console.error);
                       }
                       // Send new characters
                       for (let j = i; j < newText.length; j++) {
-                        const payload = JSON.stringify({
+                        sendMouseMessage({
                           type: 'key',
                           t: Date.now(),
                           key: newText[j],
-                        });
-                        mouseWsRef.current.send(payload);
+                        }).catch(console.error);
                       }
                     }
                   } catch (err) {
@@ -2083,34 +1958,25 @@ export default function DevScreen() {
               }
             }}
             onSendKey={(key) => {
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'key',
-                    t: Date.now(),
-                    key,
-                  });
-                  mouseWsRef.current.send(payload);
-                } catch (err) {
-                  console.warn('[Keyboard] Failed to send key', err);
-                }
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'key',
+                  t: Date.now(),
+                  key,
+                }).catch(console.error);
               }
             }}
             onSendBatchText={(text) => {
-              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
-                try {
-                  const payload = JSON.stringify({
-                    type: 'text_batch',
-                    t: Date.now(),
-                    text,
-                  });
-                  mouseWsRef.current.send(payload);
+              if (mouseControlActive && discoveredPeerId) {
+                sendMouseMessage({
+                  type: 'text_batch',
+                  t: Date.now(),
+                  text,
+                }).then(() => {
                   // Clear the text after sending
                   setKeyboardText('');
                   lastKeyboardTextRef.current = '';
-                } catch (err) {
-                  console.warn('[Keyboard] Failed to send batch text', err);
-                }
+                }).catch(console.error);
               }
             }}
             chatMode={chatMode}
