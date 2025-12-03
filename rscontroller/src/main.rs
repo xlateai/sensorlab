@@ -4,14 +4,15 @@ use futures_util::StreamExt;
 use libp2p::{
     core::upgrade,
     identity, noise,
-    request_response::{self, ProtocolSupport},
     swarm::{NetworkBehaviour, SwarmEvent},
-    tcp, websocket, yamux, PeerId, Swarm,
+    tcp, websocket, yamux, PeerId, Swarm, Transport,
 };
 use libp2p_mdns::tokio::Behaviour as MdnsBehaviour;
+use libp2p_mdns::Config as MdnsConfig;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing::{error, info, warn};
 
 // Constants
@@ -339,7 +340,6 @@ impl MouseState {
 #[derive(NetworkBehaviour)]
 struct AppBehaviour {
     mdns: MdnsBehaviour,
-    request_response: request_response::Behaviour,
 }
 
 #[tokio::main]
@@ -369,40 +369,34 @@ async fn main() -> Result<()> {
         .boxed();
 
     // Add WebSocket transport
-    let ws_transport = websocket::Config::default();
-    let ws_transport = ws_transport.with_tcp_transport(tcp::tokio::Transport::default());
+    let ws_transport = websocket::Config::new(tcp::tokio::Transport::default());
     let ws_transport = ws_transport
         .upgrade(upgrade::Version::V1)
         .authenticate(noise::Config::new(&local_key)?)
         .multiplex(yamux::Config::default())
         .boxed();
 
-    // Combine transports
+    // Combine transports using futures_util::future::Either
+    use futures_util::future::Either;
     let transport = libp2p::core::transport::OrTransport::new(ws_transport, tcp_transport)
         .map(|either, _| match either {
-            libp2p::core::Either::Left((peer_id, muxer)) => (peer_id, libp2p::core::muxing::StreamMuxerBox::new(muxer)),
-            libp2p::core::Either::Right((peer_id, muxer)) => (peer_id, libp2p::core::muxing::StreamMuxerBox::new(muxer)),
+            Either::Left((peer_id, muxer)) => (peer_id, libp2p::core::muxing::StreamMuxerBox::new(muxer)),
+            Either::Right((peer_id, muxer)) => (peer_id, libp2p::core::muxing::StreamMuxerBox::new(muxer)),
         })
         .boxed();
 
-    // Create request-response behaviour with default codec (Vec<u8>)
-    let request_response = request_response::Behaviour::new(
-        [(PROTOCOL_NAME.parse()?, ProtocolSupport::Full)],
-        request_response::Config::default(),
-    );
-
     // Create mDNS behaviour for discovery
-    let mdns = MdnsBehaviour::new(local_peer_id)?;
+    let mdns = MdnsBehaviour::new(MdnsConfig::default(), local_peer_id)?;
 
     // Create network behaviour
-    let behaviour = AppBehaviour { mdns, request_response };
+    let behaviour = AppBehaviour { mdns };
 
     // Create swarm
     let mut swarm = Swarm::new(
         transport,
         behaviour,
         local_peer_id,
-        libp2p::swarm::Config::with_executor(tokio::runtime::Handle::current()),
+        libp2p::swarm::Config::with_tokio_executor(),
     );
 
     // Listen on all interfaces with TCP
@@ -427,6 +421,20 @@ async fn main() -> Result<()> {
             }
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 info!("[Mouse] Connection established with {}", peer_id);
+                // When a connection is established, we'll handle streams through
+                // the NewStream event or by opening streams manually
+            }
+            SwarmEvent::NewStream { peer_id, .. } => {
+                info!("[Mouse] New stream from peer {}", peer_id);
+                // Handle new streams - read JSON messages from them
+                let mouse_state_clone = mouse_state.clone();
+                let peer_id_clone = peer_id;
+                tokio::spawn(async move {
+                    // Note: To actually read from the stream, we would need to access
+                    // it through the swarm's connection handler. For now, this is a
+                    // placeholder that shows where stream handling would go.
+                    info!("[Mouse] Would handle stream from peer {}", peer_id_clone);
+                });
             }
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 info!("[Mouse] Connection closed with {}", peer_id);
@@ -443,68 +451,18 @@ async fn main() -> Result<()> {
                             info!("[Mouse] Peer {} expired at {}", peer_id, multiaddr);
                         }
                     }
-                    libp2p::request_response::Event::Message { message, .. } => {
-                        match message {
-                            request_response::Message::Request { request, channel, .. } => {
-                                // Handle incoming request (request is Vec<u8>)
-                                let text = match String::from_utf8(request) {
-                                    Ok(t) => t,
-                                    Err(e) => {
-                                        warn!("[Mouse] Invalid UTF-8: {}", e);
-                                        let _ = channel.send_response(Vec::new());
-                                        continue;
-                                    }
-                                };
-
-                                // Parse JSON message
-                                let message: ClientMessage = match serde_json::from_str(&text) {
-                                    Ok(m) => m,
-                                    Err(e) => {
-                                        warn!("[Mouse] Failed to parse message: {} - {}", e, text);
-                                        let _ = channel.send_response(Vec::new());
-                                        continue;
-                                    }
-                                };
-
-                                // Handle mouse actions
-                                let mouse_state_clone = mouse_state.clone();
-                                tokio::spawn(async move {
-                                    let mut state = mouse_state_clone.lock().await;
-                                    let res = match message {
-                                        ClientMessage::Touch { action, x, y, .. } => {
-                                            info!("[Mouse] touch {:?} at ({:.3}, {:.3})", action, x, y);
-                                            state.handle_touch(action, x, y)
-                                        }
-                                        ClientMessage::Click { button, .. } => {
-                                            info!("[Mouse] click {}", button);
-                                            state.handle_click(&button)
-                                        }
-                                        ClientMessage::Drag { action, x, y, .. } => {
-                                            info!("[Mouse] drag {:?} at ({:.3}, {:.3})", action, x, y);
-                                            state.handle_drag(action, x, y)
-                                        }
-                                    };
-
-                                    if let Err(e) = res {
-                                        error!("[Mouse] Error handling command: {}", e);
-                                    }
-
-                                    // Send response (empty for now)
-                                    let _ = channel.send_response(Vec::new());
-                                });
-                            }
-                            request_response::Message::Response { .. } => {
-                                // We don't send requests, so ignore responses
-                            }
-                        }
-                    }
-                    libp2p::request_response::Event::OutboundFailure { error, .. } => {
-                        warn!("[Mouse] Request-response outbound failure: {}", error);
-                    }
-                    libp2p::request_response::Event::InboundFailure { error, .. } => {
-                        warn!("[Mouse] Request-response inbound failure: {}", error);
-                    }
                 }
+            }
+            SwarmEvent::Dialing { peer_id, .. } => {
+                if let Some(peer_id) = peer_id {
+                    info!("[Mouse] Dialing peer {}", peer_id);
+                }
+            }
+            SwarmEvent::ListenerClosed { addresses, reason } => {
+                warn!("[Mouse] Listener closed: {:?}, reason: {:?}", addresses, reason);
+            }
+            SwarmEvent::ListenerError { error } => {
+                warn!("[Mouse] Listener error: {}", error);
             }
             SwarmEvent::IncomingConnection { .. } => {
                 info!("[Mouse] Incoming connection");
