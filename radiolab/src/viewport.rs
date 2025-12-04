@@ -13,6 +13,7 @@ const WINDOW_HEIGHT: u32 = 600;
 const WAVEFORM_COLOR: [u8; 4] = [0, 255, 0, 255]; // Green
 const BACKGROUND_COLOR: [u8; 4] = [0, 0, 0, 255]; // Black
 const GRID_COLOR: [u8; 4] = [64, 64, 64, 255]; // Dark gray
+const TEXT_COLOR: [u8; 4] = [200, 200, 200, 255]; // Light gray
 
 pub fn run_viewport(receiver: mpsc::Receiver<f32>, running: Arc<AtomicBool>) -> Result<()> {
     println!("Creating event loop on main thread...");
@@ -163,58 +164,66 @@ impl ViewportApp {
             }
         }
 
-        // Draw waveform
-        let values = i_values.lock().unwrap();
-        if values.len() >= 2 {
-            let width = values.len().min(WINDOW_WIDTH as usize);
-            let height = WINDOW_HEIGHT as usize;
+            // Draw waveform
+            let values = i_values.lock().unwrap();
+            if values.len() >= 2 {
+                let width = values.len().min(WINDOW_WIDTH as usize);
+                let height = WINDOW_HEIGHT as usize;
 
-            // Calculate normalization from last 128 samples (same as TypeScript buffer)
-            let normalization_samples = 128;
-            let recent_values = if values.len() >= normalization_samples {
-                &values[values.len() - normalization_samples..]
-            } else {
-                &values[..]
-            };
-            
-            // Find min and max in recent samples (critical: use actual min/max, not mean±std)
-            let (v_min, v_max) = recent_values.iter()
-                .fold((f32::MAX, f32::MIN), |(min, max), &val| {
-                    (min.min(val), max.max(val))
-                });
-            
-            // Calculate range - use minimum to avoid division by zero (same as TypeScript Math.max(0.001, ...))
-            let value_range = (v_max - v_min).max(0.001);
-            
-            // Use most of the vertical space - from quarter to three-quarter lines
-            let quarter_y = (height / 4) as u32;
-            let three_quarter_y = (3 * height / 4) as u32;
-            let plot_height = (three_quarter_y - quarter_y) as f32;
-            let plot_bottom = three_quarter_y as f32;
-
-            for i in 0..(width - 1) {
-                let x1 = i as u32;
-                let x2 = (i + 1) as u32;
-
-                // Normalize using the same formula as ThreeAxisPlot.tsx:
-                // y = height - ((value - vMin) / range) * height
-                // This maps [vMin, vMax] to [height, 0] (inverted Y, high values at top)
-                let normalized1 = (values[i] - v_min) / value_range;
-                let normalized2 = (values[i + 1] - v_min) / value_range;
+                // Calculate normalization from last 128 samples (same as TypeScript buffer)
+                let normalization_samples = 128;
+                let recent_values = if values.len() >= normalization_samples {
+                    &values[values.len() - normalization_samples..]
+                } else {
+                    &values[..]
+                };
                 
-                // Map to plot area (between quarter and three-quarter lines)
-                // Invert: plot_bottom is at bottom, so subtract normalized value
-                let y1 = (plot_bottom - normalized1 * plot_height) as u32;
-                let y2 = (plot_bottom - normalized2 * plot_height) as u32;
+                // Find min and max in recent samples (critical: use actual min/max, not mean±std)
+                let (v_min, v_max) = recent_values.iter()
+                    .fold((f32::MAX, f32::MIN), |(min, max), &val| {
+                        (min.min(val), max.max(val))
+                    });
+                
+                // Calculate range - use minimum to avoid division by zero (same as TypeScript Math.max(0.001, ...))
+                let value_range = (v_max - v_min).max(0.001);
+                
+                // Use most of the vertical space - from quarter to three-quarter lines
+                let quarter_y = (height / 4) as u32;
+                let three_quarter_y = (3 * height / 4) as u32;
+                let plot_height = (three_quarter_y - quarter_y) as f32;
+                let plot_bottom = three_quarter_y as f32;
 
-                // Clamp to plot area
-                let y1 = y1.max(quarter_y).min(three_quarter_y);
-                let y2 = y2.max(quarter_y).min(three_quarter_y);
+                for i in 0..(width - 1) {
+                    let x1 = i as u32;
+                    let x2 = (i + 1) as u32;
 
-                // Draw line between two points
-                Self::draw_line(frame, x1, y1, x2, y2);
+                    // Normalize using the same formula as ThreeAxisPlot.tsx:
+                    // y = height - ((value - vMin) / range) * height
+                    // This maps [vMin, vMax] to [height, 0] (inverted Y, high values at top)
+                    let normalized1 = (values[i] - v_min) / value_range;
+                    let normalized2 = (values[i + 1] - v_min) / value_range;
+                    
+                    // Map to plot area (between quarter and three-quarter lines)
+                    // Invert: plot_bottom is at bottom, so subtract normalized value
+                    let y1 = (plot_bottom - normalized1 * plot_height) as u32;
+                    let y2 = (plot_bottom - normalized2 * plot_height) as u32;
+
+                    // Clamp to plot area
+                    let y1 = y1.max(quarter_y).min(three_quarter_y);
+                    let y2 = y2.max(quarter_y).min(three_quarter_y);
+
+                    // Draw line between two points
+                    Self::draw_line(frame, x1, y1, x2, y2);
+                }
+
+                // Draw min and max labels
+                let label_x = 10u32; // Left margin
+                let max_label_y = quarter_y - 5; // Above the top of the plot
+                let min_label_y = three_quarter_y + 15; // Below the bottom of the plot
+                
+                Self::draw_text(frame, &format!("max: {:.3}", v_max), label_x, max_label_y);
+                Self::draw_text(frame, &format!("min: {:.3}", v_min), label_x, min_label_y);
             }
-        }
 
         pixels.render()?;
         Ok(())
@@ -251,6 +260,66 @@ impl ViewportApp {
             if e2 < dx {
                 err += dx;
                 y += sy;
+            }
+        }
+    }
+
+    fn draw_text(frame: &mut [u8], text: &str, start_x: u32, start_y: u32) {
+        // Simple 5x7 bitmap font for digits and basic characters
+        const CHAR_WIDTH: u32 = 5;
+        const CHAR_HEIGHT: u32 = 7;
+        const CHAR_SPACING: u32 = 1;
+
+        // Bitmap patterns for characters (5 bits wide, 7 bits tall)
+        // Each character is represented as 7 u8 values (one per row)
+        let get_char_bitmap = |c: char| -> Option<[u8; 7]> {
+            match c {
+                '0' => Some([0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110]),
+                '1' => Some([0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110]),
+                '2' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111]),
+                '3' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110]),
+                '4' => Some([0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010]),
+                '5' => Some([0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110]),
+                '6' => Some([0b01110, 0b10001, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110]),
+                '7' => Some([0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000]),
+                '8' => Some([0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110]),
+                '9' => Some([0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b10001, 0b01110]),
+                '.' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00100]),
+                '-' => Some([0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000]),
+                ':' => Some([0b00000, 0b00100, 0b00000, 0b00000, 0b00000, 0b00100, 0b00000]),
+                ' ' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000]),
+                'm' => Some([0b00000, 0b00000, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001]),
+                'a' => Some([0b00000, 0b00000, 0b01110, 0b00001, 0b01111, 0b10001, 0b01111]),
+                'x' => Some([0b00000, 0b00000, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001]),
+                'i' => Some([0b00100, 0b00000, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100]),
+                'n' => Some([0b00000, 0b00000, 0b11110, 0b10001, 0b10001, 0b10001, 0b10001]),
+                _ => None,
+            }
+        };
+
+        let mut x_offset = 0u32;
+        for c in text.chars() {
+            if let Some(bitmap) = get_char_bitmap(c) {
+                for (row, &bits) in bitmap.iter().enumerate() {
+                    let y = start_y + row as u32;
+                    if y >= WINDOW_HEIGHT {
+                        continue;
+                    }
+                    for col in 0..CHAR_WIDTH {
+                        let x = start_x + x_offset + col;
+                        if x >= WINDOW_WIDTH {
+                            continue;
+                        }
+                        // Check if bit is set (bits are stored with MSB on left)
+                        if (bits >> (CHAR_WIDTH - 1 - col)) & 1 != 0 {
+                            let idx = (y * WINDOW_WIDTH + x) as usize * 4;
+                            if idx < frame.len() {
+                                frame[idx..idx + 4].copy_from_slice(&TEXT_COLOR);
+                            }
+                        }
+                    }
+                }
+                x_offset += CHAR_WIDTH + CHAR_SPACING;
             }
         }
     }
