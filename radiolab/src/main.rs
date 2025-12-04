@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     
     // Configuration
     let sample_rate_hz = 1_000_000; // 1 MHz RF sample rate
-    let center_freq_hz = 100_000_000; // 100 MHz center frequency
+    let center_freq_hz = 1_000_000; // 100_000_000; // 100 MHz center frequency
     let print_rate_hz = 60; // Print 60 IQ pairs per second
     let lna_gain_db = 16;
     let vga_gain_db = 20;

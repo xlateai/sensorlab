@@ -178,7 +178,7 @@ impl ViewportApp {
                     &values[..]
                 };
                 
-                // Find min and max in recent samples (critical: use actual min/max, not mean±std)
+                // Find min and max in recent samples for normalization (critical: use actual min/max, not mean±std)
                 let (v_min, v_max) = recent_values.iter()
                     .fold((f32::MAX, f32::MIN), |(min, max), &val| {
                         (min.min(val), max.max(val))
@@ -186,6 +186,13 @@ impl ViewportApp {
                 
                 // Calculate range - use minimum to avoid division by zero (same as TypeScript Math.max(0.001, ...))
                 let value_range = (v_max - v_min).max(0.001);
+                
+                // Find min and max in displayed samples for labels
+                let displayed_values = &values[..width];
+                let (display_min, display_max) = displayed_values.iter()
+                    .fold((f32::MAX, f32::MIN), |(min, max), &val| {
+                        (min.min(val), max.max(val))
+                    });
                 
                 // Use most of the vertical space - from quarter to three-quarter lines
                 let quarter_y = (height / 4) as u32;
@@ -216,13 +223,13 @@ impl ViewportApp {
                     Self::draw_line(frame, x1, y1, x2, y2);
                 }
 
-                // Draw min and max labels
+                // Draw min and max labels using displayed values
                 let label_x = 10u32; // Left margin
                 let max_label_y = quarter_y - 25; // Above the top of the plot
                 let min_label_y = three_quarter_y + 15; // Below the bottom of the plot
                 
-                Self::draw_text(frame, &format!("max: {:.3}", v_max), label_x, max_label_y);
-                Self::draw_text(frame, &format!("min: {:.3}", v_min), label_x, min_label_y);
+                Self::draw_text(frame, &format!("max: {:.4}", display_max), label_x, max_label_y);
+                Self::draw_text(frame, &format!("min: {:.4}", display_min), label_x, min_label_y);
             }
 
         pixels.render()?;
