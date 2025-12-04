@@ -1,7 +1,11 @@
+mod viewport;
+
 use anyhow::Result;
 use hackrfone::HackRfOne;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 fn main() -> Result<()> {
@@ -41,6 +45,16 @@ fn main() -> Result<()> {
     
     println!("\nStarting stream... (Press Ctrl+C to stop)\n");
     
+    // Create channel for sending I values to viewport
+    let (i_sender, i_receiver) = mpsc::channel();
+    
+    // Spawn viewport in a separate thread
+    thread::spawn(move || {
+        if let Err(e) = viewport::run_viewport(i_receiver) {
+            eprintln!("Viewport error: {}", e);
+        }
+    });
+    
     // Start receiving - this returns a radio in RxMode
     // hackrfone uses typestates, so we transition to RxMode
     let mut radio_rx = radio.into_rx_mode()?;
@@ -59,11 +73,19 @@ fn main() -> Result<()> {
         // Check if it's time to print
         let now = Instant::now();
         if now.duration_since(last_print_time) >= print_interval {
-            // Extract first IQ pair from samples
+            // Extract I values from samples and send to viewport
             // HackRF returns interleaved: I, Q, I, Q, ... as signed 8-bit integers
-            if samples.len() >= 2 {
+            for chunk in samples.chunks_exact(2) {
                 // Convert unsigned 8-bit to signed 8-bit, then normalize to [-1, 1]
-                // u8: 0-255, i8: -128 to 127
+                let i_val = (chunk[0] as i8) as f32 / 128.0;
+                let _q_val = (chunk[1] as i8) as f32 / 128.0;
+                
+                // Send I value to viewport (ignore errors if receiver is closed)
+                let _ = i_sender.send(i_val);
+            }
+            
+            // Print first IQ pair for console output
+            if samples.len() >= 2 {
                 let i_val = (samples[0] as i8) as f32 / 128.0;
                 let q_val = (samples[1] as i8) as f32 / 128.0;
                 let magnitude = (i_val * i_val + q_val * q_val).sqrt();
