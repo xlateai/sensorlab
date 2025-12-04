@@ -1,5 +1,6 @@
 use anyhow::Result;
 use pixels::{Pixels, SurfaceTexture};
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use winit::application::ApplicationHandler;
@@ -13,14 +14,19 @@ const WAVEFORM_COLOR: [u8; 4] = [0, 255, 0, 255]; // Green
 const BACKGROUND_COLOR: [u8; 4] = [0, 0, 0, 255]; // Black
 const GRID_COLOR: [u8; 4] = [64, 64, 64, 255]; // Dark gray
 
-pub fn run_viewport(receiver: mpsc::Receiver<f32>) -> Result<()> {
+pub fn run_viewport(receiver: mpsc::Receiver<f32>, running: Arc<AtomicBool>) -> Result<()> {
+    println!("Creating event loop on main thread...");
     let event_loop = EventLoop::new()?;
-    event_loop.run_app(&mut ViewportApp { 
+    println!("Event loop created, starting application...");
+    let mut app = ViewportApp { 
         receiver, 
         state: None,
         i_values: Arc::new(Mutex::new(Vec::new())),
         max_samples: WINDOW_WIDTH as usize,
-    })?;
+        running,
+    };
+    
+    event_loop.run_app(&mut app)?;
     Ok(())
 }
 
@@ -34,17 +40,29 @@ struct ViewportApp {
     state: Option<ViewportState>,
     i_values: Arc<Mutex<Vec<f32>>>,
     max_samples: usize,
+    running: Arc<AtomicBool>,
 }
 
 impl ApplicationHandler for ViewportApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        println!("Application resumed, creating window...");
         if self.state.is_none() {
             let window_attributes = winit::window::Window::default_attributes()
                 .with_title("HackRF I-Value Waveform")
                 .with_inner_size(winit::dpi::LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT))
                 .with_resizable(true);
 
-            let window = event_loop.create_window(window_attributes).unwrap();
+            println!("Creating window with attributes...");
+            let window = match event_loop.create_window(window_attributes) {
+                Ok(w) => {
+                    println!("Window created successfully!");
+                    w
+                }
+                Err(e) => {
+                    eprintln!("Failed to create window: {}", e);
+                    return;
+                }
+            };
             let window_size = window.inner_size();
             let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
 
@@ -78,16 +96,22 @@ impl ApplicationHandler for ViewportApp {
             }
 
             if let Some(state) = &self.state {
+                println!("Requesting initial redraw...");
                 state.window.request_redraw();
             }
+            println!("Window setup complete!");
+        } else {
+            println!("Window already exists, skipping creation");
         }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
-        match event {
-            WindowEvent::CloseRequested => {
-                event_loop.exit();
-            }
+            match event {
+                WindowEvent::CloseRequested => {
+                    use std::sync::atomic::Ordering;
+                    self.running.store(false, Ordering::SeqCst);
+                    event_loop.exit();
+                }
             WindowEvent::RedrawRequested => {
                 if let Some(state) = &mut self.state {
                     if let Err(e) = Self::render_internal(state, &self.i_values) {
