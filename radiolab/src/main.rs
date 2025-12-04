@@ -1,5 +1,5 @@
 use anyhow::Result;
-use seify_hackrfone::{Config, HackRf};
+use hackrfone::HackRfOne;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -15,7 +15,8 @@ fn main() -> Result<()> {
     println!("Opening HackRF device...");
     
     // Open the first available HackRF device
-    let radio = HackRf::open_first()?;
+    let mut radio = HackRfOne::new()
+        .ok_or_else(|| anyhow::anyhow!("No HackRF device found"))?;
     
     // Configuration
     let sample_rate_hz = 1_000_000; // 1 MHz RF sample rate
@@ -30,44 +31,41 @@ fn main() -> Result<()> {
     println!("  LNA gain: {} dB", lna_gain_db);
     println!("  VGA gain: {} dB", vga_gain_db);
     println!("  Printing IQ pairs at {} Hz", print_rate_hz);
+    
+    // Configure the device BEFORE entering RX mode
+    radio.set_freq(center_freq_hz)?;
+    radio.set_sample_rate(sample_rate_hz, 1)?; // hz and divisor (1 = no division)
+    radio.set_lna_gain(lna_gain_db)?;
+    radio.set_vga_gain(vga_gain_db)?;
+    radio.set_amp_enable(true)?;
+    
     println!("\nStarting stream... (Press Ctrl+C to stop)\n");
     
-    // Start receiving
-    radio.start_rx(&Config {
-        vga_db: vga_gain_db,
-        txvga_db: 0,
-        lna_db: lna_gain_db,
-        amp_enable: true,
-        antenna_enable: true,
-        frequency_hz: center_freq_hz,
-        sample_rate_hz,
-        sample_rate_div: 1,
-    })?;
+    // Start receiving - this returns a radio in RxMode
+    // hackrfone uses typestates, so we transition to RxMode
+    let mut radio_rx = radio.into_rx_mode()?;
     
     // Calculate timing for 60 Hz print rate
     let print_interval = Duration::from_secs_f64(1.0 / print_rate_hz as f64);
     let mut last_print_time = Instant::now();
     
-    // Buffer to store received samples
-    // HackRF returns interleaved I/Q as int8 values
-    // We need enough samples to support our print rate
-    let samples_per_read = (sample_rate_hz / print_rate_hz).max(1024) as usize;
-    let mut buf = vec![0u8; samples_per_read * 2]; // *2 for I and Q
-    
     let mut sample_count = 0u64;
     
     while running.load(Ordering::SeqCst) {
         // Read samples from HackRF
-        radio.read(&mut buf)?;
+        // rx() returns one MTU of data (interleaved I/Q as signed 8-bit integers)
+        let samples = radio_rx.rx()?;
         
         // Check if it's time to print
         let now = Instant::now();
         if now.duration_since(last_print_time) >= print_interval {
-            // Extract first IQ pair from buffer
-            // HackRF returns interleaved: I, Q, I, Q, ...
-            if buf.len() >= 2 {
-                let i_val = buf[0] as f32 / 127.0; // Normalize to [-1, 1]
-                let q_val = buf[1] as f32 / 127.0; // Normalize to [-1, 1]
+            // Extract first IQ pair from samples
+            // HackRF returns interleaved: I, Q, I, Q, ... as signed 8-bit integers
+            if samples.len() >= 2 {
+                // Convert unsigned 8-bit to signed 8-bit, then normalize to [-1, 1]
+                // u8: 0-255, i8: -128 to 127
+                let i_val = (samples[0] as i8) as f32 / 128.0;
+                let q_val = (samples[1] as i8) as f32 / 128.0;
                 let magnitude = (i_val * i_val + q_val * q_val).sqrt();
                 let phase = q_val.atan2(i_val);
                 
@@ -82,6 +80,8 @@ fn main() -> Result<()> {
         }
     }
     
+    // Clean up: stop receiving and return to unknown mode
+    let _radio = radio_rx.stop_rx()?;
     println!("HackRF device closed.");
     Ok(())
 }

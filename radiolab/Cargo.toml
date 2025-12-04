@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-seify-hackrfone = "0.2.0"
+hackrfone = { git = "https://github.com/newAM/hackrfone" }
 anyhow = "1.0"
 ctrlc = "3.4"
