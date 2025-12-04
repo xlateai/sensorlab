@@ -218,7 +218,7 @@ impl ViewportApp {
 
                 // Draw min and max labels
                 let label_x = 10u32; // Left margin
-                let max_label_y = quarter_y - 5; // Above the top of the plot
+                let max_label_y = quarter_y - 25; // Above the top of the plot
                 let min_label_y = three_quarter_y + 15; // Below the bottom of the plot
                 
                 Self::draw_text(frame, &format!("max: {:.3}", v_max), label_x, max_label_y);
