@@ -168,16 +168,48 @@ impl ViewportApp {
         if values.len() >= 2 {
             let width = values.len().min(WINDOW_WIDTH as usize);
             let height = WINDOW_HEIGHT as usize;
-            let center_y = height / 2;
+
+            // Calculate normalization from last 128 samples (same as TypeScript buffer)
+            let normalization_samples = 128;
+            let recent_values = if values.len() >= normalization_samples {
+                &values[values.len() - normalization_samples..]
+            } else {
+                &values[..]
+            };
+            
+            // Find min and max in recent samples (critical: use actual min/max, not mean±std)
+            let (v_min, v_max) = recent_values.iter()
+                .fold((f32::MAX, f32::MIN), |(min, max), &val| {
+                    (min.min(val), max.max(val))
+                });
+            
+            // Calculate range - use minimum to avoid division by zero (same as TypeScript Math.max(0.001, ...))
+            let value_range = (v_max - v_min).max(0.001);
+            
+            // Use most of the vertical space - from quarter to three-quarter lines
+            let quarter_y = (height / 4) as u32;
+            let three_quarter_y = (3 * height / 4) as u32;
+            let plot_height = (three_quarter_y - quarter_y) as f32;
+            let plot_bottom = three_quarter_y as f32;
 
             for i in 0..(width - 1) {
                 let x1 = i as u32;
                 let x2 = (i + 1) as u32;
 
-                // Normalize I value from [-1, 1] to [0, height]
-                // Invert Y so positive values go up
-                let y1 = (center_y as f32 - values[i] * (height as f32 / 2.0)) as u32;
-                let y2 = (center_y as f32 - values[i + 1] * (height as f32 / 2.0)) as u32;
+                // Normalize using the same formula as ThreeAxisPlot.tsx:
+                // y = height - ((value - vMin) / range) * height
+                // This maps [vMin, vMax] to [height, 0] (inverted Y, high values at top)
+                let normalized1 = (values[i] - v_min) / value_range;
+                let normalized2 = (values[i + 1] - v_min) / value_range;
+                
+                // Map to plot area (between quarter and three-quarter lines)
+                // Invert: plot_bottom is at bottom, so subtract normalized value
+                let y1 = (plot_bottom - normalized1 * plot_height) as u32;
+                let y2 = (plot_bottom - normalized2 * plot_height) as u32;
+
+                // Clamp to plot area
+                let y1 = y1.max(quarter_y).min(three_quarter_y);
+                let y2 = y2.max(quarter_y).min(three_quarter_y);
 
                 // Draw line between two points
                 Self::draw_line(frame, x1, y1, x2, y2);
