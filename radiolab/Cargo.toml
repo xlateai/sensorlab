@@ -1,0 +1,9 @@
+[package]
+name = "radiolab"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+seify-hackrfone = "0.2.0"
+anyhow = "1.0"
+ctrlc = "3.4"
