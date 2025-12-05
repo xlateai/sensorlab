@@ -18,7 +18,7 @@ pub fn run_audio_thread(
 ) -> Result<()> {
     let host = cpal::default_host();
     
-    // List available devices for debugging
+    // List available devices for debugging (only once at startup)
     let devices: Vec<_> = host.output_devices()?.collect();
     println!("Available audio output devices:");
     for (idx, dev) in devices.iter().enumerate() {
@@ -26,32 +26,6 @@ pub fn run_audio_thread(
             println!("  {}: {}", idx, name);
         }
     }
-    
-    let device = host
-        .default_output_device()
-        .ok_or_else(|| anyhow::anyhow!("No audio output device found"))?;
-    
-    let device_name = device.name()?;
-    println!("Using audio device: {}", device_name);
-    
-    // Get supported config - we need to keep this for recreating streams
-    let supported_config = device.default_output_config()?;
-    println!("Audio config: {:?}, sample rate: {:?}", supported_config, supported_config.sample_rate());
-    
-    // Use the device's preferred config, but try to set our desired sample rate
-    let mut config = supported_config.config();
-    
-    // Try to use our desired sample rate, or fall back to device default
-    if config.sample_rate.0 != AUDIO_SAMPLE_RATE {
-        // Try to set our desired sample rate
-        config.sample_rate = SampleRate(AUDIO_SAMPLE_RATE);
-    }
-    
-    println!("Audio stream config: channels={}, sample_rate={:?}, buffer_size={:?}", 
-             config.channels, config.sample_rate, config.buffer_size);
-    
-    // Get sample format - we need this for recreating streams
-    let sample_format = supported_config.sample_format();
     
     // Shared buffer for audio samples (thread-safe)
     let sample_buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
@@ -103,12 +77,33 @@ pub fn run_audio_thread(
             let buffer_size_before = buffer.len();
             drop(buffer);
             
-            // Start audio stream - create a new one each time
-            println!("Starting audio stream (buffer has {} samples)...", buffer_size_before);
-            println!("Audio sample format: {:?}", sample_format);
+            // Get the current default device (fresh each time to pick up device changes)
+            let device = host
+                .default_output_device()
+                .ok_or_else(|| anyhow::anyhow!("No audio output device found"))?;
+            
+            let device_name = device.name()?;
+            println!("Starting audio stream on device: {} (buffer has {} samples)...", device_name, buffer_size_before);
+            
+            // Get supported config for this device
+            let supported_config = device.default_output_config()?;
+            
+            // Use the device's preferred config, but try to set our desired sample rate
+            let mut config = supported_config.config();
+            
+            // Try to use our desired sample rate, or fall back to device default
+            if config.sample_rate.0 != AUDIO_SAMPLE_RATE {
+                // Try to set our desired sample rate
+                config.sample_rate = SampleRate(AUDIO_SAMPLE_RATE);
+            }
+            
+            // Get sample format for this device
+            let sample_format = supported_config.sample_format();
+            println!("Audio sample format: {:?}, sample_rate: {:?}", sample_format, config.sample_rate);
+            
             let sample_buffer_for_callback = Arc::clone(&sample_buffer);
             
-            // Create a new stream - we can do this because device and config are still available
+            // Create a new stream using the current default device
             let stream_result = match sample_format {
                 SampleFormat::F32 => {
                     device.build_output_stream(
