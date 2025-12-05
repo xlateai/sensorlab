@@ -1,56 +1,127 @@
-# Welcome to your Expo app 👋
+# xlate sensorlab
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native application built with Expo, featuring custom native modules for advanced sensor processing and real-time data visualization.
 
-## Development
+## Overview
 
-- Easy way: `npx expo start`.
-- With custom native modules: `npx expo run:ios --device` (requires extra setup and phone to be plugged into your pc)
-- Persistent version on your phone (locally plugged in only) `npx expo run:ios --configuration Release`
+xlate sensorlab leverages Expo's development framework to deliver a cross-platform mobile application with deep native integrations. The project combines React Native's flexibility with custom native code written in Swift and Rust, enabling high-performance sensor data processing and visualization capabilities.
 
-## Get started
+## Architecture
 
-1. Install dependencies
+This project requires a **custom Expo development client** rather than the standard Expo Go app. This is necessary because we integrate custom native modules that aren't available in the standard Expo runtime:
+
+- **Custom Swift modules** (`sensorlib`) provide iOS-specific sensor interfaces and native UI components
+- **Custom Rust libraries** (`rustcore`) deliver high-performance computational routines compiled to native code
+
+These native modules are compiled and linked directly into the development client, which is installed on your iOS device. This approach provides the performance benefits of native code while maintaining the developer experience of Expo's tooling.
+
+### Repository Structure
+
+```
+pycontroller/
+├── app/                    # React Native application code (Expo Router)
+├── components/             # Reusable React components
+├── sensorlib/              # Custom Expo module (Swift/TypeScript)
+│   ├── ios/               # Swift implementation for iOS
+│   ├── android/           # Kotlin implementation for Android
+│   └── src/               # TypeScript interface definitions
+├── rustcore/              # Rust library for native computations
+│   ├── src/               # Rust source code
+│   └── build-ios.sh      # iOS build script
+└── ios/                   # Native iOS project configuration
+```
+
+## Development Setup
+
+### Prerequisites
+
+- Node.js and npm
+- iOS development: Xcode and CocoaPods
+- Rust toolchain (for building `rustcore`)
+- An iOS device with Developer Mode enabled
+
+### Initial Setup
+
+1. Install dependencies:
 
    ```bash
+   cd pycontroller
    npm install
    ```
 
-2. Start the app
+2. Install iOS dependencies:
 
    ```bash
-   npx expo start
+   cd ios
+   pod install
+   cd ..
    ```
 
-In the output, you'll find options to open the app in a
+3. Build Rust libraries (if needed):
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   sh rustcore/build-ios.sh
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Running the Application
 
-## Get a fresh project
-
-When you're ready, run:
+To launch the app on a connected iOS device:
 
 ```bash
-npm run reset-project
+cd pycontroller
+npx expo run:ios --device
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+**Note:** This command requires:
+- Your iOS device to be connected via USB
+- Developer Mode to be enabled on your iPhone (Settings → Privacy & Security → Developer Mode)
+- A custom development client to be installed on your device (built automatically on first run)
 
-## Learn more
+### Common Development Tasks
 
-To learn more about developing your project with Expo, look at the following resources:
+#### Rebuilding Native Dependencies
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+If you encounter issues with native modules, you may need to rebuild dependencies:
 
-## Join the community
+**iOS CocoaPods:**
+```bash
+cd pycontroller/ios
+pod install
+cd ..
+```
 
-Join our community of developers creating universal apps.
+**Rust Libraries:**
+```bash
+sh pycontroller/rustcore/build-ios.sh
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+#### Development Workflow
+
+The standard development workflow:
+1. Make changes to your code
+2. The Expo development server will hot-reload changes automatically
+3. For native code changes (Swift/Rust), rebuild the development client using `npx expo run:ios --device`
+
+## Continuous Integration & Deployment
+
+This project uses GitHub Actions for automated builds and releases. When a new GitHub release is created, the `ios.yml` workflow automatically:
+
+1. Builds the iOS application
+2. Submits the build to TestFlight for beta testing
+
+This ensures that every tagged release is immediately available for testing through Apple's TestFlight distribution platform.
+
+## Technology Stack
+
+- **Expo** - React Native framework with development tooling
+- **React Native** - Cross-platform mobile application framework
+- **TypeScript** - Type-safe JavaScript for application logic
+- **Swift** - Native iOS modules for sensor interfaces
+- **Rust** - High-performance native computations
+- **Expo Router** - File-based routing for navigation
+
+## Learn More
+
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Native Documentation](https://reactnative.dev/)
+- [Expo Development Builds](https://docs.expo.dev/develop/development-builds/introduction/)
