@@ -48,6 +48,9 @@ fn main() -> Result<()> {
     // Create channel for audio enable/disable state
     let (audio_enabled_sender, audio_enabled_receiver) = mpsc::channel();
     
+    // Create channel for frequency updates
+    let (freq_sender, freq_receiver) = mpsc::channel::<u64>();
+    
     // Create running flag for HackRF thread
     let running = Arc::new(AtomicBool::new(true));
     let running_clone = running.clone();
@@ -86,6 +89,44 @@ fn main() -> Result<()> {
         }
     });
     
+    // Spawn thread to handle frequency updates
+    // We'll create a new radio instance for frequency updates
+    // Note: This works because set_freq can be called on a separate device instance
+    let freq_receiver_clone = freq_receiver;
+    let running_for_freq = Arc::clone(&running);
+    let sample_rate_hz_clone = sample_rate_hz;
+    let lna_gain_db_clone = lna_gain_db;
+    let vga_gain_db_clone = vga_gain_db;
+    thread::spawn(move || {
+        // Create a separate radio instance for frequency updates
+        // This allows us to update frequency without interfering with RX mode
+        let mut freq_radio = match HackRfOne::new() {
+            Some(r) => r,
+            None => {
+                eprintln!("Failed to create radio instance for frequency updates");
+                return;
+            }
+        };
+        
+        // Configure it with the same settings
+        let _ = freq_radio.set_sample_rate(sample_rate_hz_clone, 1);
+        let _ = freq_radio.set_lna_gain(lna_gain_db_clone);
+        let _ = freq_radio.set_vga_gain(vga_gain_db_clone);
+        let _ = freq_radio.set_amp_enable(true);
+        
+        while running_for_freq.load(Ordering::SeqCst) {
+            if let Ok(new_freq) = freq_receiver_clone.try_recv() {
+                println!("Updating frequency to: {:.3} MHz", new_freq as f64 / 1e6);
+                if let Err(e) = freq_radio.set_freq(new_freq) {
+                    eprintln!("Failed to update frequency: {}", e);
+                } else {
+                    println!("Frequency updated successfully to {:.3} MHz", new_freq as f64 / 1e6);
+                }
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    });
+    
     // Spawn HackRF reading in a background thread
     // (On macOS, the main thread must run the event loop)
     let radio_rx = radio.into_rx_mode()?;
@@ -108,7 +149,7 @@ fn main() -> Result<()> {
                     let should_print = now.duration_since(last_print_time) >= print_interval;
                     
                     // Process all samples
-                    for (idx, chunk) in samples.chunks_exact(2).enumerate() {
+                    for chunk in samples.chunks_exact(2) {
                         let i_val = (chunk[0] as i8) as f32 / 128.0;
                         let _q_val = (chunk[1] as i8) as f32 / 128.0;
                         
@@ -171,7 +212,7 @@ fn main() -> Result<()> {
     
     // Run viewport on main thread (required on macOS)
     println!("Starting viewport on main thread...");
-    viewport::run_viewport(i_receiver, running, audio_enabled_sender)?;
+    viewport::run_viewport(i_receiver, running, audio_enabled_sender, freq_sender, center_freq_hz)?;
     
     println!("HackRF device closed.");
     Ok(())
