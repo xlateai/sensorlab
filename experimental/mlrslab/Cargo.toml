@@ -1,0 +1,8 @@
+[package]
+name = "mlrslab"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+burn = "0.19.1"
+burn-ndarray = "0.19.1"
