@@ -24,7 +24,7 @@ const CHECKBOX_Y: u32 = 10;
 const CHECKBOX_LABEL_X: u32 = CHECKBOX_X + CHECKBOX_SIZE + 5;
 
 // Slider dimensions and position
-const SLIDER_X: u32 = 10;
+const SLIDER_X: u32 = 40; // Moved right to make room for - button
 const SLIDER_Y: u32 = 35;
 const SLIDER_WIDTH: u32 = 300;
 const SLIDER_HEIGHT: u32 = 20;
@@ -32,6 +32,12 @@ const SLIDER_TRACK_HEIGHT: u32 = 4;
 const SLIDER_HANDLE_SIZE: u32 = 16;
 const SLIDER_MIN_FREQ_HZ: u64 = 1_000_000; // 1 MHz
 const SLIDER_MAX_FREQ_HZ: u64 = 6_000_000_000; // 6 GHz
+
+// Button dimensions and position
+const BUTTON_SIZE: u32 = 25;
+const BUTTON_MINUS_X: u32 = 10;
+const BUTTON_PLUS_X: u32 = SLIDER_X + SLIDER_WIDTH + 5;
+const BUTTON_Y: u32 = SLIDER_Y;
 
 pub fn run_viewport(
     receiver: mpsc::Receiver<f32>, 
@@ -195,6 +201,24 @@ impl ApplicationHandler for ViewportApp {
                             // Request redraw to update checkbox
                             state.window.request_redraw();
                         }
+                        // Check if click is within minus button bounds
+                        else if x >= BUTTON_MINUS_X && x < BUTTON_MINUS_X + BUTTON_SIZE &&
+                                y >= BUTTON_Y && y < BUTTON_Y + BUTTON_SIZE {
+                            drop(state);
+                            self.decrement_frequency();
+                            if let Some(state) = &self.state {
+                                state.window.request_redraw();
+                            }
+                        }
+                        // Check if click is within plus button bounds
+                        else if x >= BUTTON_PLUS_X && x < BUTTON_PLUS_X + BUTTON_SIZE &&
+                                y >= BUTTON_Y && y < BUTTON_Y + BUTTON_SIZE {
+                            drop(state);
+                            self.increment_frequency();
+                            if let Some(state) = &self.state {
+                                state.window.request_redraw();
+                            }
+                        }
                         // Check if click is within slider bounds
                         else if x >= SLIDER_X && x < SLIDER_X + SLIDER_WIDTH &&
                                 y >= SLIDER_Y && y < SLIDER_Y + SLIDER_HEIGHT {
@@ -256,8 +280,30 @@ impl ViewportApp {
         self.current_freq = freq;
         
         // Send frequency update
+        self.send_frequency_update(freq);
+    }
+    
+    fn increment_frequency(&mut self) {
+        if self.current_freq < SLIDER_MAX_FREQ_HZ {
+            self.current_freq += 1;
+            // Update slider position to match new frequency
+            self.slider_position = frequency_to_slider_position(self.current_freq);
+            self.send_frequency_update(self.current_freq);
+        }
+    }
+    
+    fn decrement_frequency(&mut self) {
+        if self.current_freq > SLIDER_MIN_FREQ_HZ {
+            self.current_freq -= 1;
+            // Update slider position to match new frequency
+            self.slider_position = frequency_to_slider_position(self.current_freq);
+            self.send_frequency_update(self.current_freq);
+        }
+    }
+    
+    fn send_frequency_update(&self, freq: u64) {
         if self.freq_sender.send(freq).is_ok() {
-            println!("Frequency updated to: {:.3} MHz", freq as f64 / 1e6);
+            println!("Frequency updated to: {} Hz", freq);
         }
     }
     
@@ -408,10 +454,39 @@ impl ViewportApp {
             }
         }
         
-        // Draw frequency label
-        let freq_mhz = freq as f64 / 1e6;
-        let freq_text = format!("{:.3} MHz", freq_mhz);
+        // Draw frequency label (full number)
+        let freq_text = format!("{} Hz", freq);
         Self::draw_text(frame, &freq_text, SLIDER_X, SLIDER_Y + SLIDER_HEIGHT + 5);
+        
+        // Draw minus button
+        Self::draw_button(frame, BUTTON_MINUS_X, BUTTON_Y, BUTTON_SIZE, '-');
+        
+        // Draw plus button
+        Self::draw_button(frame, BUTTON_PLUS_X, BUTTON_Y, BUTTON_SIZE, '+');
+    }
+    
+    fn draw_button(frame: &mut [u8], x: u32, y: u32, size: u32, symbol: char) {
+        // Draw button border and fill
+        for by in y..(y + size) {
+            for bx in x..(x + size) {
+                let idx = (by * WINDOW_WIDTH + bx) as usize * 4;
+                if idx < frame.len() {
+                    // Draw border
+                    if bx == x || bx == x + size - 1 || by == y || by == y + size - 1 {
+                        frame[idx..idx + 4].copy_from_slice(&CHECKBOX_COLOR);
+                    } else {
+                        // Fill with slightly lighter gray
+                        frame[idx..idx + 4].copy_from_slice(&GRID_COLOR);
+                    }
+                }
+            }
+        }
+        
+        // Draw symbol in center
+        let symbol_x = x + size / 2 - 2; // Center the symbol (roughly)
+        let symbol_y = y + size / 2 - 3;
+        let symbol_str = if symbol == '+' { "+" } else { "-" };
+        Self::draw_text(frame, symbol_str, symbol_x, symbol_y);
     }
 
     fn draw_checkbox(frame: &mut [u8], checked: bool) {
@@ -503,6 +578,9 @@ impl ViewportApp {
                 'u' => Some([0b00000, 0b00000, 0b10001, 0b10001, 0b10001, 0b10001, 0b01111]),
                 'd' => Some([0b00000, 0b00000, 0b11110, 0b10001, 0b10001, 0b10001, 0b11110]),
                 'o' => Some([0b00000, 0b00000, 0b01110, 0b10001, 0b10001, 0b10001, 0b01110]),
+                '+' => Some([0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000]),
+                'z' => Some([0b00000, 0b00000, 0b11111, 0b00010, 0b00100, 0b01000, 0b11111]),
+                'H' => Some([0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001]),
                 _ => None,
             }
         };
