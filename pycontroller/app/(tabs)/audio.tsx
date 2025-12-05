@@ -14,9 +14,11 @@ import {
   AmbientControllerState,
   relayMicrophoneToSpeakers
 } from '../utils/audio-utils';
+import Sensorlib from 'sensorlib';
 import { MagnetometerData, getMagnetometerAverageNormalized, getMagnetometerAxisNormalized } from '../utils/sensor-utils';
 import Slider from '../../components/ui/slider';
 import WaveformSliderGroup from '../../components/ui/waveform-slider-group';
+import WaveformPlot from '../../components/WaveformPlot';
 
 // Default frequency constant
 const DEFAULT_FREQUENCY = 744;
@@ -149,6 +151,14 @@ export default function AudioTab() {
   const [bufferLength, setBufferLength] = useState(0);
   const [isMicrophoneRelaying, setIsMicrophoneRelaying] = useState(false);
   const microphoneRelayControllerRef = useRef<AudioController | null>(null);
+  
+  // Microphone listening state (separate from relay)
+  const [isMicrophoneListening, setIsMicrophoneListening] = useState(false);
+  const microphoneListeningIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [waveformData, setWaveformData] = useState<Array<{ t: number; value: number }>>([]);
+  const waveformStartTimeRef = useRef<number | null>(null);
+  const WAVEFORM_DURATION_MS = 3000; // 3 seconds
+  const MICROPHONE_SAMPLE_RATE_MS = 16; // ~60Hz (1000/60 ≈ 16ms)
   const [baseFrequency, setBaseFrequency] = useState(DEFAULT_FREQUENCY); // Base frequency from main slider
   const [precisionOffset, setPrecisionOffset] = useState(0); // Precision offset in Hz (-1000 to +1000)
   const [frequencyInput, setFrequencyInput] = useState(DEFAULT_FREQUENCY.toString()); // For text input
@@ -689,6 +699,69 @@ export default function AudioTab() {
     }
   };
   
+  // Handle microphone listening toggle (just listen, don't relay)
+  const handleMicrophoneListeningToggle = async () => {
+    if (isMicrophoneListening) {
+      // Stop listening
+      setIsMicrophoneListening(false);
+      if (microphoneListeningIntervalRef.current) {
+        clearInterval(microphoneListeningIntervalRef.current);
+        microphoneListeningIntervalRef.current = null;
+      }
+      try {
+        await Sensorlib.stopListening();
+      } catch (error) {
+        console.error('Failed to stop microphone listening:', error);
+      }
+      setWaveformData([]);
+      waveformStartTimeRef.current = null;
+    } else {
+      // Start listening
+      try {
+        setIsMicrophoneListening(true);
+        waveformStartTimeRef.current = Date.now();
+        setWaveformData([]);
+        
+        await Sensorlib.initializeMicrophone({
+          sampleRate: 44100,
+          channelCount: 1
+        });
+        
+        // Sample microphone at ~60Hz
+        microphoneListeningIntervalRef.current = setInterval(() => {
+          try {
+            const samples = Sensorlib.readSamplesBatch();
+            if (samples.length > 0) {
+              // Calculate RMS (root mean square) for this batch to get amplitude
+              const rms = Math.sqrt(
+                samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length
+              );
+              
+              const now = Date.now();
+              if (waveformStartTimeRef.current === null) {
+                waveformStartTimeRef.current = now;
+              }
+              
+              const t = (now - waveformStartTimeRef.current) / 1000; // Convert to seconds
+              
+              setWaveformData(prev => {
+                // Remove data older than 3 seconds
+                const cutoff = t - (WAVEFORM_DURATION_MS / 1000);
+                const filtered = prev.filter(point => point.t >= cutoff);
+                return [...filtered, { t, value: rms }];
+              });
+            }
+          } catch (error) {
+            console.error('Error reading microphone samples:', error);
+          }
+        }, MICROPHONE_SAMPLE_RATE_MS);
+      } catch (error) {
+        console.error('Failed to start microphone listening:', error);
+        setIsMicrophoneListening(false);
+      }
+    }
+  };
+
   // Handle microphone relay toggle
   const handleMicrophoneRelayToggle = async () => {
     if (isMicrophoneRelaying) {
@@ -732,7 +805,11 @@ export default function AudioTab() {
       if (microphoneRelayControllerRef.current) {
         microphoneRelayControllerRef.current.cancel();
       }
+      if (microphoneListeningIntervalRef.current) {
+        clearInterval(microphoneListeningIntervalRef.current);
+      }
       stopAudio().catch(() => {});
+      Sensorlib.stopListening().catch(() => {});
     };
   }, []);
 
@@ -814,10 +891,12 @@ export default function AudioTab() {
       
         <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>
           <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Microphone Test</Text>
+          
+          {/* Microphone Listening Button */}
           <Pressable
-            onPress={handleMicrophoneRelayToggle}
+            onPress={handleMicrophoneListeningToggle}
             style={{
-              backgroundColor: '#39ff14',
+              backgroundColor: isMicrophoneListening ? '#e53935' : '#39ff14',
               paddingVertical: 12,
               paddingHorizontal: 24,
               borderRadius: 8,
@@ -826,9 +905,45 @@ export default function AudioTab() {
             android_ripple={null}
           >
             <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
+              {isMicrophoneListening ? 'Stop Listening' : 'Start Listening'}
+            </Text>
+          </Pressable>
+          
+          {/* Waveform Visualization */}
+          {isMicrophoneListening && (
+            <View style={{ marginBottom: 16 }}>
+              <WaveformPlot 
+                data={waveformData} 
+                height={120}
+                color="#39ff14"
+                duration={3}
+              />
+            </View>
+          )}
+          
+          {/* Microphone Relay Button */}
+          <Pressable
+            onPress={handleMicrophoneRelayToggle}
+            style={{
+              backgroundColor: '#39ff14',
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 8,
+              marginBottom: 16,
+              opacity: isMicrophoneListening ? 0.5 : 1,
+            }}
+            android_ripple={null}
+            disabled={isMicrophoneListening}
+          >
+            <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600' }}>
               {isMicrophoneRelaying ? 'Stop Relay' : 'Start Microphone Relay'}
             </Text>
           </Pressable>
+          {isMicrophoneListening && (
+            <Text style={{ color: '#888', fontSize: 12, marginTop: -12, marginBottom: 16, textAlign: 'center' }}>
+              Stop listening before starting relay
+            </Text>
+          )}
         </View>
       
         <View style={{ marginTop: 32, paddingTop: 32, borderTopWidth: 1, borderTopColor: '#333' }}>

@@ -21,7 +21,8 @@ final class AudioModule {
   private var sampleRate: Double = 44100
   private var channels: Int = 1
 
-  private var format: AVAudioFormat?
+  private var format: AVAudioFormat? // Output format for speakers
+  private var inputFormat: AVAudioFormat? // Input format from microphone
   
   // Track scheduled buffer length for speakers
   private var scheduledFrameCount: Int = 0
@@ -160,15 +161,39 @@ final class AudioModule {
   }
 
   func playSpeakersBatch(input: AudioSamplesInput) {
-    guard let format = format, let player = player else { return }
+    guard let format = format, let player = player else { 
+      print("[AudioModule] playSpeakersBatch - format or player is nil")
+      return 
+    }
 
-    let frameCount = AVAudioFrameCount(input.samples.count / channels)
-    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
+    // If we have input format and it's different from output format, we need to resample
+    if let inputFmt = inputFormat, inputFmt.sampleRate != format.sampleRate {
+      // Resample the samples to match output format
+      let resampledSamples = resampleSamples(
+        input.samples,
+        fromSampleRate: inputFmt.sampleRate,
+        toSampleRate: format.sampleRate
+      )
+      playResampledSamples(resampledSamples, format: format, player: player)
+    } else {
+      // Same sample rate, play directly
+      playResampledSamples(input.samples, format: format, player: player)
+    }
+  }
+  
+  private func playResampledSamples(_ samples: [Float], format: AVAudioFormat, player: AVAudioPlayerNode) {
+    let frameCount = AVAudioFrameCount(samples.count / channels)
+    guard frameCount > 0 else { return }
+    
+    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+      print("[AudioModule] playResampledSamples - failed to create buffer")
+      return
+    }
     buffer.frameLength = frameCount
 
     let dst = buffer.floatChannelData![0]
-    input.samples.withUnsafeBufferPointer { src in
-      dst.initialize(from: src.baseAddress!, count: src.count)
+    samples.withUnsafeBufferPointer { src in
+      dst.initialize(from: src.baseAddress!, count: min(src.count, Int(frameCount) * channels))
     }
 
     // Track scheduled frames
@@ -182,6 +207,32 @@ final class AudioModule {
         self?.scheduledFrameCount = max(0, self!.scheduledFrameCount - Int(frameCount))
       }
     }
+  }
+  
+  // Simple linear interpolation resampler
+  private func resampleSamples(_ samples: [Float], fromSampleRate: Double, toSampleRate: Double) -> [Float] {
+    guard fromSampleRate != toSampleRate && samples.count > 0 else {
+      return samples
+    }
+    
+    let ratio = toSampleRate / fromSampleRate
+    let outputCount = Int(Double(samples.count) * ratio)
+    var resampled: [Float] = []
+    resampled.reserveCapacity(outputCount)
+    
+    for i in 0..<outputCount {
+      let sourceIndex = Double(i) / ratio
+      let index1 = Int(sourceIndex)
+      let index2 = min(index1 + 1, samples.count - 1)
+      let fraction = sourceIndex - Double(index1)
+      
+      let sample1 = samples[index1]
+      let sample2 = samples[index2]
+      let interpolated = Float(Double(sample1) * (1.0 - fraction) + Double(sample2) * fraction)
+      resampled.append(interpolated)
+    }
+    
+    return resampled
   }
 
   func getCurrentSpeakerBufferLength() -> Int {
@@ -316,8 +367,8 @@ final class AudioModule {
     let inputFormat = inputNode.outputFormat(forBus: 0)
     print("[AudioModule] initializeMicrophone - inputNode.outputFormat: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount), commonFormat=\(inputFormat.commonFormat.rawValue), interleaved=\(inputFormat.isInterleaved)")
     
-    // Store the actual input format we are tapping from
-    self.format = inputFormat
+    // Store the actual input format we are tapping from (separate from output format)
+    self.inputFormat = inputFormat
     
     // Clear microphone samples buffer
     queue.async {
@@ -370,6 +421,7 @@ final class AudioModule {
   func stopListening() {
     inputNode?.removeTap(onBus: 0)
     inputNode = nil
+    inputFormat = nil // Clear input format when stopping
     queue.async {
       self.microphoneSamples.removeAll()
     }
