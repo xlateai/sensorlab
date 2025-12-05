@@ -122,7 +122,8 @@ fn main() -> Result<()> {
                         if audio_enabled_for_rf.load(Ordering::SeqCst) {
                             if downsample_counter == 0 {
                                 // Amplify the sample for better audibility (HackRF samples are typically small)
-                                let amplified = i_val * 10.0; // Amplify by 10x
+                                // Reduced amplification to prevent clipping/crackling
+                                let amplified = i_val * 5.0; // Amplify by 5x (reduced from 10x)
                                 let clamped = amplified.max(-1.0).min(1.0); // Clamp to valid range
                                 // Send this sample
                                 if audio_sender.send(clamped).is_err() {
@@ -185,21 +186,43 @@ fn run_audio_thread(
     const AUDIO_SAMPLE_RATE: u32 = 44100;
     
     let host = cpal::default_host();
+    
+    // List available devices for debugging
+    let devices: Vec<_> = host.output_devices()?.collect();
+    println!("Available audio output devices:");
+    for (idx, dev) in devices.iter().enumerate() {
+        if let Ok(name) = dev.name() {
+            println!("  {}: {}", idx, name);
+        }
+    }
+    
     let device = host
         .default_output_device()
         .ok_or_else(|| anyhow::anyhow!("No audio output device found"))?;
     
-    println!("Audio device: {}", device.name()?);
+    let device_name = device.name()?;
+    println!("Using audio device: {}", device_name);
     
-    let config = StreamConfig {
-        channels: 1,
-        sample_rate: SampleRate(AUDIO_SAMPLE_RATE),
-        buffer_size: cpal::BufferSize::Default,
-    };
+    // Get supported config
+    let supported_config = device.default_output_config()?;
+    println!("Audio config: {:?}, sample rate: {:?}", supported_config, supported_config.sample_rate());
+    
+    // Use the device's preferred config, but try to set our desired sample rate
+    let mut config = supported_config.config();
+    
+    // Try to use our desired sample rate, or fall back to device default
+    if config.sample_rate.0 != AUDIO_SAMPLE_RATE {
+        // Try to set our desired sample rate
+        config.sample_rate = SampleRate(AUDIO_SAMPLE_RATE);
+    }
+    
+    println!("Audio stream config: channels={}, sample_rate={:?}, buffer_size={:?}", 
+             config.channels, config.sample_rate, config.buffer_size);
     
     // Shared buffer for audio samples (thread-safe)
     let sample_buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
-    const BUFFER_SIZE: usize = 4096; // Keep a reasonable buffer
+    const BUFFER_SIZE: usize = 8192; // Larger buffer to prevent underruns
+    const MIN_BUFFER_BEFORE_START: usize = 2048; // Pre-fill buffer before starting
     
     let mut stream_opt: Option<cpal::Stream> = None;
     
@@ -238,41 +261,33 @@ fn run_audio_thread(
         let should_be_enabled = audio_enabled.load(Ordering::SeqCst);
         
         if should_be_enabled && stream_opt.is_none() {
+            // Wait for buffer to fill before starting
+            let buffer = sample_buffer.lock().unwrap();
+            if buffer.len() < MIN_BUFFER_BEFORE_START {
+                drop(buffer);
+                thread::sleep(Duration::from_millis(50));
+                continue; // Check again next iteration
+            }
+            let buffer_size_before = buffer.len();
+            drop(buffer);
+            
             // Start audio stream
-            println!("Starting audio stream...");
+            println!("Starting audio stream (buffer has {} samples)...", buffer_size_before);
             let sample_format = device.default_output_config()?.sample_format();
             println!("Audio sample format: {:?}", sample_format);
             let sample_buffer_for_callback = Arc::clone(&sample_buffer);
-            let buffer_size_before = sample_buffer.lock().unwrap().len();
-            println!("Audio buffer size before starting: {}", buffer_size_before);
             
             let stream = match sample_format {
                 SampleFormat::F32 => {
-                    let underrun_counter = Arc::new(Mutex::new(0u64));
-                    let underrun_counter_clone = Arc::clone(&underrun_counter);
                     let stream = device.build_output_stream(
                         &config,
                         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                             let mut buf = sample_buffer_for_callback.lock().unwrap();
-                            let buf_len_before = buf.len();
-                            let mut underruns = 0;
                             for output_sample in data.iter_mut() {
                                 if !buf.is_empty() {
                                     *output_sample = buf.remove(0); // FIFO - remove from front
                                 } else {
                                     *output_sample = 0.0; // Silence if no samples available
-                                    underruns += 1;
-                                }
-                            }
-                            // Debug: warn if buffer is getting low
-                            if buf_len_before < 100 && buf_len_before > 0 {
-                                println!("Audio buffer low: {} samples remaining", buf_len_before);
-                            }
-                            if underruns > 0 {
-                                let mut count = underrun_counter_clone.lock().unwrap();
-                                *count += underruns;
-                                if *count % 1000 == 0 {
-                                    println!("Audio underruns: {} (buffer was empty)", *count);
                                 }
                             }
                         },
@@ -329,10 +344,13 @@ fn run_audio_thread(
                 stream_opt = Some(s);
             }
         } else if !should_be_enabled && stream_opt.is_some() {
-            // Stop audio stream
+            // Stop audio stream by dropping it
             println!("Stopping audio stream...");
-            stream_opt = None;
+            if let Some(stream) = stream_opt.take() {
+                drop(stream); // Explicitly drop to stop playback
+            }
             sample_buffer.lock().unwrap().clear();
+            println!("Audio stream stopped.");
         }
         
         thread::sleep(Duration::from_millis(100));
