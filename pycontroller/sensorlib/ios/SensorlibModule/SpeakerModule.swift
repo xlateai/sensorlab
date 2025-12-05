@@ -14,7 +14,6 @@ struct AudioSamplesInput: Record {
 final class SpeakerModule {
   static let shared = SpeakerModule()
   
-  private var engine: AVAudioEngine?
   private var player: AVAudioPlayerNode?
 
   private var sampleRate: Double = 44100
@@ -38,63 +37,52 @@ final class SpeakerModule {
     self.sampleRate = sampleRate
     self.channels = channelCount
 
-    // Configure audio session for playback
-    let audioSession = AVAudioSession.sharedInstance()
+    // Configure audio session for playback (shared with microphone)
     print("[SpeakerModule] initializeSpeakers - configuring AVAudioSession")
     do {
-      // Try to deactivate first to ensure clean state
-      try? audioSession.setActive(false)
-      
-      // Set category with defaultToSpeaker option to route to built-in speakers
-      // Use playAndRecord to allow potential simultaneous microphone usage
-      try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-      try audioSession.setActive(true)
+      try SharedAudioEngine.shared.configureAudioSession()
     } catch {
       // Fallback: try without options if it fails
       do {
+        let audioSession = AVAudioSession.sharedInstance()
+        try? audioSession.setActive(false)
         try audioSession.setCategory(.playAndRecord, mode: .default)
         try audioSession.setActive(true)
       } catch {
         // If that also fails, just try to activate (might already be configured)
-        try? audioSession.setActive(true)
+        try? AVAudioSession.sharedInstance().setActive(true)
       }
     }
 
-    // If speakers are already initialized and we have a running engine and player,
+    // Use shared audio engine
+    let engine = SharedAudioEngine.shared.getOrCreateEngine()
+    SharedAudioEngine.shared.acquireSpeakers()
+
+    // If speakers are already initialized and we have a player,
     // just make sure the engine is running and return.
-    if speakersInitialized, let existingEngine = engine, let existingPlayer = player {
+    if speakersInitialized, let existingPlayer = player {
       print("[SpeakerModule] initializeSpeakers - reusing existing speakers configuration")
       DispatchQueue.main.async {
+        guard existingPlayer.engine === engine else {
+          print("[SpeakerModule] initializeSpeakers - WARNING: existing player.engine mismatch, not calling play()")
+          return
+        }
+        
+        // Ensure engine is running
         do {
-          if !existingEngine.isRunning {
-            print("[SpeakerModule] initializeSpeakers - restarting existing AVAudioEngine")
-            try existingEngine.start()
-          } else {
-            print("[SpeakerModule] initializeSpeakers - existing engine already running")
-          }
-          
-          guard existingPlayer.engine === existingEngine else {
-            print("[SpeakerModule] initializeSpeakers - WARNING: existing player.engine mismatch, not calling play()")
-            return
-          }
-          
-          print("[SpeakerModule] initializeSpeakers - ensuring player is playing")
-          if !existingPlayer.isPlaying {
-            existingPlayer.play()
-          }
+          try SharedAudioEngine.shared.startEngineIfNeeded()
         } catch {
-          print("[SpeakerModule] initializeSpeakers - failed to restart existing engine: \(error.localizedDescription)")
+          print("[SpeakerModule] initializeSpeakers - failed to start engine: \(error.localizedDescription)")
+          return
+        }
+        
+        print("[SpeakerModule] initializeSpeakers - ensuring player is playing")
+        if !existingPlayer.isPlaying {
+          existingPlayer.play()
         }
       }
       return
     }
-
-    // First-time speaker initialization: create dedicated engine / player graph.
-    if engine == nil {
-      print("[SpeakerModule] initializeSpeakers - creating dedicated AVAudioEngine for speakers")
-      engine = AVAudioEngine()
-    }
-    guard let engine = engine else { return }
     
     let format = AVAudioFormat(
       commonFormat: .pcmFormatFloat32,
@@ -108,12 +96,12 @@ final class SpeakerModule {
       self.scheduledFrameCount = 0
     }
     
-    // Configure player and engine graph on the main thread to avoid race conditions
-    DispatchQueue.main.async {
+    // Safely modify engine graph (will stop/start if needed)
+    try SharedAudioEngine.shared.withEngineModification { engine in
       // Check if player already exists (shouldn't happen, but be safe)
       if self.player == nil {
         let player = AVAudioPlayerNode()
-        print("[SpeakerModule] initializeSpeakers - creating AVAudioPlayerNode on main thread (first init)")
+        print("[SpeakerModule] initializeSpeakers - creating AVAudioPlayerNode (first init)")
         
         self.player = player
         self.format = format
@@ -125,26 +113,25 @@ final class SpeakerModule {
         print("[SpeakerModule] initializeSpeakers - player already exists, updating format only")
         self.format = format
       }
-      
+    }
+    
+    // Configure player on main thread after graph is set up
+    DispatchQueue.main.async {
       guard let player = self.player else {
         print("[SpeakerModule] initializeSpeakers - ERROR: player is nil after setup")
         return
       }
       
+      guard player.engine === engine else {
+        print("[SpeakerModule] initializeSpeakers - WARNING: player.engine is not the expected engine, skipping play() (first init)")
+        return
+      }
+      
+      // Ensure engine is running
       do {
-        if !engine.isRunning {
-          print("[SpeakerModule] initializeSpeakers - starting AVAudioEngine on main thread (first init)")
-          try engine.start()
-        } else {
-          print("[SpeakerModule] initializeSpeakers - engine already running (main thread, first init)")
-        }
+        try SharedAudioEngine.shared.startEngineIfNeeded()
         
-        guard player.engine === engine else {
-          print("[SpeakerModule] initializeSpeakers - WARNING: player.engine is not the expected engine, skipping play() (first init)")
-          return
-        }
-        
-        print("[SpeakerModule] initializeSpeakers - starting player node on main thread (first init)")
+        print("[SpeakerModule] initializeSpeakers - starting player node (first init)")
         if !player.isPlaying {
           player.play()
         }
@@ -201,16 +188,10 @@ final class SpeakerModule {
     queue.async {
       self.scheduledFrameCount = 0
     }
-    // Stop and reset engine
-    engine?.stop()
-    engine?.reset()
-    engine = nil
-    // Deactivate audio session
-    do {
-      try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    } catch {
-      // Ignore errors when deactivating
-    }
+    // Release speakers reference (engine will stop if microphone also inactive)
+    SharedAudioEngine.shared.releaseSpeakers()
+    // Only deactivate audio session if both modules are inactive
+    SharedAudioEngine.shared.deactivateAudioSessionIfNeeded()
   }
 }
 

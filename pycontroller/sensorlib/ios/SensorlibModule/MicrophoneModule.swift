@@ -5,7 +5,6 @@ import AVFoundation
 final class MicrophoneModule {
   static let shared = MicrophoneModule()
   
-  private var engine: AVAudioEngine?
   private var inputNode: AVAudioInputNode?
   
   private var inputFormat: AVAudioFormat?
@@ -79,88 +78,79 @@ final class MicrophoneModule {
       print("[MicrophoneModule] initializeMicrophone - permission already granted")
     }
 
-    // Configure audio session for recording
+    // Configure audio session for recording (shared with speakers)
     do {
-      // Try to deactivate first to ensure clean state
-      try? audioSession.setActive(false)
-      
-      // Set category for recording - use playAndRecord to allow potential simultaneous playback
-      try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-      try audioSession.setActive(true)
-      print("[MicrophoneModule] initializeMicrophone - AVAudioSession configured successfully")
+      try SharedAudioEngine.shared.configureAudioSession()
     } catch {
       // Fallback: try without options if it fails
       print("[MicrophoneModule] initializeMicrophone - AVAudioSession primary configuration failed: \(error.localizedDescription)")
       do {
+        let audioSession = AVAudioSession.sharedInstance()
+        try? audioSession.setActive(false)
         try audioSession.setCategory(.playAndRecord, mode: .default)
         try audioSession.setActive(true)
       } catch {
         // If that also fails, just try to activate (might already be configured)
-        try? audioSession.setActive(true)
+        try? AVAudioSession.sharedInstance().setActive(true)
       }
       print("[MicrophoneModule] initializeMicrophone - AVAudioSession fallback activation attempted")
     }
 
-    // Create dedicated engine for microphone
-    if engine == nil {
-      print("[MicrophoneModule] initializeMicrophone - creating dedicated AVAudioEngine for microphone")
-      engine = AVAudioEngine()
-    }
-    guard let engine = engine else { return }
+    // Use shared audio engine
+    let engine = SharedAudioEngine.shared.getOrCreateEngine()
+    SharedAudioEngine.shared.acquireMicrophone()
     
-    let inputNode = engine.inputNode
-    self.inputNode = inputNode
-    
-    // IMPORTANT: For installTap, the format must match the node's output format (or be nil).
-    // Using a mismatched format will cause an abort with "Failed to create tap due to format mismatch".
-    let inputFormat = inputNode.outputFormat(forBus: 0)
-    print("[MicrophoneModule] initializeMicrophone - inputNode.outputFormat: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount), commonFormat=\(inputFormat.commonFormat.rawValue), interleaved=\(inputFormat.isInterleaved)")
-    
-    // Store the actual input format we are tapping from
-    self.inputFormat = inputFormat
-    
-    // Clear microphone samples buffer
-    queue.async {
-      self.microphoneSamples.removeAll()
-    }
-
-    // Install tap on input node to capture audio
-    let bufferSize: AVAudioFrameCount = 4096
-    print("[MicrophoneModule] initializeMicrophone - installing tap with bufferSize=\(bufferSize) using inputNode.outputFormat")
-    
-    // Remove any existing tap first (shouldn't be needed, but be safe)
-    inputNode.removeTap(onBus: 0)
-    
-    inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer, time) in
-      guard let self = self, let channelData = buffer.floatChannelData else { return }
+    // Safely modify engine graph (will stop/start if needed)
+    try SharedAudioEngine.shared.withEngineModification { engine in
+      let inputNode = engine.inputNode
+      self.inputNode = inputNode
       
-      let frameLength = Int(buffer.frameLength)
-      let channelCount = Int(buffer.format.channelCount)
+      // IMPORTANT: For installTap, the format must match the node's output format (or be nil).
+      // Using a mismatched format will cause an abort with "Failed to create tap due to format mismatch".
+      let inputFormat = inputNode.outputFormat(forBus: 0)
+      print("[MicrophoneModule] initializeMicrophone - inputNode.outputFormat: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount), commonFormat=\(inputFormat.commonFormat.rawValue), interleaved=\(inputFormat.isInterleaved)")
       
-      // Extract samples from buffer (non-interleaved format, so each channel is separate)
-      // For now, read from first channel only, or combine all channels if needed
-      var samples: [Float] = []
-      if channelCount == 1 {
-        // Mono: just read from first channel
-        samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-      } else {
-        // Multi-channel: average all channels to mono, or take first channel
-        // For simplicity, taking first channel - can be extended later
-        samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+      // Store the actual input format we are tapping from
+      self.inputFormat = inputFormat
+      
+      // Clear microphone samples buffer
+      queue.async {
+        self.microphoneSamples.removeAll()
       }
+
+      // Install tap on input node to capture audio
+      let bufferSize: AVAudioFrameCount = 4096
+      print("[MicrophoneModule] initializeMicrophone - installing tap with bufferSize=\(bufferSize) using inputNode.outputFormat")
       
-      self.queue.async {
-        self.microphoneSamples.append(contentsOf: samples)
+      // Remove any existing tap first (shouldn't be needed, but be safe)
+      inputNode.removeTap(onBus: 0)
+      
+      inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer, time) in
+        guard let self = self, let channelData = buffer.floatChannelData else { return }
+        
+        let frameLength = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        
+        // Extract samples from buffer (non-interleaved format, so each channel is separate)
+        // For now, read from first channel only, or combine all channels if needed
+        var samples: [Float] = []
+        if channelCount == 1 {
+          // Mono: just read from first channel
+          samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+        } else {
+          // Multi-channel: average all channels to mono, or take first channel
+          // For simplicity, taking first channel - can be extended later
+          samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+        }
+        
+        self.queue.async {
+          self.microphoneSamples.append(contentsOf: samples)
+        }
       }
     }
-
-    // Start engine if not already running
-    if !engine.isRunning {
-      print("[MicrophoneModule] initializeMicrophone - starting AVAudioEngine")
-      try engine.start()
-    } else {
-      print("[MicrophoneModule] initializeMicrophone - engine already running")
-    }
+    
+    // Ensure engine is running
+    try SharedAudioEngine.shared.startEngineIfNeeded()
     print("[MicrophoneModule] initializeMicrophone - completed successfully")
   }
 
@@ -179,16 +169,10 @@ final class MicrophoneModule {
     queue.async {
       self.microphoneSamples.removeAll()
     }
-    // Stop and reset engine
-    engine?.stop()
-    engine?.reset()
-    engine = nil
-    // Deactivate audio session
-    do {
-      try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    } catch {
-      // Ignore errors when deactivating
-    }
+    // Release microphone reference (engine will stop if speakers also inactive)
+    SharedAudioEngine.shared.releaseMicrophone()
+    // Only deactivate audio session if both modules are inactive
+    SharedAudioEngine.shared.deactivateAudioSessionIfNeeded()
   }
 }
 
