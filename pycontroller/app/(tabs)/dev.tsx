@@ -15,17 +15,18 @@ import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
 import SensorlibModule from 'sensorlib';
 
-// libp2p imports
-import { createLibp2p } from 'libp2p';
-import { webSockets } from '@libp2p/websockets';
-import { mdns } from '@libp2p/mdns';
-import { noise } from '@libp2p/noise';
-import { mplex } from '@libp2p/mplex';
-import { peerIdFromString } from '@libp2p/peer-id';
-import type { Libp2p } from 'libp2p';
+// mDNS / DNS-SD (native only; you'll need to install `react-native-zeroconf`)
+// On web this will be unused.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Zeroconf: any = Platform.OS === 'web' ? null : require('react-native-zeroconf').default ?? require('react-native-zeroconf');
 
-// Protocol name for mouse control
-const PROTOCOL_NAME = '/mouse-control/1.0.0';
+// mDNS service types
+const MAGNETO_SERVICE_TYPE = '_magneto._tcp.local.';
+const MOUSE_SERVICE_TYPE = '_pymouse._tcp.local.';
+
+// Fallback URLs (used if mDNS discovery fails)
+const FALLBACK_MAGNETO_WS_URL = 'ws://172.20.10.3:8765';
+// No fallback for mouse service - must be discovered
 
 const screenHeight = Dimensions.get('window').height;
 const screenWidth = Dimensions.get('window').width;
@@ -1041,18 +1042,19 @@ export default function DevScreen() {
   const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
   const [paused, setPaused] = useState(true); // default to paused
 
-  // libp2p node
-  const libp2pRef = useRef<Libp2p | null>(null);
-  const [discoveredPeerId, setDiscoveredPeerId] = useState<string>('');
-  const [mdnsStatus, setMdnsStatus] = useState<string>('Initializing libp2p...');
-  const [manualMouseIP, setManualMouseIP] = useState<string>(''); // Manual IP entry
-  const [showManualIPInput, setShowManualIPInput] = useState<boolean>(false);
+  // mDNS discovered URLs
+  const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
+  const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
+  const [mdnsStatus, setMdnsStatus] = useState<string>('Discovering...');
+  const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
+  const zeroconfRef = useRef<any | null>(null);
   
-  // Magnetometer -> Python streaming (keeping WebSocket for now, can be migrated later)
+  // Magnetometer -> Python streaming
   const magnetoWsRef = useRef<WebSocket | null>(null);
   const [magnetoStreaming, setMagnetoStreaming] = useState(false);
   
-  // Mouse control -> libp2p
+  // Mouse control -> Python streaming
+  const mouseWsRef = useRef<WebSocket | null>(null);
   const [mouseControlActive, setMouseControlActive] = useState(false);
   const [touchpadVisible, setTouchpadVisible] = useState(false);
   
@@ -1094,95 +1096,265 @@ export default function DevScreen() {
   const gyroSubRef = useRef<any>(null);
   const baroSubRef = useRef<any>(null);
   
-  // No IP brute force scanning - we rely entirely on mDNS discovery
-  // Manual IP entry is available as a fallback if mDNS doesn't work
-  
-  // Function to restart mDNS discovery
-  const restartMdnsDiscovery = React.useCallback(() => {
-    if (libp2pRef.current) {
-      setMdnsStatus('mDNS discovery is running...');
-      console.log('[libp2p] mDNS discovery is active');
-    }
-  }, []);
-  
-  // Handle manual IP entry (for libp2p, we'd need to dial the peer directly)
-  const handleManualIPSubmit = () => {
-    if (manualMouseIP.trim()) {
-      // Validate IP format (basic check)
-      const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-      if (ipPattern.test(manualMouseIP.trim())) {
-        // For libp2p, we'd dial the peer at this IP
-        // This is a simplified version - in practice you'd need the peer ID
-        setMdnsStatus(`Manual IP entry not fully supported with libp2p. Use discovery instead.`);
-        setShowManualIPInput(false);
-      } else {
-        setMdnsStatus('Invalid IP format. Use format: 192.168.1.100');
-      }
-    }
-  };
-
-  // libp2p initialization and mDNS discovery
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      setMdnsStatus('libp2p not fully supported on web - use native app');
+  // Service discovery using HTTP discovery endpoint
+  // The Python server provides an HTTP endpoint at /discover for service discovery
+  const discoverServices = React.useCallback(async () => {
+    // Don't discover if we already have the mouse service URL
+    if (mouseWsUrl) {
       return;
     }
-
-    let mounted = true;
-
-    const initLibp2p = async () => {
-      try {
-        const node = await createLibp2p({
-          transports: [webSockets()],
-          peerDiscovery: [
-            mdns({
-              interval: 10000, // Discover peers every 10 seconds
-            }),
-          ],
-          connectionEncrypters: [noise()],
-          streamMuxers: [mplex()],
-        });
-
-        libp2pRef.current = node;
-
-        // Listen for peer discovery events
-        node.addEventListener('peer:discovery', (evt) => {
-          const peerId = evt.detail.id.toString();
-          console.log('[libp2p] Discovered peer:', peerId);
-          if (mounted) {
-            setDiscoveredPeerId(peerId);
-            setMdnsStatus(`Discovered peer: ${peerId.substring(0, 8)}...`);
+    
+    if (isDiscovering) return; // Prevent concurrent discoveries
+    
+    setIsDiscovering(true);
+    setMdnsStatus('Discovering services...');
+      
+      // Extract service names from mDNS service types
+      // MOUSE_SERVICE_TYPE = "_pymouse._tcp.local." -> service name is "pymouse"
+      // MAGNETO_SERVICE_TYPE = "_magneto._tcp.local." -> service name is "magneto"
+      const mouseServiceName = MOUSE_SERVICE_TYPE.split('_')[1].split('.')[0]; // "pymouse"
+      const magnetoServiceName = MAGNETO_SERVICE_TYPE.split('_')[1].split('.')[0]; // "magneto"
+      
+      // Discovery ports for each service
+      const mouseDiscoveryPort = 8767; // HTTP discovery port for mouse service
+      const magnetoDiscoveryPort = 8768; // HTTP discovery port for magnetometer service
+      
+      // Helper to try discovering a service at a specific IP
+      const tryDiscoverService = async (
+        ip: string,
+        port: number,
+        serviceName: string,
+        serviceType: string
+      ): Promise<string | null> => {
+        try {
+          const discoveryUrl = `http://${ip}:${port}/discover`;
+          const controller = new AbortController();
+          
+          // Faster timeout (500ms) for quicker discovery
+          const timeoutId = setTimeout(() => controller.abort(), 500);
+          
+          const response = await fetch(discoveryUrl, {
+            method: 'GET',
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.service === serviceName && data.ws_url) {
+              // Don't log here - let the caller log once
+              return data.ws_url;
+            }
           }
-        });
-
-        // Start the node
-        await node.start();
-        console.log('[libp2p] Node started with peer ID:', node.peerId.toString());
+        } catch (e: any) {
+          // Silently fail - we'll try many IPs in parallel
+        }
+        return null;
+      };
+      
+      // Build list of IPs to try - optimized for speed
+      const ipsToTry: string[] = [];
+      
+      // First, try the most likely IP (previously in fallback)
+      const likelyIP = '172.20.10.3';
+      ipsToTry.push(likelyIP);
+      
+      // Then add a smaller set of common IP ranges (reduced for speed)
+      const commonIPRanges = [
+        '172.20.10.3',  // Common hotspot IP (already added)
+        '192.168.1.1',  // Common router IP
+        '192.168.0.1',  // Alternative router IP
+      ];
+      
+      for (const baseIP of commonIPRanges) {
+        const ipParts = baseIP.split('.');
+        const base = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+        // Scan only first 3 IPs per range for speed (reduced from 5)
+        for (let i = 1; i <= 3; i++) {
+          const testIP = `${base}.${i}`;
+          if (!ipsToTry.includes(testIP)) {
+            ipsToTry.push(testIP);
+          }
+        }
+      }
+      
+      let discoveredMouseUrl: string | null = null;
+      let discoveredMagnetoUrl: string | null = null;
+      let mouseLogged = false;
+      let magnetoLogged = false;
+      
+      // Try most likely IP first (fast path)
+      const [likelyMouse, likelyMagneto] = await Promise.all([
+        tryDiscoverService(likelyIP, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE),
+        tryDiscoverService(likelyIP, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE),
+      ]);
+      
+      if (likelyMouse) {
+        discoveredMouseUrl = likelyMouse;
+        if (!mouseLogged) {
+          console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${likelyMouse}`);
+          mouseLogged = true;
+        }
+      }
+      if (likelyMagneto) {
+        discoveredMagnetoUrl = likelyMagneto;
+        if (!magnetoLogged) {
+          console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${likelyMagneto}`);
+          magnetoLogged = true;
+        }
+      }
+      
+      // If we found both on the likely IP, we're done!
+      if (!discoveredMouseUrl || !discoveredMagnetoUrl) {
+        // Try remaining IPs in parallel with higher concurrency
+        // But only if we still need to find something
+        const remainingIPs = ipsToTry.filter(ip => ip !== likelyIP);
+        const MAX_CONCURRENT = 12; // Increased concurrency for faster scanning
         
-        if (mounted) {
-          setMdnsStatus(`libp2p ready. Peer ID: ${node.peerId.toString().substring(0, 8)}...`);
+        // Process in chunks so we can stop early if we find what we need
+        for (let i = 0; i < remainingIPs.length; i += MAX_CONCURRENT) {
+          const chunk = remainingIPs.slice(i, i + MAX_CONCURRENT);
+          
+          const promises = chunk.flatMap(ip => [
+            !discoveredMouseUrl 
+              ? tryDiscoverService(ip, mouseDiscoveryPort, mouseServiceName, MOUSE_SERVICE_TYPE)
+                  .then(url => { 
+                    if (url && !discoveredMouseUrl) {
+                      discoveredMouseUrl = url;
+                      if (!mouseLogged) {
+                        console.log(`[Discovery] Found ${MOUSE_SERVICE_TYPE} service at ${url}`);
+                        mouseLogged = true;
+                      }
+                    }
+                    return url; 
+                  })
+              : Promise.resolve(null),
+            !discoveredMagnetoUrl
+              ? tryDiscoverService(ip, magnetoDiscoveryPort, magnetoServiceName, MAGNETO_SERVICE_TYPE)
+                  .then(url => { 
+                    if (url && !discoveredMagnetoUrl) {
+                      discoveredMagnetoUrl = url;
+                      if (!magnetoLogged) {
+                        console.log(`[Discovery] Found ${MAGNETO_SERVICE_TYPE} service at ${url}`);
+                        magnetoLogged = true;
+                      }
+                    }
+                    return url; 
+                  })
+              : Promise.resolve(null),
+          ]);
+          
+          await Promise.all(promises);
+          
+          // Stop early if we found both services
+          if (discoveredMouseUrl && discoveredMagnetoUrl) {
+            break;
+          }
         }
-      } catch (err) {
-        console.error('[libp2p] Failed to initialize:', err);
-        if (mounted) {
-          setMdnsStatus(`libp2p initialization failed: ${err}`);
+      }
+      
+      if (discoveredMouseUrl) {
+        setMouseWsUrl(discoveredMouseUrl);
+      } else {
+        setMouseWsUrl(''); // No fallback for mouse service
+        console.warn('[Discovery] Mouse service not found after scanning', ipsToTry.length, 'IPs');
+      }
+      
+      if (discoveredMagnetoUrl) {
+        setMagnetoWsUrl(discoveredMagnetoUrl);
+      } else {
+        setMagnetoWsUrl(FALLBACK_MAGNETO_WS_URL);
+      }
+      
+      if (discoveredMouseUrl && discoveredMagnetoUrl) {
+        const discoveredIP = (discoveredMouseUrl as string).split(':')[1].slice(2);
+        setMdnsStatus(`Discovered services at ${discoveredIP}`);
+      } else if (discoveredMouseUrl) {
+        const discoveredIP = (discoveredMouseUrl as string).split(':')[1].slice(2);
+        setMdnsStatus(`Mouse service found at ${discoveredIP} (magneto using fallback)`);
+      } else if (discoveredMagnetoUrl) {
+        const discoveredIP = (discoveredMagnetoUrl as string).split(':')[1].slice(2);
+        setMdnsStatus(`Magneto service found at ${discoveredIP} (mouse not found)`);
+      } else {
+        setMdnsStatus('Mouse service not found - ensure pymouse.py is running');
+      }
+      
+      setIsDiscovering(false);
+  }, [isDiscovering, mouseWsUrl]);
+
+  // mDNS discovery using native DNS-SD (react-native-zeroconf)
+  useEffect(() => {
+    if (!Zeroconf || Platform.OS === 'web') {
+      return;
+    }
+    const zeroconf = new Zeroconf();
+    zeroconfRef.current = zeroconf;
+    const handleResolved = (service: any) => {
+      try {
+        const serviceName = (service.name || '').toLowerCase();
+        const serviceType = (service.type || '').toLowerCase();
+        const host =
+          (service.addresses && service.addresses[0]) ||
+          service.host ||
+          '';
+        const port = service.port;
+        if (!host || !port) {
+          return;
         }
+        const wsUrl = `ws://${host}:${port}`;
+        // Match pymouse service
+        if (
+          serviceName.includes('pymouse') ||
+          serviceType.includes('pymouse')
+        ) {
+          setMouseWsUrl((prev) => prev || wsUrl);
+          setMdnsStatus(`mDNS: Mouse service at ${host}:${port}`);
+        }
+        // Match magneto service
+        if (
+          serviceName.includes('magneto') ||
+          serviceType.includes('magneto')
+        ) {
+          setMagnetoWsUrl((prev) => prev || wsUrl);
+          setMdnsStatus(`mDNS: Magneto service at ${host}:${port}`);
+        }
+      } catch (e) {
+        console.warn('[mDNS] Error handling resolved service', e);
       }
     };
-
-    initLibp2p();
-
+    const handleError = (err: any) => {
+      console.warn('[mDNS] Zeroconf error', err);
+    };
+    zeroconf.on('resolved', handleResolved);
+    zeroconf.on('error', handleError);
+    try {
+      // Types here are without leading underscores: "pymouse" -> "_pymouse._tcp.local."
+      zeroconf.scan('pymouse', 'tcp', 'local.');
+      zeroconf.scan('magneto', 'tcp', 'local.');
+      setMdnsStatus('Discovering services via mDNS...');
+    } catch (e) {
+      console.warn('[mDNS] Failed to start scan', e);
+    }
     return () => {
-      mounted = false;
-      if (libp2pRef.current) {
-        libp2pRef.current.stop().catch(console.error);
-        libp2pRef.current = null;
+      try {
+        zeroconf.removeListener('resolved', handleResolved);
+        zeroconf.removeListener('error', handleError);
+        zeroconf.stop();
+        zeroconf.close();
+      } catch {
+        // ignore
       }
+      zeroconfRef.current = null;
     };
   }, []);
   
-  // mDNS discovery happens automatically via the Zeroconf useEffect below
-  // No need for IP scanning - mDNS is the proper way to discover services
+  // Initial discovery on mount - only if we don't have mouse service yet
+  useEffect(() => {
+    if (!mouseWsUrl && !isDiscovering) {
+      discoverServices();
+    }
+  }, []); // Only run once on mount
 
   // Helper to kill all listeners
   const killAllListeners = () => {
@@ -1241,29 +1413,55 @@ export default function DevScreen() {
     }
   };
 
-  // Send message via libp2p stream
-  const sendMouseMessage = async (message: any) => {
-    if (!libp2pRef.current || !discoveredPeerId) {
-      console.warn('[Mouse] libp2p not ready or no peer discovered');
+  const connectMouseSocket = () => {
+    if (!mouseWsUrl) {
+      console.warn('[Mouse] No mouse service URL available - discovery may have failed');
       return;
     }
 
+    if (mouseWsRef.current && 
+      (mouseWsRef.current.readyState === WebSocket.OPEN || 
+       mouseWsRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     try {
-      const peerId = peerIdFromString(discoveredPeerId);
-      const payload = new TextEncoder().encode(JSON.stringify(message));
-      
-      // Open a stream to the peer using our protocol
-      const stream = await libp2pRef.current.dialProtocol(peerId, PROTOCOL_NAME);
-      
-      // Send the message over the stream
-      await stream.write(payload);
-
-      // Close the stream after sending
-      await stream.close();
-      console.log('[Mouse] Message sent successfully');
+      const ws = new WebSocket(mouseWsUrl);
+      ws.onopen = () => {
+        console.log('[Mouse] WebSocket connected');
+      };
+      ws.onerror = (event) => {
+        console.warn('[Mouse] WebSocket error', event);
+      };
+      ws.onclose = () => {
+        console.log('[Mouse] WebSocket closed');
+      };
+      mouseWsRef.current = ws;
     } catch (err) {
-      console.warn('[Mouse] Failed to send message via libp2p:', err);
-      setMdnsStatus(`Failed to send: ${err}`);
+      console.warn('[Mouse] Failed to open WebSocket', err);
+    }
+  };
+
+  const disconnectMouseSocket = () => {
+    if (mouseWsRef.current) {
+      try {
+        // Send end event before closing to reset mouse tracking
+        if (mouseWsRef.current.readyState === WebSocket.OPEN) {
+          const payload = JSON.stringify({
+            type: 'touch',
+            t: Date.now(),
+            action: 'end',
+            x: 0,
+            y: 0,
+            screenWidth: Math.round(screenWidth),
+            screenHeight: Math.round(screenHeight),
+          });
+          mouseWsRef.current.send(payload);
+        }
+        mouseWsRef.current.close();
+    } catch (err) {
+        console.warn('[Mouse] Error closing WebSocket', err);
+      }
+      mouseWsRef.current = null;
     }
   };
 
@@ -1353,31 +1551,18 @@ export default function DevScreen() {
     };
   }, [magnetoStreaming]);
 
-  // Handle mouse control activation
+  // Open / close WebSocket when mouse control toggled
   useEffect(() => {
     if (mouseControlActive) {
-      if (!discoveredPeerId) {
-        setMdnsStatus('No peer discovered yet - waiting for discovery...');
-        setMouseControlActive(false);
+      connectMouseSocket();
       } else {
-        setMdnsStatus(`Connected to peer: ${discoveredPeerId.substring(0, 8)}...`);
-      }
-    } else {
+      disconnectMouseSocket();
       setTouchpadVisible(false);
-      // Send end event when deactivating
-      if (discoveredPeerId) {
-        sendMouseMessage({
-          type: 'touch',
-          t: Date.now(),
-          action: 'end',
-          x: 0,
-          y: 0,
-          screenWidth: Math.round(screenWidth),
-          screenHeight: Math.round(screenHeight),
-        }).catch(console.error);
-      }
     }
-  }, [mouseControlActive, discoveredPeerId]);
+    return () => {
+      disconnectMouseSocket();
+    };
+  }, [mouseControlActive, mouseWsUrl]);
 
   // Push latest magnetometer readings over WebSocket
   useEffect(() => {
@@ -1709,8 +1894,8 @@ export default function DevScreen() {
             <Pressable
               onPress={() => {
                 if (!mouseControlActive) {
-                  if (!discoveredPeerId) {
-                    setMdnsStatus('Peer not discovered yet - cannot start');
+                  if (!mouseWsUrl) {
+                    setMdnsStatus('Mouse service not found - cannot start');
                     return;
                   }
                   setMouseControlActive(true);
@@ -1721,7 +1906,7 @@ export default function DevScreen() {
                 }
               }}
               style={{
-                backgroundColor: mouseControlActive ? '#43a047' : (!discoveredPeerId ? '#666' : '#222'),
+                backgroundColor: mouseControlActive ? '#43a047' : (!mouseWsUrl ? '#666' : '#222'),
                 paddingHorizontal: 36,
                 paddingVertical: 14,
                 borderRadius: 32,
@@ -1731,111 +1916,39 @@ export default function DevScreen() {
                 shadowRadius: 4,
                 elevation: 2,
                 marginBottom: 4,
-                opacity: !discoveredPeerId ? 0.5 : 1,
+                opacity: !mouseWsUrl ? 0.5 : 1,
               }}
             >
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
-                {mouseControlActive ? 'Stop Mouse Control' : (!discoveredPeerId ? 'Peer Not Discovered' : 'Start Mouse Control')}
+                {mouseControlActive ? 'Stop Mouse Control' : (!mouseWsUrl ? 'Mouse Service Not Found' : 'Start Mouse Control')}
               </Text>
             </Pressable>
             <Text style={{ color: '#888', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              {discoveredPeerId ? `Control mouse via touchpad over libp2p.` : 'Waiting for peer discovery via mDNS...'}
+              {mouseWsUrl ? `Control mouse via touchpad over WebSocket to Python at ${mouseWsUrl}.` : 'Mouse service discovery failed. Please ensure pymouse.py is running.'}
             </Text>
-            <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 8 }}>
               <Text style={{ color: '#666', fontSize: 10, textAlign: 'center' }}>
                 {mdnsStatus}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {!showManualIPInput ? (
-                  <>
+              {!mouseWsUrl && (
                     <Pressable
-                      onPress={restartMdnsDiscovery}
+                  onPress={discoverServices}
+                  disabled={isDiscovering}
                       style={{
-                        backgroundColor: '#39ff14',
+                    backgroundColor: isDiscovering ? '#444' : '#39ff14',
                         paddingHorizontal: 12,
                         paddingVertical: 4,
                         borderRadius: 4,
+                    opacity: isDiscovering ? 0.5 : 1,
                       }}
                     >
                       <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
-                        Retry mDNS
+                    {isDiscovering ? 'Discovering...' : 'Retry'}
                       </Text>
                     </Pressable>
-                    <Pressable
-                      onPress={() => setShowManualIPInput(true)}
-                      style={{
-                        backgroundColor: '#39ff14',
-                        paddingHorizontal: 12,
-                        paddingVertical: 4,
-                        borderRadius: 4,
-                      }}
-                    >
-                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
-                        Manual IP
-                      </Text>
-                    </Pressable>
-                  </>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <TextInput
-                      value={manualMouseIP}
-                      onChangeText={setManualMouseIP}
-                      placeholder="192.168.1.100"
-                      placeholderTextColor="#666"
-                      style={{
-                        backgroundColor: '#222',
-                        color: '#fff',
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 4,
-                        borderWidth: 1,
-                        borderColor: '#39ff14',
-                        fontSize: 10,
-                        minWidth: 100,
-                      }}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="numeric"
-                    />
-                    <Pressable
-                      onPress={handleManualIPSubmit}
-                      style={{
-                        backgroundColor: '#39ff14',
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 4,
-                      }}
-                    >
-                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>
-                        Set
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        setShowManualIPInput(false);
-                        setManualMouseIP('');
-                      }}
-                      style={{
-                        backgroundColor: '#666',
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 4,
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>
-                        Cancel
-                      </Text>
-                    </Pressable>
-                  </View>
                 )}
               </View>
-              {!discoveredPeerId && (
-                <Text style={{ color: '#888', fontSize: 9, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
-                  libp2p mDNS discovery is running. Make sure the Rust server is running and on the same network.
-                </Text>
-              )}
             </View>
-          </View>
 
         </View>
       </ScrollView>
@@ -1847,8 +1960,9 @@ export default function DevScreen() {
         animationType="fade"
         onRequestClose={() => {
           // Send end event before closing
-          if (mouseControlActive && discoveredPeerId) {
-            sendMouseMessage({
+          if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+            try {
+              const payload = JSON.stringify({
               type: 'touch',
               t: Date.now(),
               action: 'end',
@@ -1856,7 +1970,11 @@ export default function DevScreen() {
               y: 0,
               screenWidth: Math.round(screenWidth),
               screenHeight: Math.round(screenHeight),
-            }).catch(console.error);
+              });
+              mouseWsRef.current.send(payload);
+            } catch (err) {
+              console.warn('[Mouse] Failed to send end event', err);
+            }
           }
           setTouchpadVisible(false);
           setMouseControlActive(false);
@@ -1866,8 +1984,9 @@ export default function DevScreen() {
           <TouchpadComponent
             onDismiss={() => {
               // Send end event before closing
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'touch',
                   t: Date.now(),
                   action: 'end',
@@ -1875,14 +1994,19 @@ export default function DevScreen() {
                   y: 0,
                   screenWidth: Math.round(screenWidth),
                   screenHeight: Math.round(screenHeight),
-                }).catch(console.error);
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send end event', err);
+                }
               }
               setTouchpadVisible(false);
               setMouseControlActive(false);
             }}
             onTouchEvent={(action, x, y) => {
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'touch',
                   t: Date.now(),
                   action,
@@ -1890,21 +2014,31 @@ export default function DevScreen() {
                   y,
                   screenWidth: Math.round(screenWidth),
                   screenHeight: Math.round(screenHeight),
-                }).catch(console.error);
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send touch event', err);
+                }
               }
             }}
             onClick={(x, y) => {
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'click',
                   t: Date.now(),
                   button: 'left',
-                }).catch(console.error);
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send click event', err);
+                }
               }
             }}
             onDragEvent={(action, x, y) => {
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'drag',
                   t: Date.now(),
                   action,
@@ -1912,16 +2046,25 @@ export default function DevScreen() {
                   y,
                   screenWidth: Math.round(screenWidth),
                   screenHeight: Math.round(screenHeight),
-                }).catch(console.error);
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send drag event', err);
+                }
               }
             }}
             onScrollEvent={(deltaY) => {
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'scroll',
                   t: Date.now(),
                   deltaY,
-                }).catch(console.error);
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Mouse] Failed to send scroll event', err);
+                }
               }
             }}
             keyboardText={keyboardText}
@@ -1935,27 +2078,29 @@ export default function DevScreen() {
                 setKeyboardText(newText);
                 lastKeyboardTextRef.current = newText;
                 
-                if (mouseControlActive && discoveredPeerId) {
+                if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
                   try {
                     if (newText.length > oldText.length) {
                       // Text was added - send new characters
                       const addedChars = newText.slice(oldText.length);
                       for (const char of addedChars) {
-                        sendMouseMessage({
+                        const payload = JSON.stringify({
                           type: 'key',
                           t: Date.now(),
                           key: char,
-                        }).catch(console.error);
+                        });
+                        mouseWsRef.current.send(payload);
                       }
                     } else if (newText.length < oldText.length) {
                       // Text was deleted - send backspace
                       const deletedCount = oldText.length - newText.length;
                       for (let i = 0; i < deletedCount; i++) {
-                        sendMouseMessage({
+                        const payload = JSON.stringify({
                           type: 'key',
                           t: Date.now(),
                           key: 'backspace',
-                        }).catch(console.error);
+                        });
+                        mouseWsRef.current.send(payload);
                       }
                     } else if (newText !== oldText) {
                       // Text was modified in place
@@ -1967,19 +2112,21 @@ export default function DevScreen() {
                       
                       // Send backspaces for deleted characters
                       for (let j = 0; j < deletedFromPos; j++) {
-                        sendMouseMessage({
+                        const payload = JSON.stringify({
                           type: 'key',
                           t: Date.now(),
                           key: 'backspace',
-                        }).catch(console.error);
+                        });
+                        mouseWsRef.current.send(payload);
                       }
                       // Send new characters
                       for (let j = i; j < newText.length; j++) {
-                        sendMouseMessage({
+                        const payload = JSON.stringify({
                           type: 'key',
                           t: Date.now(),
                           key: newText[j],
-                        }).catch(console.error);
+                        });
+                        mouseWsRef.current.send(payload);
                       }
                     }
                   } catch (err) {
@@ -2001,25 +2148,34 @@ export default function DevScreen() {
               }
             }}
             onSendKey={(key) => {
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'key',
                   t: Date.now(),
                   key,
-                }).catch(console.error);
+                  });
+                  mouseWsRef.current.send(payload);
+                } catch (err) {
+                  console.warn('[Keyboard] Failed to send key', err);
+                }
               }
             }}
             onSendBatchText={(text) => {
-              if (mouseControlActive && discoveredPeerId) {
-                sendMouseMessage({
+              if (mouseWsRef.current && mouseWsRef.current.readyState === WebSocket.OPEN) {
+                try {
+                  const payload = JSON.stringify({
                   type: 'text_batch',
                   t: Date.now(),
                   text,
-                }).then(() => {
+                  });
+                  mouseWsRef.current.send(payload);
                   // Clear the text after sending
                   setKeyboardText('');
                   lastKeyboardTextRef.current = '';
-                }).catch(console.error);
+                } catch (err) {
+                  console.warn('[Keyboard] Failed to send batch text', err);
+                }
               }
             }}
             chatMode={chatMode}
