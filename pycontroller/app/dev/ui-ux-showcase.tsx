@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, Text, Dimensions } from 'react-native';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
@@ -36,39 +36,15 @@ const uiStyles = StyleSheet.create({
   },
 });
 
-interface UIUXShowcaseProps {
-  r: number;
-  setR: (value: number) => void;
-  g: number;
-  setG: (value: number) => void;
-  b: number;
-  setB: (value: number) => void;
-  rangeMin: number;
-  setRangeMin: (value: number) => void;
-  rangeMax: number;
-  setRangeMax: (value: number) => void;
-  verticalRangeMin: number;
-  setVerticalRangeMin: (value: number) => void;
-  verticalRangeMax: number;
-  setVerticalRangeMax: (value: number) => void;
-}
+export default function UIUXShowcase() {
+  const [r, setR] = useState(0.5);
+  const [g, setG] = useState(0.5);
+  const [b, setB] = useState(0.5);
+  const [rangeMin, setRangeMin] = useState(0.2);
+  const [rangeMax, setRangeMax] = useState(0.8);
+  const [verticalRangeMin, setVerticalRangeMin] = useState(0.3);
+  const [verticalRangeMax, setVerticalRangeMax] = useState(0.7);
 
-export default function UIUXShowcase({
-  r,
-  setR,
-  g,
-  setG,
-  b,
-  setB,
-  rangeMin,
-  setRangeMin,
-  rangeMax,
-  setRangeMax,
-  verticalRangeMin,
-  setVerticalRangeMin,
-  verticalRangeMax,
-  setVerticalRangeMax,
-}: UIUXShowcaseProps) {
   return (
     <View style={uiStyles.container}>
       <View style={uiStyles.sliderRow}>
@@ -125,4 +101,3 @@ export default function UIUXShowcase({
     </View>
   );
 }
-

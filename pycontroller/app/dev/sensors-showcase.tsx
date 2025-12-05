@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Pressable, Modal } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
 import type { DeviceMotionMeasurement } from 'expo-sensors';
 import AccelerationScreen from '@/components/sensorvisuals/acceleration';
 import MagneticScreen from '@/components/sensorvisuals/magnetic';
@@ -75,27 +76,102 @@ function BlankPopup({ visible, onClose, children }: {
 }
 
 interface SensorsShowcaseProps {
-  motionData: DeviceMotionMeasurement | null;
-  magnetometerData: { x: number; y: number; z: number } | null;
-  gyroscopeData: { x: number; y: number; z: number } | null;
-  barometerData: { pressure: number } | null;
-  paused: boolean;
-  onPausedChange: (paused: boolean) => void;
   styles: any;
 }
 
-export default function SensorsShowcase({
-  motionData,
-  magnetometerData,
-  gyroscopeData,
-  barometerData,
-  paused,
-  onPausedChange,
-  styles,
-}: SensorsShowcaseProps) {
-  const [popupVisible, setPopupVisible] = React.useState(false);
-  const [popupMeasurement, setPopupMeasurement] = React.useState('');
-  const [popupComponent, setPopupComponent] = React.useState<string>('');
+export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
+  const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
+  const [magnetometerData, setMagnetometerData] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [gyroscopeData, setGyroscopeData] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [barometerData, setBarometerData] = useState<{ pressure: number } | null>(null);
+  const [paused, setPaused] = useState(true); // default to paused
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupMeasurement, setPopupMeasurement] = useState('');
+  const [popupComponent, setPopupComponent] = useState<string>('');
+
+  // Store subscriptions in refs so we can kill them on pause and recreate on play
+  const motionSubRef = useRef<any>(null);
+  const magSubRef = useRef<any>(null);
+  const gyroSubRef = useRef<any>(null);
+  const baroSubRef = useRef<any>(null);
+
+  const killAllListeners = () => {
+    motionSubRef.current && motionSubRef.current.remove();
+    magSubRef.current && magSubRef.current.remove();
+    gyroSubRef.current && gyroSubRef.current.remove();
+    baroSubRef.current && baroSubRef.current.remove();
+    motionSubRef.current = null;
+    magSubRef.current = null;
+    gyroSubRef.current = null;
+    baroSubRef.current = null;
+    // Explicitly remove all listeners at native level
+    try { DeviceMotion.removeAllListeners(); } catch {}
+    try { Magnetometer.removeAllListeners(); } catch {}
+    try { Gyroscope.removeAllListeners(); } catch {}
+    try { Barometer.removeAllListeners(); } catch {}
+  };
+
+  useEffect(() => {
+    if (!paused) {
+      killAllListeners(); // Always kill before creating new
+      motionSubRef.current = DeviceMotion.addListener(setMotionData);
+      gyroSubRef.current = Gyroscope.addListener(setGyroscopeData);
+      baroSubRef.current = Barometer.addListener(setBarometerData);
+
+      DeviceMotion.setUpdateInterval(100);
+      Gyroscope.setUpdateInterval(100);
+      Barometer.setUpdateInterval(500);
+    } else {
+      killAllListeners();
+      // Clear sensor data state to stop background updates
+      setMotionData(null);
+      setMagnetometerData(null);
+      setGyroscopeData(null);
+      setBarometerData(null);
+    }
+    // Clean up on unmount or tab switch
+    return () => {
+      killAllListeners();
+      setMotionData(null);
+      setGyroscopeData(null);
+      setBarometerData(null);
+    };
+  }, [paused]);
+
+  // Manage magnetometer subscription independently
+  useEffect(() => {
+    if (!paused) {
+      if (magSubRef.current) {
+        try {
+          magSubRef.current.remove();
+        } catch {}
+      }
+      try {
+        magSubRef.current = Magnetometer.addListener(setMagnetometerData);
+        Magnetometer.setUpdateInterval(100);
+      } catch (err) {
+        console.warn('[Magneto] Failed to subscribe magnetometer', err);
+      }
+    } else {
+      if (magSubRef.current) {
+        try {
+          magSubRef.current.remove();
+        } catch {}
+        magSubRef.current = null;
+      }
+      setMagnetometerData(null);
+    }
+
+    // Cleanup
+    return () => {
+      if (magSubRef.current) {
+        try {
+          magSubRef.current.remove();
+        } catch {}
+        magSubRef.current = null;
+      }
+    };
+  }, [paused]);
 
   const openPopup = (measurement: string) => {
     setPopupMeasurement(measurement);
@@ -110,7 +186,7 @@ export default function SensorsShowcase({
       {/* Modern Play/Pause Toggle Button */}
       <View style={{ alignItems: 'center', marginBottom: 16 }}>
         <Text
-          onPress={() => onPausedChange(!paused)}
+          onPress={() => setPaused(p => !p)}
           style={{
             backgroundColor: paused ? '#222' : '#e53935',
             color: '#fff',
@@ -262,4 +338,3 @@ export default function SensorsShowcase({
     </>
   );
 }
-

@@ -2,9 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pressable, TextInput, InputAccessoryView, Platform, Switch, Keyboard } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
-import type { DeviceMotionMeasurement } from 'expo-sensors';
-import SensorlibModule from 'sensorlib';
+import { Magnetometer } from 'expo-sensors';
 import SensorsShowcase from '@/app/dev/sensors-showcase';
 import UIUXShowcase from '@/app/dev/ui-ux-showcase';
 import RustCoreShowcase from '@/app/dev/rust-core-showcase';
@@ -956,12 +954,6 @@ function TouchpadComponent({
 }
 
 export default function DevScreen() {
-  const [motionData, setMotionData] = useState<DeviceMotionMeasurement | null>(null);
-  const [magnetometerData, setMagnetometerData] = useState<{x: number, y: number, z: number} | null>(null);
-  const [gyroscopeData, setGyroscopeData] = useState<{x: number, y: number, z: number} | null>(null);
-  const [barometerData, setBarometerData] = useState<{pressure: number} | null>(null);
-  const [paused, setPaused] = useState(true); // default to paused
-
   // mDNS discovered URLs
   const [magnetoWsUrl, setMagnetoWsUrl] = useState<string>(FALLBACK_MAGNETO_WS_URL);
   const [mouseWsUrl, setMouseWsUrl] = useState<string>(''); // No fallback - must be discovered
@@ -997,24 +989,6 @@ export default function DevScreen() {
   React.useEffect(() => {
     lastKeyboardTextRef.current = keyboardText;
   }, [keyboardText]);
-  
-  // UI/UX slider states
-  const [r, setR] = useState(0.5);
-  const [g, setG] = useState(0.5);
-  const [b, setB] = useState(0.5);
-  const [rangeMin, setRangeMin] = useState(0.2);
-  const [rangeMax, setRangeMax] = useState(0.8);
-  const [verticalRangeMin, setVerticalRangeMin] = useState(0.3);
-  const [verticalRangeMax, setVerticalRangeMax] = useState(0.7);
-
-  // Rust core state
-  const [rustcoreResult, setRustcoreResult] = useState<string>('');
-
-  // Store subscriptions in refs so we can kill them on pause and recreate on play
-  const motionSubRef = useRef<any>(null);
-  const magSubRef = useRef<any>(null);
-  const gyroSubRef = useRef<any>(null);
-  const baroSubRef = useRef<any>(null);
   
   // Service discovery using HTTP discovery endpoint
   // The Python server provides an HTTP endpoint at /discover for service discovery
@@ -1277,26 +1251,9 @@ export default function DevScreen() {
   }, []); // Only run once on mount
 
   // Helper to kill all listeners
-  const killAllListeners = () => {
-  motionSubRef.current && motionSubRef.current.remove();
-  magSubRef.current && magSubRef.current.remove();
-  gyroSubRef.current && gyroSubRef.current.remove();
-  baroSubRef.current && baroSubRef.current.remove();
-  motionSubRef.current = null;
-  magSubRef.current = null;
-  gyroSubRef.current = null;
-  baroSubRef.current = null;
-  // Explicitly remove all listeners at native level
-  try { DeviceMotion.removeAllListeners(); } catch {}
-  try { Magnetometer.removeAllListeners(); } catch {}
-  try { Gyroscope.removeAllListeners(); } catch {}
-  try { Barometer.removeAllListeners(); } catch {}
-    // Explicitly remove all listeners at native level
-    try { DeviceMotion.removeAllListeners(); } catch {}
-    try { Magnetometer.removeAllListeners(); } catch {}
-    try { Gyroscope.removeAllListeners(); } catch {}
-    try { Barometer.removeAllListeners(); } catch {}
-  };
+  // Store magnetometer subscription for streaming (separate from SensorsShowcase)
+  const magSubRef = useRef<any>(null);
+  const [magnetometerData, setMagnetometerData] = useState<{x: number, y: number, z: number} | null>(null);
 
   const connectMagnetoSocket = () => {
     if (magnetoWsRef.current && 
@@ -1385,42 +1342,9 @@ export default function DevScreen() {
     }
   };
 
+  // Manage magnetometer subscription for streaming (independent of SensorsShowcase)
   useEffect(() => {
-    if (!paused) {
-      killAllListeners(); // Always kill before creating new
-      motionSubRef.current = DeviceMotion.addListener(setMotionData);
-      gyroSubRef.current = Gyroscope.addListener(setGyroscopeData);
-      baroSubRef.current = Barometer.addListener(setBarometerData);
-
-      DeviceMotion.setUpdateInterval(100);
-      Gyroscope.setUpdateInterval(100);
-      Barometer.setUpdateInterval(500);
-    } else {
-      killAllListeners();
-      // Clear sensor data state to stop background updates
-      setMotionData(null);
-      setMagnetometerData(null);
-      setGyroscopeData(null);
-      setBarometerData(null);
-    }
-    // Clean up on unmount or tab switch
-    return () => {
-      killAllListeners();
-      setMotionData(null);
-      setGyroscopeData(null);
-      setBarometerData(null);
-      disconnectMagnetoSocket();
-    };
-  }, [paused]);
-
-  // Manage magnetometer subscription independently so streaming can be enabled
-  // without having to start all sensors.
-  useEffect(() => {
-    // We want magnetometer data if either the main sensors are playing
-    // or the magnetometer->Python stream is enabled.
-    const wantMagData = !paused || magnetoStreaming;
-
-    if (!wantMagData) {
+    if (!magnetoStreaming) {
       if (magSubRef.current) {
         try {
           magSubRef.current.remove();
@@ -1431,7 +1355,7 @@ export default function DevScreen() {
       return;
     }
 
-    // (Re)subscribe magnetometer
+    // Subscribe magnetometer for streaming
     if (magSubRef.current) {
       try {
         magSubRef.current.remove();
@@ -1446,14 +1370,14 @@ export default function DevScreen() {
 
     // Cleanup
     return () => {
-      if (!wantMagData && magSubRef.current) {
+      if (magSubRef.current) {
         try {
           magSubRef.current.remove();
         } catch {}
         magSubRef.current = null;
       }
     };
-  }, [paused, magnetoStreaming]);
+  }, [magnetoStreaming]);
 
   // Open / close WebSocket when streaming toggled
   useEffect(() => {
@@ -1527,41 +1451,15 @@ export default function DevScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
           <CollapsibleSection title="Sensors">
-            <SensorsShowcase
-              motionData={motionData}
-              magnetometerData={magnetometerData}
-              gyroscopeData={gyroscopeData}
-              barometerData={barometerData}
-              paused={paused}
-              onPausedChange={setPaused}
-              styles={styles}
-            />
+            <SensorsShowcase styles={styles} />
           </CollapsibleSection>
 
           <CollapsibleSection title="UI/UX">
-            <UIUXShowcase
-              r={r}
-              setR={setR}
-              g={g}
-              setG={setG}
-              b={b}
-              setB={setB}
-              rangeMin={rangeMin}
-              setRangeMin={setRangeMin}
-              rangeMax={rangeMax}
-              setRangeMax={setRangeMax}
-              verticalRangeMin={verticalRangeMin}
-              setVerticalRangeMin={setVerticalRangeMin}
-              verticalRangeMax={verticalRangeMax}
-              setVerticalRangeMax={setVerticalRangeMax}
-            />
+            <UIUXShowcase />
           </CollapsibleSection>
 
           <CollapsibleSection title="Rust core">
-            <RustCoreShowcase
-              rustcoreResult={rustcoreResult}
-              setRustcoreResult={setRustcoreResult}
-            />
+            <RustCoreShowcase />
           </CollapsibleSection>
 
           <View style={{ marginTop: 24, alignItems: 'center' }}>

@@ -1,16 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, TextInput } from 'react-native';
 import SensorlibModule from 'sensorlib';
 
-interface RustCoreShowcaseProps {
-  rustcoreResult: string;
-  setRustcoreResult: (result: string) => void;
-}
+export default function RustCoreShowcase() {
+  const [rustcoreResult, setRustcoreResult] = useState<string>('');
 
-export default function RustCoreShowcase({
-  rustcoreResult,
-  setRustcoreResult,
-}: RustCoreShowcaseProps) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
       <Pressable
@@ -56,4 +50,3 @@ export default function RustCoreShowcase({
     </View>
   );
 }
-
