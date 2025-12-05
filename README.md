@@ -1,5 +1,13 @@
 # xlate sensorlab
 
+## Related Projects
+
+- **[rscontroller](https://github.com/xlateai/rscontroller)** - Device Rust controller WebSocket host for mouse control
+- **[mlrslab](https://github.com/xlateai/mlrslab)** - Rust machine learning library
+- **[radiolab](https://github.com/xlateai/radiolab)** - Radio lab for RF/EM experiments
+
+---
+
 Expo app with custom native modules for sensor processing. Uses a custom dev client (not Expo Go) because we integrate Swift and Rust code.
 
 ## Quick Start
