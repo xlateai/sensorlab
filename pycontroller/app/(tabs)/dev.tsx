@@ -13,6 +13,7 @@ import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
 import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import Slider from '@/components/ui/slider';
 import RangedSlider from '@/components/ui/ranged-slider';
+import SensorlibModule from 'sensorlib';
 
 // libp2p imports
 import { createLibp2p } from 'libp2p';
@@ -1084,6 +1085,9 @@ export default function DevScreen() {
   const [verticalRangeMin, setVerticalRangeMin] = useState(0.3);
   const [verticalRangeMax, setVerticalRangeMax] = useState(0.7);
 
+  // Rust core state
+  const [rustcoreResult, setRustcoreResult] = useState<string>('');
+
   // Store subscriptions in refs so we can kill them on pause and recreate on play
   const motionSubRef = useRef<any>(null);
   const magSubRef = useRef<any>(null);
@@ -1625,6 +1629,51 @@ export default function DevScreen() {
                   orientation="horizontal"
                 />
               </View>
+            </View>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Rust core">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <Pressable
+                onPress={() => {
+                  try {
+                    const result = SensorlibModule.rustcoreHello();
+                    setRustcoreResult(result);
+                  } catch (error) {
+                    setRustcoreResult(`Error: ${error}`);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#39ff14',
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  minWidth: 120,
+                }}
+              >
+                <Text style={{ color: '#000', fontWeight: '600', fontSize: 16, textAlign: 'center' }}>
+                  Call Rust
+                </Text>
+              </Pressable>
+              <TextInput
+                value={rustcoreResult}
+                editable={false}
+                placeholder="Rust function result will appear here..."
+                placeholderTextColor="#666"
+                style={{
+                  flex: 1,
+                  backgroundColor: '#222',
+                  color: '#fff',
+                  padding: 12,
+                  borderRadius: 8,
+                  fontSize: 14,
+                  borderWidth: 2,
+                  borderColor: '#39ff14',
+                  minHeight: 50,
+                  textAlignVertical: 'top',
+                }}
+                multiline
+              />
             </View>
           </CollapsibleSection>
 
