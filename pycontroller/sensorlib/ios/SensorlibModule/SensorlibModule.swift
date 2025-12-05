@@ -38,7 +38,7 @@ public class SensorlibModule: Module {
       try playHaptic(input: input)
     }
 
-    // Speaker functions - delegates to AudioModule
+    // Speaker functions - delegates to SpeakerModule
     AsyncFunction("initializeSpeakers") { (input: AudioInitInput) in
       try initializeSpeakers(input: input)
     }
@@ -55,7 +55,7 @@ public class SensorlibModule: Module {
       stopSpeakers()
     }
 
-    // Microphone functions - delegates to AudioModule
+    // Microphone functions - delegates to MicrophoneModule
     AsyncFunction("initializeMicrophone") { (input: AudioInitInput) in
       try initializeMicrophone(input: input)
     }
