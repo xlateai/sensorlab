@@ -485,7 +485,7 @@ export default function ControllersShowcase({
           onPress={() => setMagnetoStreaming((v) => !v)}
           style={{
             backgroundColor: magnetoStreaming ? '#43a047' : '#222',
-            paddingHorizontal: 36,
+            paddingHorizontal: 24,
             paddingVertical: 14,
             borderRadius: 32,
             shadowColor: '#000',
@@ -494,9 +494,12 @@ export default function ControllersShowcase({
             shadowRadius: 4,
             elevation: 2,
             marginBottom: 4,
+            minWidth: 280,
+            maxWidth: 320,
+            alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16, textAlign: 'center' }}>
             {magnetoStreaming ? 'Stop Magnetometer → Python Stream' : 'Start Magnetometer → Python Stream'}
           </Text>
         </Pressable>
@@ -513,7 +516,7 @@ export default function ControllersShowcase({
           onPress={handleMouseControlToggle}
           style={{
             backgroundColor: mouseControlActive ? '#43a047' : (!mouseWsUrl ? '#666' : '#222'),
-            paddingHorizontal: 36,
+            paddingHorizontal: 24,
             paddingVertical: 14,
             borderRadius: 32,
             shadowColor: '#000',
@@ -523,9 +526,12 @@ export default function ControllersShowcase({
             elevation: 2,
             marginBottom: 4,
             opacity: !mouseWsUrl ? 0.5 : 1,
+            minWidth: 280,
+            maxWidth: 320,
+            alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 18 }}>
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16, textAlign: 'center' }}>
             {mouseControlActive ? 'Stop Mouse Control' : (!mouseWsUrl ? 'Mouse Service Not Found' : 'Start Mouse Control')}
           </Text>
         </Pressable>
