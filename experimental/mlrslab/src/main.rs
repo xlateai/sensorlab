@@ -1,11 +1,12 @@
 use burn::{
     module::Module,
     nn,
+    optim::{Optimizer, GradientsParams},
     tensor::{backend::Backend, Tensor},
-    train::{GradientsParams, LearnerBuilder, TrainOutput, TrainStep, ValidStep},
 };
 
-use burn_ndarray::NdArrayBackend;
+use burn_ndarray::NdArray;
+use burn_autodiff::Autodiff;
 
 // Simple linear model: y = Wx + b
 #[derive(Module, Debug)]
@@ -29,14 +30,15 @@ fn main() {
     println!("🔥 Burn-rs Hello World!");
     println!("Training a simple linear model to learn y = 2x + 1\n");
 
-    // Use CPU device
+    // Use Autodiff wrapper for automatic differentiation during training
+    type Backend = Autodiff<NdArray<f32>>;
     let device = Default::default();
     
     // Create model
-    let model = LinearModel::<NdArrayBackend<f32>>::new(&device);
+    let model = LinearModel::<Backend>::new(&device);
     
     // Create optimizer
-    let optim = burn::optim::AdamConfig::new().init();
+    let mut optim = burn::optim::AdamConfig::new().init();
     
     // Create simple training data: y = 2x + 1
     // Input: x values from 0 to 10
@@ -50,33 +52,39 @@ fn main() {
     }
     println!();
 
-    // Convert to tensors
-    let x_tensor = Tensor::from_floats(
-        x_train.iter().map(|&x| vec![x]).collect::<Vec<_>>(),
+    // Convert to tensors - create 2D tensors with shape (batch_size, 1)
+    let batch_size = x_train.len();
+    
+    // Create tensors from 1D data and reshape to [batch_size, 1]
+    let x_tensor = Tensor::<Backend, 1>::from_floats(
+        x_train.as_slice(),
         &device,
-    );
-    let y_tensor = Tensor::from_floats(
-        y_train.iter().map(|&y| vec![y]).collect::<Vec<_>>(),
+    ).reshape([batch_size, 1]);
+    
+    let y_tensor = Tensor::<Backend, 1>::from_floats(
+        y_train.as_slice(),
         &device,
-    );
+    ).reshape([batch_size, 1]);
 
     // Training loop
     let num_epochs = 100;
     println!("Training for {} epochs...\n", num_epochs);
 
     let mut model = model;
-    let mut optim = optim;
 
     for epoch in 0..num_epochs {
         // Forward pass
         let y_pred = model.forward(x_tensor.clone());
         
         // Compute loss (mean squared error)
-        let loss = (y_pred - y_tensor.clone()).powf(2.0).mean();
+        // Use powf_scalar for scalar exponent
+        let loss = (y_pred - y_tensor.clone()).powf_scalar(2.0).mean();
         
         // Backward pass and update
         let grads = loss.backward();
-        model = optim.step(model, grads);
+        let grads_params = GradientsParams::from_grads(grads, &model);
+        let learning_rate = 0.01;
+        model = optim.step(learning_rate, model, grads_params);
         
         // Print progress every 10 epochs
         if epoch % 10 == 0 || epoch == num_epochs - 1 {
@@ -87,16 +95,22 @@ fn main() {
 
     println!("\n✅ Training complete!\n");
     
-    // Test the model
+    // Test the model - convert to inference backend (no autodiff needed)
     println!("Testing the model:");
     let test_x: Vec<f32> = vec![3.0, 5.0, 7.0];
-    let test_x_tensor = Tensor::from_floats(
-        test_x.iter().map(|&x| vec![x]).collect::<Vec<_>>(),
+    let test_batch_size = test_x.len();
+    
+    // For inference, we can use the model directly (Autodiff backend works for inference too)
+    let test_x_tensor = Tensor::<Backend, 1>::from_floats(
+        test_x.as_slice(),
         &device,
-    );
+    ).reshape([test_batch_size, 1]);
     
     let predictions = model.forward(test_x_tensor);
-    let pred_values: Vec<f32> = predictions.into_data().value.iter().map(|v| v[0]).collect();
+    
+    // Extract values from tensor by converting to data and accessing elements
+    let pred_data = predictions.into_data();
+    let pred_values: Vec<f32> = pred_data.as_slice::<f32>().unwrap().to_vec();
     
     for (x, pred) in test_x.iter().zip(pred_values.iter()) {
         let expected = 2.0 * x + 1.0;

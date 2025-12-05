@@ -3574,6 +3574,7 @@ name = "mlrslab"
 version = "0.1.0"
 dependencies = [
  "burn",
+ "burn-autodiff",
  "burn-ndarray",
 ]
 
