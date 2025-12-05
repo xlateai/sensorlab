@@ -1949,7 +1949,6 @@ export default function DevScreen() {
                 )}
               </View>
             </View>
-          </View>
 
         </View>
       </ScrollView>
