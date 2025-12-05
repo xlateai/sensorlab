@@ -20,10 +20,13 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
 
+  
+  # Rust library - vendored_libraries automatically links it
+  s.vendored_libraries = "libs/librustcore.a"
+  s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"
+  
   # Swift/Objective-C compatibility
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
   }
-
-  s.source_files = "SensorlibModule/**/*.{h,m,mm,swift,hpp,cpp}"
 end

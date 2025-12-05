@@ -3,4 +3,8 @@ name = "rustcore"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "rustcore"
+crate-type = ["cdylib", "staticlib"]
+
 [dependencies]
