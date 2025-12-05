@@ -19,3 +19,22 @@ pub extern "C" fn rustcore_hello_free(ptr: *mut c_char) {
     }
 }
 
+/// Run ML training and return output as a C-compatible string
+/// The caller is responsible for freeing the memory using rustcore_ml_training_free
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_ml_training() -> *mut c_char {
+    let output = mlrslab::run_training();
+    let s = CString::new(output).expect("CString::new failed");
+    s.into_raw()
+}
+
+/// Free the memory allocated by rustcore_ml_training
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_ml_training_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+    }
+}
+

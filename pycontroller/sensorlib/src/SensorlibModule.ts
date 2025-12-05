@@ -6,6 +6,7 @@ declare class SensorlibModule extends NativeModule<SensorlibModuleEvents> {
   PI: number;
   hello(): string;
   rustcoreHello(): string;
+  rustcoreMLTraining(): string;
   setValueAsync(value: string): Promise<void>;
 }
 

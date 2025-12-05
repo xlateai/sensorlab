@@ -8,3 +8,4 @@ name = "rustcore"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
+mlrslab = { path = "../../../mlrslab" }
