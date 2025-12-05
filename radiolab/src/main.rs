@@ -41,9 +41,28 @@ fn main() -> Result<()> {
     // Create channel for sending I values to viewport
     let (i_sender, i_receiver) = mpsc::channel();
     
+    // Create channel for audio enable/disable state
+    let (audio_enabled_sender, audio_enabled_receiver) = mpsc::channel();
+    
     // Create running flag for HackRF thread
     let running = Arc::new(AtomicBool::new(true));
     let running_clone = running.clone();
+    
+    // Spawn thread to handle audio state changes
+    // This is where you would implement audio playback when enabled
+    thread::spawn(move || {
+        let mut audio_enabled = false;
+        while let Ok(enabled) = audio_enabled_receiver.recv() {
+            audio_enabled = enabled;
+            if audio_enabled {
+                println!("Audio playback enabled");
+                // TODO: Start audio playback from stream here
+            } else {
+                println!("Audio playback disabled");
+                // TODO: Stop audio playback here
+            }
+        }
+    });
     
     // Spawn HackRF reading in a background thread
     // (On macOS, the main thread must run the event loop)
@@ -109,7 +128,7 @@ fn main() -> Result<()> {
     
     // Run viewport on main thread (required on macOS)
     println!("Starting viewport on main thread...");
-    viewport::run_viewport(i_receiver, running)?;
+    viewport::run_viewport(i_receiver, running, audio_enabled_sender)?;
     
     println!("HackRF device closed.");
     Ok(())

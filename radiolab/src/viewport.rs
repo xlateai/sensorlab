@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
@@ -14,17 +14,32 @@ const WAVEFORM_COLOR: [u8; 4] = [0, 255, 0, 255]; // Green
 const BACKGROUND_COLOR: [u8; 4] = [0, 0, 0, 255]; // Black
 const GRID_COLOR: [u8; 4] = [64, 64, 64, 255]; // Dark gray
 const TEXT_COLOR: [u8; 4] = [200, 200, 200, 255]; // Light gray
+const CHECKBOX_COLOR: [u8; 4] = [255, 255, 255, 255]; // White for checkbox border
+const CHECKBOX_CHECKED_COLOR: [u8; 4] = [0, 255, 0, 255]; // Green for checked fill
 
-pub fn run_viewport(receiver: mpsc::Receiver<f32>, running: Arc<AtomicBool>) -> Result<()> {
+// Checkbox dimensions and position
+const CHECKBOX_SIZE: u32 = 20; // Made slightly larger for easier clicking
+const CHECKBOX_X: u32 = 10;
+const CHECKBOX_Y: u32 = 10;
+const CHECKBOX_LABEL_X: u32 = CHECKBOX_X + CHECKBOX_SIZE + 5;
+
+pub fn run_viewport(receiver: mpsc::Receiver<f32>, running: Arc<AtomicBool>, audio_enabled_sender: mpsc::Sender<bool>) -> Result<()> {
     println!("Creating event loop on main thread...");
     let event_loop = EventLoop::new()?;
     println!("Event loop created, starting application...");
+    
+    // Send initial state (off) to audio thread
+    let _ = audio_enabled_sender.send(false);
+    
     let mut app = ViewportApp { 
         receiver, 
         state: None,
         i_values: Arc::new(Mutex::new(Vec::new())),
         max_samples: WINDOW_WIDTH as usize,
         running,
+        audio_enabled: false, // Default is off
+        audio_enabled_sender,
+        cursor_pos: (0.0, 0.0),
     };
     
     event_loop.run_app(&mut app)?;
@@ -42,6 +57,9 @@ struct ViewportApp {
     i_values: Arc<Mutex<Vec<f32>>>,
     max_samples: usize,
     running: Arc<AtomicBool>,
+    audio_enabled: bool,
+    audio_enabled_sender: mpsc::Sender<bool>,
+    cursor_pos: (f64, f64),
 }
 
 impl ApplicationHandler for ViewportApp {
@@ -115,7 +133,7 @@ impl ApplicationHandler for ViewportApp {
                 }
             WindowEvent::RedrawRequested => {
                 if let Some(state) = &mut self.state {
-                    if let Err(e) = Self::render_internal(state, &self.i_values) {
+                    if let Err(e) = Self::render_internal(state, &self.i_values, self.audio_enabled) {
                         eprintln!("Error rendering: {}", e);
                     }
                     // Request another redraw for continuous updates
@@ -128,13 +146,47 @@ impl ApplicationHandler for ViewportApp {
                     state.window.request_redraw();
                 }
             }
+            WindowEvent::MouseInput { state: button_state, button: MouseButton::Left, .. } => {
+                if button_state == ElementState::Pressed {
+                    if let Some(state) = &self.state {
+                        // Convert physical position to logical position
+                        let scale_factor = state.window.scale_factor();
+                        let logical_x = self.cursor_pos.0 / scale_factor;
+                        let logical_y = self.cursor_pos.1 / scale_factor;
+                        
+                        // Check if click is within checkbox bounds
+                        let x = logical_x as u32;
+                        let y = logical_y as u32;
+                        
+                        println!("Mouse click at logical ({}, {}), physical ({}, {}), scale: {}, checkbox bounds: ({}, {}) to ({}, {})", 
+                                 x, y, self.cursor_pos.0, self.cursor_pos.1, scale_factor,
+                                 CHECKBOX_X, CHECKBOX_Y, 
+                                 CHECKBOX_X + CHECKBOX_SIZE, CHECKBOX_Y + CHECKBOX_SIZE);
+                        
+                        if x >= CHECKBOX_X && x < CHECKBOX_X + CHECKBOX_SIZE &&
+                           y >= CHECKBOX_Y && y < CHECKBOX_Y + CHECKBOX_SIZE {
+                            // Toggle checkbox
+                            self.audio_enabled = !self.audio_enabled;
+                            println!("Checkbox toggled to: {}", self.audio_enabled);
+                            // Send state change to main thread
+                            let _ = self.audio_enabled_sender.send(self.audio_enabled);
+                            // Request redraw to update checkbox
+                            state.window.request_redraw();
+                        }
+                    }
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                // Store cursor position for click detection (physical pixels)
+                self.cursor_pos = (position.x, position.y);
+            }
             _ => {}
         }
     }
 }
 
 impl ViewportApp {
-    fn render_internal(state: &mut ViewportState, i_values: &Arc<Mutex<Vec<f32>>>) -> Result<()> {
+    fn render_internal(state: &mut ViewportState, i_values: &Arc<Mutex<Vec<f32>>>, audio_enabled: bool) -> Result<()> {
         let pixels = &mut state.pixels;
         let frame = pixels.frame_mut();
 
@@ -232,8 +284,33 @@ impl ViewportApp {
                 Self::draw_text(frame, &format!("min: {:.4}", display_min), label_x, min_label_y);
             }
 
+        // Draw checkbox
+        Self::draw_checkbox(frame, audio_enabled);
+
         pixels.render()?;
         Ok(())
+    }
+
+    fn draw_checkbox(frame: &mut [u8], checked: bool) {
+        // Draw checkbox border
+        for y in CHECKBOX_Y..(CHECKBOX_Y + CHECKBOX_SIZE) {
+            for x in CHECKBOX_X..(CHECKBOX_X + CHECKBOX_SIZE) {
+                let idx = (y * WINDOW_WIDTH + x) as usize * 4;
+                if idx < frame.len() {
+                    // Draw border (outer pixels)
+                    if x == CHECKBOX_X || x == CHECKBOX_X + CHECKBOX_SIZE - 1 ||
+                       y == CHECKBOX_Y || y == CHECKBOX_Y + CHECKBOX_SIZE - 1 {
+                        frame[idx..idx + 4].copy_from_slice(&CHECKBOX_COLOR);
+                    } else if checked {
+                        // Fill with checked color
+                        frame[idx..idx + 4].copy_from_slice(&CHECKBOX_CHECKED_COLOR);
+                    }
+                }
+            }
+        }
+        
+        // Draw label
+        Self::draw_text(frame, "audio", CHECKBOX_LABEL_X, CHECKBOX_Y + 5);
     }
 
     fn draw_line(frame: &mut [u8], x1: u32, y1: u32, x2: u32, y2: u32) {
@@ -300,6 +377,9 @@ impl ViewportApp {
                 'x' => Some([0b00000, 0b00000, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001]),
                 'i' => Some([0b00100, 0b00000, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100]),
                 'n' => Some([0b00000, 0b00000, 0b11110, 0b10001, 0b10001, 0b10001, 0b10001]),
+                'u' => Some([0b00000, 0b00000, 0b10001, 0b10001, 0b10001, 0b10001, 0b01111]),
+                'd' => Some([0b00000, 0b00000, 0b11110, 0b10001, 0b10001, 0b10001, 0b11110]),
+                'o' => Some([0b00000, 0b00000, 0b01110, 0b10001, 0b10001, 0b10001, 0b01110]),
                 _ => None,
             }
         };
