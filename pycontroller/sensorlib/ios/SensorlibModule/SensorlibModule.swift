@@ -33,6 +33,11 @@ public class SensorlibModule: Module {
       return rustcoreMLTraining()
     }
 
+    // Rust convolution function
+    Function("rustcoreConvolution") { (input: String) in
+      return rustcoreConvolution(input)
+    }
+
     // Unified haptics play function - delegates to HapticsModule
     AsyncFunction("playHaptic") { (input: HapticPatternInput) in
       try playHaptic(input: input)

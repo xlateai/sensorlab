@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import NumericalPrediction from '@/app/ai/numerical-prediction';
+import Convolution from '@/app/ai/convolution';
 
 // Collapsible section component
 function CollapsibleSection({ 
@@ -42,6 +43,9 @@ export default function AIScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
+          <CollapsibleSection title="Convolution" defaultExpanded={true}>
+            <Convolution />
+          </CollapsibleSection>
           <CollapsibleSection title="Numerical Prediction">
             <NumericalPrediction />
           </CollapsibleSection>

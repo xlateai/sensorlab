@@ -11,6 +11,7 @@ import RotationScreen from '@/components/sensorvisuals/rotation';
 import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
 import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
 import { useStabilizedMagnetometer } from '@/app/utils/sensors';
+import PlayPauseButton from '@/components/ui/play-pause-button';
 
 // Map measurement to component
 const measurementComponentMap: Record<string, React.ComponentType | null> = {
@@ -189,29 +190,10 @@ export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
   return (
     <>
       {/* Modern Play/Pause Toggle Button */}
-      <View style={{ alignItems: 'center', marginBottom: 16 }}>
-        <Text
-          onPress={() => setPaused(p => !p)}
-          style={{
-            backgroundColor: paused ? '#222' : '#e53935',
-            color: '#fff',
-            paddingHorizontal: 36,
-            paddingVertical: 14,
-            borderRadius: 32,
-            fontWeight: '600',
-            fontSize: 20,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 2,
-            letterSpacing: 1,
-            marginBottom: 0,
-          }}
-        >
-          {paused ? '▶ Play' : '⏸ Pause'}
-        </Text>
-      </View>
+      <PlayPauseButton
+        paused={paused}
+        onToggle={() => setPaused(p => !p)}
+      />
       <Text style={styles.header}>Device Motion Sensor Table</Text>
       {/* Motion Data Table */}
       <View style={[styles.tableContainer, styles.motionTable]}>
