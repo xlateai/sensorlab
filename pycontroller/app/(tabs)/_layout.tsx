@@ -114,27 +114,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="renshu"
-        options={{
-          title: '練習',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="character.book.closed" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="directional"
-        options={{
-          title: 'Heading',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass.circle" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="threeD"
-        options={{
-          title: '3D',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="cube" color={color} />, // pick a cube icon for 3D
-        }}
-      />
-      <Tabs.Screen
         name="video"
         options={{
           title: 'Video',
@@ -146,6 +125,13 @@ export default function TabLayout() {
         options={{
           title: 'AI',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="brain" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="apps"
+        options={{
+          title: 'Apps',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="square.grid.2x2" color={color} />,
         }}
       />
       <Tabs.Screen
