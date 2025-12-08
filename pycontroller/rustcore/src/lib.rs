@@ -2,8 +2,12 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use serde::{Deserialize, Serialize};
 
+#[macro_use]
+extern crate lazy_static;
+
 mod helloworld;
 mod convolution;
+mod convolution_state;
 
 #[derive(Serialize, Deserialize)]
 struct ConvolutionInput {
@@ -113,6 +117,194 @@ pub extern "C" fn rustcore_convolution(input_json: *const c_char) -> *mut c_char
 /// Free memory allocated by rustcore_convolution
 #[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+    }
+}
+
+// Stateful convolution API for better performance
+
+#[derive(Serialize, Deserialize)]
+struct ConvolutionStateInput {
+    context_id: u64,
+    image: Vec<f32>,
+    kernel: Vec<f32>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ConvolutionStateOutput {
+    result: Vec<f32>,
+    error: Option<String>,
+}
+
+/// Initialize or update convolution state (keeps tensors in memory)
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_init(input_json: *const c_char) -> *mut c_char {
+    unsafe {
+        if input_json.is_null() {
+            let err = CString::new(r#"{"error":"null input"}"#).unwrap();
+            return err.into_raw();
+        }
+        
+        let input_str = match std::ffi::CStr::from_ptr(input_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                let err = CString::new(r#"{"error":"invalid string"}"#).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        let input: ConvolutionStateInput = match serde_json::from_str(input_str) {
+            Ok(data) => data,
+            Err(e) => {
+                let err = CString::new(format!(r#"{{"error":"parse error: {}"}}"#, e)).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        match convolution_state::init_or_update_convolution(input.context_id, &input.image, &input.kernel) {
+            Ok(result) => {
+                let output = ConvolutionStateOutput { result, error: None };
+                let result_json = match serde_json::to_string(&output) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        let err = CString::new(format!(r#"{{"error":"serialize error: {}"}}"#, e)).unwrap();
+                        return err.into_raw();
+                    }
+                };
+                CString::new(result_json).unwrap().into_raw()
+            }
+            Err(e) => {
+                let output = ConvolutionStateOutput { result: vec![], error: Some(e) };
+                let result_json = match serde_json::to_string(&output) {
+                    Ok(json) => json,
+                    Err(_) => {
+                        let err = CString::new(r#"{"error":"failed to serialize error"}"#).unwrap();
+                        return err.into_raw();
+                    }
+                };
+                CString::new(result_json).unwrap().into_raw()
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct ConvolutionStepInput {
+    context_id: u64,
+}
+
+/// Apply one convolution step (in-place, no serialization overhead)
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_step(input_json: *const c_char) -> *mut c_char {
+    unsafe {
+        if input_json.is_null() {
+            let err = CString::new(r#"{"error":"null input"}"#).unwrap();
+            return err.into_raw();
+        }
+        
+        let input_str = match std::ffi::CStr::from_ptr(input_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                let err = CString::new(r#"{"error":"invalid string"}"#).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        let input: ConvolutionStepInput = match serde_json::from_str(input_str) {
+            Ok(data) => data,
+            Err(e) => {
+                let err = CString::new(format!(r#"{{"error":"parse error: {}"}}"#, e)).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        match convolution_state::step_convolution(input.context_id) {
+            Ok(result) => {
+                let output = ConvolutionStateOutput { result, error: None };
+                let result_json = match serde_json::to_string(&output) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        let err = CString::new(format!(r#"{{"error":"serialize error: {}"}}"#, e)).unwrap();
+                        return err.into_raw();
+                    }
+                };
+                CString::new(result_json).unwrap().into_raw()
+            }
+            Err(e) => {
+                let output = ConvolutionStateOutput { result: vec![], error: Some(e) };
+                let result_json = match serde_json::to_string(&output) {
+                    Ok(json) => json,
+                    Err(_) => {
+                        let err = CString::new(r#"{"error":"failed to serialize error"}"#).unwrap();
+                        return err.into_raw();
+                    }
+                };
+                CString::new(result_json).unwrap().into_raw()
+            }
+        }
+    }
+}
+
+/// Free memory allocated by stateful convolution functions
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_init_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_step_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct ConvolutionCleanupInput {
+    context_id: u64,
+}
+
+/// Clean up convolution state
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_cleanup(input_json: *const c_char) -> *mut c_char {
+    unsafe {
+        if input_json.is_null() {
+            let err = CString::new(r#"{"error":"null input"}"#).unwrap();
+            return err.into_raw();
+        }
+        
+        let input_str = match std::ffi::CStr::from_ptr(input_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                let err = CString::new(r#"{"error":"invalid string"}"#).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        let input: ConvolutionCleanupInput = match serde_json::from_str(input_str) {
+            Ok(data) => data,
+            Err(_) => {
+                let err = CString::new(r#"{"error":"parse error"}"#).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        convolution_state::cleanup_convolution(input.context_id);
+        let result = CString::new(r#"{"success":true}"#).unwrap();
+        result.into_raw()
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_cleanup_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);

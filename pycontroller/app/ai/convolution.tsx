@@ -25,21 +25,68 @@ export default function Convolution() {
   const frameCountRef = useRef(0);
   const lastFpsUpdateRef = useRef(Date.now());
   const animationFrameRef = useRef<number | null>(null);
+  const contextIdRef = useRef(1); // Simple context ID
 
-  // Initialize random image and kernel
-  const initialize = useCallback(() => {
-    // Random RGB image (128x128x3 = 49152 values)
-    const newImage = Array.from({ length: WIDTH * HEIGHT * CHANNELS }, () => Math.random());
-    setImageData(newImage);
-    
-    // Random 3x3x3 kernel (-1 to +1)
-    const newKernel = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
-    setKernel(newKernel);
+  // Initialize convolution state
+  const initConvolution = useCallback((image: number[], kernel: number[]) => {
+    try {
+      const input = JSON.stringify({
+        context_id: contextIdRef.current,
+        image,
+        kernel,
+      });
+      
+      const resultJson = SensorlibModule.rustcoreConvolutionInit(input);
+      if (!resultJson) {
+        console.error('Convolution init returned null');
+        return false;
+      }
+      
+      const result = JSON.parse(resultJson);
+      
+      if (result.error) {
+        console.error('Convolution init error:', result.error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Convolution init failed:', error);
+      return false;
+    }
   }, []);
 
-  useEffect(() => {
-    initialize();
-  }, [initialize]);
+  // Apply convolution step (stateful, no serialization overhead)
+  const applyConvolutionStep = useCallback((): number[] | null => {
+    try {
+      const input = JSON.stringify({
+        context_id: contextIdRef.current,
+      });
+      
+      const resultJson = SensorlibModule.rustcoreConvolutionStep(input);
+      if (!resultJson) {
+        console.error('Convolution step returned null');
+        return null;
+      }
+      
+      const result = JSON.parse(resultJson);
+      
+      if (result.error) {
+        console.error('Convolution step error:', result.error);
+        return null;
+      }
+      
+      if (!result.result || !Array.isArray(result.result)) {
+        console.error('Convolution step returned invalid result:', result);
+        return null;
+      }
+      
+      return result.result;
+    } catch (error) {
+      console.error('Convolution step failed:', error);
+      return null;
+    }
+  }, []);
 
   // Check if image has died out (sum is 0)
   const checkIfDead = useCallback((data: number[]): boolean => {
@@ -47,27 +94,38 @@ export default function Convolution() {
     return sum < 0.001; // Very small threshold
   }, []);
 
-  // Apply convolution using Rust
-  const applyConvolution = useCallback(async (inputImage: number[], inputKernel: number[]): Promise<number[]> => {
-    try {
-      const input = JSON.stringify({
-        image: inputImage,
-        kernel: inputKernel,
-      });
+  // Initialize on mount
+  useEffect(() => {
+    const init = () => {
+      // Random RGB image
+      const newImage = Array.from({ length: WIDTH * HEIGHT * CHANNELS }, () => Math.random());
+      // Random 3x3x3 kernel (-1 to +1)
+      const newKernel = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
       
-      const resultJson = SensorlibModule.rustcoreConvolution(input);
-      const result = JSON.parse(resultJson);
+      setImageData(newImage);
+      setKernel(newKernel);
       
-      if (result.error) {
-        console.error('Convolution error:', result.error);
-        return inputImage; // Return original on error
+      // Initialize Rust state
+      if (initConvolution(newImage, newKernel)) {
+        setImageData(newImage);
       }
-      
-      return result.result;
-    } catch (error) {
-      console.error('Convolution failed:', error);
-      return inputImage; // Return original on error
-    }
+    };
+    
+    init();
+  }, [initConvolution]);
+
+  // Cleanup convolution state
+  useEffect(() => {
+    return () => {
+      try {
+        const input = JSON.stringify({
+          context_id: contextIdRef.current,
+        });
+        SensorlibModule.rustcoreConvolutionCleanup(input);
+      } catch (error) {
+        console.error('Convolution cleanup failed:', error);
+      }
+    };
   }, []);
 
   // Main animation loop - runs as fast as possible
@@ -107,25 +165,28 @@ export default function Convolution() {
         lastFpsUpdateRef.current = now;
       }
       
-      // Apply convolution as fast as possible (don't wait for previous to finish)
+      // Apply convolution step (stateful, no serialization overhead)
       if (!processingRef.current) {
         processingRef.current = true;
-        const imageToProcess = [...currentImageRef.current];
-        const kernelToUse = [...currentKernelRef.current];
         
-        applyConvolution(imageToProcess, kernelToUse).then((newImage) => {
-          processingRef.current = false;
-          
+        const newImage = applyConvolutionStep();
+        processingRef.current = false;
+        
+        if (newImage) {
           // Check if dead
           if (checkIfDead(newImage)) {
-            initialize();
+            // Re-initialize
+            const newImageData = Array.from({ length: WIDTH * HEIGHT * CHANNELS }, () => Math.random());
+            const newKernelData = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
+            setKernel(newKernelData);
+            if (initConvolution(newImageData, newKernelData)) {
+              setImageData(newImageData);
+            }
             return;
           }
           
           setImageData(newImage);
-        }).catch(() => {
-          processingRef.current = false;
-        });
+        }
       }
       
       if (isRunning) {
@@ -142,7 +203,7 @@ export default function Convolution() {
         animationFrameRef.current = null;
       }
     };
-  }, [paused, applyConvolution, checkIfDead, initialize]);
+  }, [paused, applyConvolutionStep, checkIfDead, initConvolution]);
 
   // Convert image data to a single flat array of pixel colors for faster rendering
   const pixelColors = useMemo(() => {
