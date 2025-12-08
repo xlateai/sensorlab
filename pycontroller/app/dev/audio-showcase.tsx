@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Button, Keyboard, Pressable, TextInput, ScrollView, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeviceMotion, Magnetometer } from 'expo-sensors';
-import { useFocusEffect } from '@react-navigation/native';
 import { playContinuousHaptic } from '../utils/haptics';
 import { 
   playWaveform, 
@@ -137,7 +135,7 @@ function ControlSelector({
   );
 }
 
-export default function AudioTab() {
+export default function AudioShowcase() {
   const [intensity, setIntensity] = useState(1.0);
   const [sharpness, setSharpness] = useState(0.5);
   // Use refs to hold live values for haptic stream
@@ -562,41 +560,38 @@ export default function AudioTab() {
   };
 
   // Subscribe to DeviceMotion for pitch and roll rotation
-  useFocusEffect(
-    React.useCallback(() => {
-      const subscription = DeviceMotion.addListener((data) => {
-        let pitch: number | undefined;
-        let roll: number | undefined;
-        
-        if (data?.rotation?.beta !== undefined) {
-          const beta = data.rotation.beta; // Pitch rotation in radians
-          setPitchRotation(beta);
-          pitchRotationRef.current = beta;
-          pitch = beta;
-        }
-        if (data?.rotation?.gamma !== undefined) {
-          const gamma = data.rotation.gamma; // Roll rotation in radians
-          setRollRotation(gamma);
-          rollRotationRef.current = gamma;
-          roll = gamma;
-        }
-        
-        // Update rolling average baseline when we have both values
-        if (pitch !== undefined && roll !== undefined) {
-          updateBaseline(pitch, roll);
-        }
-      });
-      DeviceMotion.setUpdateInterval(16); // ~60Hz updates
-      return () => {
-        subscription && subscription.remove();
-      };
-    }, [])
-  );
+  useEffect(() => {
+    const subscription = DeviceMotion.addListener((data) => {
+      let pitch: number | undefined;
+      let roll: number | undefined;
+      
+      if (data?.rotation?.beta !== undefined) {
+        const beta = data.rotation.beta; // Pitch rotation in radians
+        setPitchRotation(beta);
+        pitchRotationRef.current = beta;
+        pitch = beta;
+      }
+      if (data?.rotation?.gamma !== undefined) {
+        const gamma = data.rotation.gamma; // Roll rotation in radians
+        setRollRotation(gamma);
+        rollRotationRef.current = gamma;
+        roll = gamma;
+      }
+      
+      // Update rolling average baseline when we have both values
+      if (pitch !== undefined && roll !== undefined) {
+        updateBaseline(pitch, roll);
+      }
+    });
+    DeviceMotion.setUpdateInterval(16); // ~60Hz updates
+    return () => {
+      subscription && subscription.remove();
+    };
+  }, []);
   
   // Subscribe to Magnetometer for ambient control
-  useFocusEffect(
-    React.useCallback(() => {
-      const subscription = Magnetometer.addListener((data) => {
+  useEffect(() => {
+    const subscription = Magnetometer.addListener((data) => {
         const magnetometerData: MagnetometerData = {
           x: data.x || 0,
           y: data.y || 0,
@@ -651,8 +646,7 @@ export default function AudioTab() {
       return () => {
         subscription && subscription.remove();
       };
-    }, [])
-  );
+    }, []);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -734,7 +728,7 @@ export default function AudioTab() {
             if (samples.length > 0) {
               // Calculate RMS (root mean square) for this batch to get amplitude
               const rms = Math.sqrt(
-                samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length
+                samples.reduce((sum: number, sample: number) => sum + sample * sample, 0) / samples.length
               );
               
               const now = Date.now();
@@ -814,22 +808,19 @@ export default function AudioTab() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          padding: 24,
-          paddingBottom: 48,
-          flexGrow: 1,
-        }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={true}
-        bounces={true}
-        scrollEnabled={true}
-        nestedScrollEnabled={true}
-      >
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: '#fff' }}>Audio Test</Text>
-        <View style={{ marginBottom: 32 }}>
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        padding: 0,
+        flexGrow: 1,
+      }}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={true}
+      bounces={true}
+      scrollEnabled={true}
+      nestedScrollEnabled={true}
+    >
+      <View style={{ marginBottom: 32 }}>
         <WaveformSliderGroup
           baseFrequency={baseFrequency}
           precisionOffset={precisionOffset}
@@ -968,7 +959,6 @@ export default function AudioTab() {
             />
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }

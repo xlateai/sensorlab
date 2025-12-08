@@ -4,6 +4,7 @@ import { StyleSheet, View, Text, SafeAreaView, ScrollView, Dimensions, Modal, Pr
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import SensorsShowcase from '@/app/dev/sensors-showcase';
 import UIUXShowcase from '@/app/dev/ui-ux-showcase';
+import AudioShowcase from '@/app/dev/audio-showcase';
 import RustCoreShowcase from '@/app/dev/rust-core-showcase';
 import ControllersShowcase from '@/app/dev/controllers-showcase';
 
@@ -978,6 +979,10 @@ export default function DevScreen() {
 
           <CollapsibleSection title="UI/UX">
             <UIUXShowcase />
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Audio">
+            <AudioShowcase />
           </CollapsibleSection>
 
           <CollapsibleSection title="Rust core">
