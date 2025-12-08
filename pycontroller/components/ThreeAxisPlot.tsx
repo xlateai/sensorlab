@@ -19,15 +19,17 @@ interface ThreeAxisPlotProps {
   colorZ?: string;
   min?: number;
   max?: number;
+  averageData?: DataPoint[];
+  colorAverage?: string;
 }
 
-function getPolylinePoints(data: Array<{ v: number }>, width: number, height: number) {
+function getPolylinePoints(data: Array<{ v: number }>, width: number, height: number, vMin?: number, vMax?: number) {
   if (data.length === 0) return '';
-  const vMin = Math.min(...data.map(d => d.v));
-  const vMax = Math.max(...data.map(d => d.v));
+  const min = vMin !== undefined ? vMin : Math.min(...data.map(d => d.v));
+  const max = vMax !== undefined ? vMax : Math.max(...data.map(d => d.v));
   return data.map((d, i) => {
     const x = (i / Math.max(1, data.length - 1)) * width;
-    const y = height - ((d.v - vMin) / Math.max(0.001, vMax - vMin)) * height;
+    const y = height - ((d.v - min) / Math.max(0.001, max - min)) * height;
     return `${x},${y}`;
   }).join(' ');
 }
@@ -42,15 +44,25 @@ export default function ThreeAxisPlot({
   colorZ = '#0fa',
   min,
   max,
+  averageData,
+  colorAverage = '#fff',
 }: ThreeAxisPlotProps) {
   const tMax = data.length > 0 ? data.length - 1 : 0;
-  const xPoints = getPolylinePoints(data.map(d => ({ v: d.x })), width, height);
-  const yPoints = getPolylinePoints(data.map(d => ({ v: d.y })), width, height);
-  const zPoints = getPolylinePoints(data.map(d => ({ v: d.z })), width, height);
-  // For axis labels, use min/max across all axes
+  // For axis labels, use min/max across all axes (including average if present)
   const allVals = data.flatMap(d => [d.x, d.y, d.z]);
-  const vMin = typeof min === 'number' ? min : (allVals.length ? Math.min(...allVals) : -1);
-  const vMax = typeof max === 'number' ? max : (allVals.length ? Math.max(...allVals) : 1);
+  const avgVals = averageData ? averageData.map(d => (d.x + d.y + d.z) / 3) : [];
+  const allValsWithAvg = [...allVals, ...avgVals];
+  const vMin = typeof min === 'number' ? min : (allValsWithAvg.length ? Math.min(...allValsWithAvg) : -1);
+  const vMax = typeof max === 'number' ? max : (allValsWithAvg.length ? Math.max(...allValsWithAvg) : 1);
+  
+  const xPoints = getPolylinePoints(data.map(d => ({ v: d.x })), width, height, vMin, vMax);
+  const yPoints = getPolylinePoints(data.map(d => ({ v: d.y })), width, height, vMin, vMax);
+  const zPoints = getPolylinePoints(data.map(d => ({ v: d.z })), width, height, vMin, vMax);
+  
+  // Average line points (average of x, y, z at each time point)
+  const avgPoints = averageData 
+    ? getPolylinePoints(averageData.map(d => ({ v: (d.x + d.y + d.z) / 3 })), width, height, vMin, vMax)
+    : '';
 
   return (
     <View style={{ marginBottom: 12 }}>
@@ -59,12 +71,18 @@ export default function ThreeAxisPlot({
         <Text style={{ color: colorX, fontWeight: 'bold', marginLeft: 12, marginRight: 4 }}>x</Text>
         <Text style={{ color: colorY, fontWeight: 'bold', marginHorizontal: 4 }}>y</Text>
         <Text style={{ color: colorZ, fontWeight: 'bold', marginHorizontal: 4 }}>z</Text>
+        {averageData && (
+          <Text style={{ color: colorAverage, fontWeight: 'bold', marginHorizontal: 4, fontSize: 16 }}>avg</Text>
+        )}
       </View>
       <View style={{ position: 'relative' }}>
         <Svg width={width} height={height} style={{ backgroundColor: '#222', borderRadius: 8 }}>
           <Polyline points={xPoints} fill="none" stroke={colorX} strokeWidth="2" />
           <Polyline points={yPoints} fill="none" stroke={colorY} strokeWidth="2" />
           <Polyline points={zPoints} fill="none" stroke={colorZ} strokeWidth="2" />
+          {avgPoints && (
+            <Polyline points={avgPoints} fill="none" stroke={colorAverage} strokeWidth="2" strokeDasharray="4 2" opacity={0.8} />
+          )}
           {/* Zero line */}
           <Line x1={0} y1={height/2} x2={width} y2={height/2} stroke="#888" strokeDasharray="4 2" strokeWidth="1" />
           {/* Axes */}
