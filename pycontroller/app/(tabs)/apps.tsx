@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, Pressable, Modal, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import DirectionalScreen from '@/app/subapps/directional';
 import ThreeDScreen from '@/app/subapps/threeD';
@@ -12,24 +13,25 @@ type AppType = 'directional' | 'threeD' | 'renshu' | null;
 
 export default function AppsScreen() {
   const [selectedApp, setSelectedApp] = useState<AppType>(null);
+  const insets = useSafeAreaInsets();
 
   const apps = [
     {
       id: 'directional' as AppType,
       title: 'Heading',
-      icon: 'magnifyingglass.circle',
+      icon: 'magnifyingglass.circle' as const,
       description: 'Compass and directional heading',
     },
     {
       id: 'threeD' as AppType,
       title: '3D',
-      icon: 'cube',
+      icon: 'cube' as const,
       description: '3D orientation visualization',
     },
     {
       id: 'renshu' as AppType,
       title: '練習',
-      icon: 'character.book.closed',
+      icon: 'character.book.closed' as const,
       description: 'Japanese typing practice',
     },
   ];
@@ -77,7 +79,7 @@ export default function AppsScreen() {
           {renderApp()}
           <Pressable
             onPress={() => setSelectedApp(null)}
-            style={styles.dismissButton}
+            style={[styles.dismissButton, { paddingBottom: Math.max(insets.bottom, 16) }]}
           >
             <Text style={styles.dismissButtonText}>Dismiss</Text>
           </Pressable>
