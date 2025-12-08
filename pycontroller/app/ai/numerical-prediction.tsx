@@ -1,14 +1,34 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 
 export default function NumericalPrediction() {
   const [inputValue, setInputValue] = useState('');
+  const [prediction, setPrediction] = useState<number | null>(null);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [totalGames, setTotalGames] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTextChange = (text: string) => {
     // Only allow single digit 0-9
     const lastChar = text.slice(-1);
     if (lastChar.match(/[0-9]/)) {
+      const actualNumber = parseInt(lastChar, 10);
+      
+      // Generate random prediction (0-9)
+      const randomPrediction = Math.floor(Math.random() * 10);
+      setPrediction(randomPrediction);
+      
+      // Check if prediction is correct
+      const correct = randomPrediction === actualNumber;
+      setIsCorrect(correct);
+      
+      // Update stats
+      setTotalGames(prev => prev + 1);
+      if (correct) {
+        setCorrectCount(prev => prev + 1);
+      }
+      
       setInputValue(lastChar);
       
       // Clear any existing timeout
@@ -19,6 +39,8 @@ export default function NumericalPrediction() {
       // Clear input after 1 second
       timeoutRef.current = setTimeout(() => {
         setInputValue('');
+        setPrediction(null);
+        setIsCorrect(null);
       }, 1000);
     } else if (text === '') {
       setInputValue('');
@@ -38,8 +60,43 @@ export default function NumericalPrediction() {
     };
   }, []);
 
+  const accuracy = totalGames > 0 ? (correctCount / totalGames) * 100 : 0;
+
   return (
     <View style={styles.container}>
+      {/* Stats Bar */}
+      <View style={styles.statsBar}>
+        <View style={styles.statsRow}>
+          <View style={styles.statCell}>
+            <Text style={styles.statLabel}>Accuracy</Text>
+            <Text style={styles.statValue}>{accuracy.toFixed(1)}%</Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text style={styles.statLabel}>Games</Text>
+            <Text style={styles.statValue}>{totalGames}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Prediction Display */}
+      <View style={styles.predictionContainer}>
+        <Text style={styles.predictionLabel}>Prediction:</Text>
+        <Text style={styles.predictionValue}>
+          {prediction !== null ? prediction : '-'}
+        </Text>
+        {isCorrect !== null ? (
+          <Text style={[
+            styles.predictionResult,
+            isCorrect ? styles.predictionCorrect : styles.predictionIncorrect
+          ]}>
+            {isCorrect ? '✓ Correct' : '✗ Wrong'}
+          </Text>
+        ) : (
+          <Text style={styles.predictionPlaceholder}>Select a Digit</Text>
+        )}
+      </View>
+
+      {/* Number input */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -62,6 +119,74 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 24,
+  },
+  statsBar: {
+    backgroundColor: '#181818',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#333',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    minWidth: 270,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    gap: 16,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#b0b0b0',
+    marginBottom: 1,
+  },
+  statValue: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  predictionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+  },
+  predictionLabel: {
+    fontSize: 16,
+    color: '#888',
+    marginBottom: 8,
+  },
+  predictionValue: {
+    fontSize: 72,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#888',
+  },
+  predictionPlaceholder: {
+    fontSize: 18,
+    color: '#666',
+  },
+  predictionCorrect: {
+    color: '#39ff14',
+  },
+  predictionIncorrect: {
+    color: '#ff4444',
+  },
+  predictionResult: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   inputContainer: {
     width: '100%',
