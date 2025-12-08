@@ -110,9 +110,8 @@ export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
     magSubRef.current = null;
     gyroSubRef.current = null;
     baroSubRef.current = null;
-    // Explicitly remove all listeners at native level
+    // Explicitly remove all listeners at native level (but not Magnetometer - let useStabilizedMagnetometer handle it)
     try { DeviceMotion.removeAllListeners(); } catch {}
-    try { Magnetometer.removeAllListeners(); } catch {}
     try { Gyroscope.removeAllListeners(); } catch {}
     try { Barometer.removeAllListeners(); } catch {}
   };
