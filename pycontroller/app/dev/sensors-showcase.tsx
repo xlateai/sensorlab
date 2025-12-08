@@ -5,11 +5,12 @@ import { DeviceMotion, Magnetometer, Gyroscope, Barometer } from 'expo-sensors';
 import type { DeviceMotionMeasurement } from 'expo-sensors';
 import AccelerationScreen from '@/components/sensorvisuals/acceleration';
 import MagneticScreen from '@/components/sensorvisuals/magnetic';
-import NonRotMagneticScreen from '@/components/sensorvisuals/nonrotmagnetic';
+import NonRotMagneticScreen from '@/components/sensorvisuals/stablemagnetic';
 import AccelerationWithGravityScreen from '@/components/sensorvisuals/accelerationWithGravity';
 import RotationScreen from '@/components/sensorvisuals/rotation';
 import RotationDeltaScreen from '@/components/sensorvisuals/rotationDelta';
 import GyroscopeScreen from '@/components/sensorvisuals/gyroscope';
+import { useStabilizedMagnetometer } from '@/app/utils/sensors';
 
 // Map measurement to component
 const measurementComponentMap: Record<string, React.ComponentType | null> = {
@@ -18,7 +19,7 @@ const measurementComponentMap: Record<string, React.ComponentType | null> = {
   'rot': RotationScreen,
   'rotΔ': RotationDeltaScreen,
   'magnetometer': MagneticScreen,
-  'norotmag': NonRotMagneticScreen,
+  'smag': NonRotMagneticScreen,
   'gyroscope': GyroscopeScreen,
   'barometer': null,
 };
@@ -90,6 +91,9 @@ export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupMeasurement, setPopupMeasurement] = useState('');
   const [popupComponent, setPopupComponent] = useState<string>('');
+
+  // Get stabilized magnetometer reading
+  const { stabilized } = useStabilizedMagnetometer(24, 128);
 
   // Store subscriptions in refs so we can kill them on pause and recreate on play
   const motionSubRef = useRef<any>(null);
@@ -283,12 +287,12 @@ export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
           </Pressable>
         </View>
         <View style={styles.tableRow}>
-          <Text style={styles.tableMeasurementCell}>norotmag</Text>
-          <Text style={styles.tableCell}>{magnetometerData?.x?.toFixed(2) ?? '-'}</Text>
-          <Text style={styles.tableCell}>{magnetometerData?.y?.toFixed(2) ?? '-'}</Text>
-          <Text style={styles.tableCell}>{magnetometerData?.z?.toFixed(2) ?? '-'}</Text>
+          <Text style={styles.tableMeasurementCell}>smag</Text>
+          <Text style={styles.tableCell}>{stabilized.x.toFixed(2)}</Text>
+          <Text style={styles.tableCell}>-</Text>
+          <Text style={styles.tableCell}>-</Text>
           <Text style={styles.tableCell}>μT</Text>
-          <Pressable onPress={() => openPopup('norotmag')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+          <Pressable onPress={() => openPopup('smag')} style={{ marginLeft: 4, backgroundColor: '#222', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
             <Text style={{ color: '#fff', fontSize: 12 }}>Plot</Text>
           </Pressable>
         </View>

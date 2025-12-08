@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Dimensions, ScrollView, SafeAreaView } from 'react-native';
-import RecordButton from '../../components/RecordButton';
-import SensorDots from '../../components/SensorDots';
-import ThreeAxisPlot from '../../components/ThreeAxisPlot';
+import RecordButton from '../RecordButton';
+import SensorDots from '../SensorDots';
+import ThreeAxisPlot from '../ThreeAxisPlot';
 import { View } from 'react-native';
 import { useStabilizedMagnetometer } from '@/app/utils/sensors';
 
@@ -83,7 +83,7 @@ export default function NonRotMagneticScreen() {
           width={plotWidth}
           height={plotHeight}
           colorX="#4af"
-          title="No-Rotation Magneto"
+          title="Stable EMF"
           colorY="#fa4"
           colorZ="#0fa"
           averageData={averageData}
