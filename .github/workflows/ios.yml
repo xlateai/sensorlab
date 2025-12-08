@@ -15,6 +15,16 @@ jobs:
         working-directory: ./pycontroller
         run: npm ci
         shell: bash
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - name: 🦀 Build Rust library for iOS
+        working-directory: ./pycontroller/rustcore
+        run: |
+          chmod +x build-ios.sh
+          ./build-ios.sh
+        shell: bash
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
         with:
