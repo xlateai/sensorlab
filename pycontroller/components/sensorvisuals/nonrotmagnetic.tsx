@@ -14,13 +14,34 @@ export default function NonRotMagneticScreen() {
   const [magHistory, setMagHistory] = useState<Array<{ t: number; x: number; y: number; z: number }>>([]);
   const startTimeRef = useRef<number | null>(null);
 
+  // Track all-time min/max values for the current session
+  const [minMax, setMinMax] = useState<{
+    min: number;
+    max: number;
+  }>({
+    min: Infinity,
+    max: -Infinity,
+  });
+
   // Use the stabilized magnetometer hook - provides both raw and stabilized readings
   const { stabilized, stabilizedBuffer } = useStabilizedMagnetometer(
     24, // updateInterval: 24ms
-    16, // trendWindowSize: 16 samples
-    16, // normalizationWindowSize: 16 samples
     128 // bufferSize: 128 samples
   );
+
+  // Update all-time min/max values from stabilized readings
+  useEffect(() => {
+    // Since stabilized values are all the same (euclidean norm), we can use any axis
+    const value = stabilized.x; // x, y, z are all the same
+    
+    // Skip if value is zero (initial state)
+    if (value === 0 && minMax.min === Infinity) return;
+    
+    setMinMax(prev => ({
+      min: prev.min === Infinity ? value : Math.min(prev.min, value),
+      max: prev.max === -Infinity ? value : Math.max(prev.max, value),
+    }));
+  }, [stabilized]);
 
   // Record stabilized readings when recording is active
   useEffect(() => {
@@ -45,6 +66,15 @@ export default function NonRotMagneticScreen() {
     z: (d.x + d.y + d.z) / 3,
   }));
 
+  // Calculate plot min/max (all-time values)
+  const plotMin = minMax.min === Infinity ? 0 : minMax.min;
+  const plotMax = minMax.max === -Infinity ? 100 : minMax.max;
+
+  // Calculate 10th and 90th percentile thresholds for SensorDots
+  const range = plotMax - plotMin;
+  const lowThreshold = plotMin + range * 0.1;  // Bottom 10%
+  const highThreshold = plotMax - range * 0.1;  // Top 10%
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ alignItems: 'center' }}>
@@ -58,20 +88,20 @@ export default function NonRotMagneticScreen() {
           colorZ="#0fa"
           averageData={averageData}
           colorAverage="#fff"
-          min={-1}
-          max={1}
+          min={plotMin}
+          max={plotMax}
         />
         {/* SensorDots below the plot */}
         <SensorDots
           x={stabilized.x}
           y={stabilized.y}
           z={stabilized.z}
-          xLow={-1}
-          xHigh={1}
-          yLow={-1}
-          yHigh={1}
-          zLow={-1}
-          zHigh={1}
+          xLow={lowThreshold}
+          xHigh={highThreshold}
+          yLow={lowThreshold}
+          yHigh={highThreshold}
+          zLow={lowThreshold}
+          zHigh={highThreshold}
         />
       </ScrollView>
       {/* Record button at bottom center */}
@@ -93,6 +123,11 @@ export default function NonRotMagneticScreen() {
           onClear={() => {
             setMagHistory([]);
             startTimeRef.current = null;
+            // Reset min/max values
+            setMinMax({
+              min: Infinity,
+              max: -Infinity,
+            });
           }}
           color="#4af"
         />
