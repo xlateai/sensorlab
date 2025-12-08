@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { useStabilizedMagnetometer } from '@/app/utils/sensors';
 
 export default function NumericalPrediction() {
   const [inputValue, setInputValue] = useState('');
@@ -8,6 +9,9 @@ export default function NumericalPrediction() {
   const [totalGames, setTotalGames] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Get stabilized magnetometer reading
+  const { stabilized } = useStabilizedMagnetometer(24, 128);
 
   const handleTextChange = (text: string) => {
     // Only allow single digit 0-9
@@ -72,8 +76,12 @@ export default function NumericalPrediction() {
             <Text style={styles.statValue}>{accuracy.toFixed(1)}%</Text>
           </View>
           <View style={styles.statCell}>
-            <Text style={styles.statLabel}>Games</Text>
+            <Text style={styles.statLabel}>Plays</Text>
             <Text style={styles.statValue}>{totalGames}</Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text style={styles.statLabel}>µT</Text>
+            <Text style={styles.statValue}>{stabilized.x.toFixed(1)}</Text>
           </View>
         </View>
       </View>
