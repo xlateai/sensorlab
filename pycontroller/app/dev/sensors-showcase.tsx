@@ -92,8 +92,8 @@ export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
   const [popupMeasurement, setPopupMeasurement] = useState('');
   const [popupComponent, setPopupComponent] = useState<string>('');
 
-  // Get stabilized magnetometer reading
-  const { stabilized } = useStabilizedMagnetometer(24, 128);
+  // Get stabilized magnetometer reading (only when not paused)
+  const { stabilized } = useStabilizedMagnetometer(24, 128, !paused);
 
   // Store subscriptions in refs so we can kill them on pause and recreate on play
   const motionSubRef = useRef<any>(null);
@@ -287,7 +287,7 @@ export default function SensorsShowcase({ styles }: SensorsShowcaseProps) {
         </View>
         <View style={styles.tableRow}>
           <Text style={styles.tableMeasurementCell}>smag</Text>
-          <Text style={styles.tableCell}>{stabilized.x.toFixed(2)}</Text>
+          <Text style={styles.tableCell}>{paused || stabilized.x === 0 ? '-' : stabilized.x.toFixed(2)}</Text>
           <Text style={styles.tableCell}>-</Text>
           <Text style={styles.tableCell}>-</Text>
           <Text style={styles.tableCell}>μT</Text>

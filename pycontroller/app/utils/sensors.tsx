@@ -28,6 +28,7 @@ function euclideanNorm(vec: { x: number; y: number; z: number }): number {
  * 
  * @param updateInterval - Update interval in milliseconds (default: 24ms)
  * @param bufferSize - Maximum number of raw samples to keep in buffer (default: 128)
+ * @param enabled - Whether the sensor listener should be active (default: true)
  * 
  * @returns Object containing:
  *   - raw: Current raw magnetometer reading
@@ -37,7 +38,8 @@ function euclideanNorm(vec: { x: number; y: number; z: number }): number {
  */
 export function useStabilizedMagnetometer(
   updateInterval: number = 24,
-  bufferSize: number = 128
+  bufferSize: number = 128,
+  enabled: boolean = true
 ): {
   raw: MagnetometerReading;
   stabilized: MagnetometerReading;
@@ -55,6 +57,18 @@ export function useStabilizedMagnetometer(
   const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      // Clear state when disabled
+      setRaw({ x: 0, y: 0, z: 0 });
+      setStabilized({ x: 0, y: 0, z: 0 });
+      setRawBuffer([]);
+      setStabilizedBuffer([]);
+      rawBufferRef.current = [];
+      stabilizedBufferRef.current = [];
+      startTimeRef.current = null;
+      return;
+    }
+
     // Initialize start time
     if (startTimeRef.current === null) {
       startTimeRef.current = Date.now();
@@ -106,7 +120,7 @@ export function useStabilizedMagnetometer(
       stabilizedBufferRef.current = [];
       startTimeRef.current = null;
     };
-  }, [updateInterval, bufferSize]);
+  }, [updateInterval, bufferSize, enabled]);
 
   return {
     raw,
