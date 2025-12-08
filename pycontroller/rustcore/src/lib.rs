@@ -1,6 +1,8 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
 
+mod helloworld;
+
 /// Hello world function that returns a C-compatible string
 /// The caller is responsible for freeing the memory using rustcore_hello_free
 #[unsafe(no_mangle)]
@@ -23,7 +25,7 @@ pub extern "C" fn rustcore_hello_free(ptr: *mut c_char) {
 /// The caller is responsible for freeing the memory using rustcore_ml_training_free
 #[unsafe(no_mangle)]
 pub extern "C" fn rustcore_ml_training() -> *mut c_char {
-    let output = mlrslab::run_training();
+    let output = helloworld::run_training();
     let s = CString::new(output).expect("CString::new failed");
     s.into_raw()
 }

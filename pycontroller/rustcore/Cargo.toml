@@ -8,4 +8,6 @@ name = "rustcore"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-mlrslab = { path = "../../../mlrslab" }
+burn = { version = "0.19.1", features = ["train"] }
+burn-ndarray = "0.19.1"
+burn-autodiff = "0.19.1"

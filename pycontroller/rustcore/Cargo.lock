@@ -3570,15 +3570,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mlrslab"
-version = "0.1.0"
-dependencies = [
- "burn",
- "burn-autodiff",
- "burn-ndarray",
-]
-
-[[package]]
 name = "moddef"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4693,7 +4684,9 @@ dependencies = [
 name = "rustcore"
 version = "0.1.0"
 dependencies = [
- "mlrslab",
+ "burn",
+ "burn-autodiff",
+ "burn-ndarray",
 ]
 
 [[package]]
