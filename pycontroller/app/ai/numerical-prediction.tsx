@@ -81,7 +81,10 @@ export default function NumericalPrediction() {
       {/* Prediction Display */}
       <View style={styles.predictionContainer}>
         <Text style={styles.predictionLabel}>Prediction:</Text>
-        <Text style={styles.predictionValue}>
+        <Text style={[
+          styles.predictionValue,
+          isCorrect !== null && (isCorrect ? styles.predictionCorrect : styles.predictionIncorrect)
+        ]}>
           {prediction !== null ? prediction : '-'}
         </Text>
         {isCorrect !== null ? (
