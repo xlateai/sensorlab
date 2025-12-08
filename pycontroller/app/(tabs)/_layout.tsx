@@ -128,13 +128,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="audio"
-        options={{
-          title: 'Audio',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="waveform" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="threeD"
         options={{
           title: '3D',
@@ -146,6 +139,13 @@ export default function TabLayout() {
         options={{
           title: 'Video',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="play.rectangle" color={color} />, // video icon
+        }}
+      />
+      <Tabs.Screen
+        name="ai"
+        options={{
+          title: 'AI',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="brain" color={color} />,
         }}
       />
       <Tabs.Screen
