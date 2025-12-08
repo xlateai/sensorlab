@@ -81,8 +81,17 @@ pub extern "C" fn rustcore_convolution(input_json: *const c_char) -> *mut c_char
             }
         };
         
-        if input.image.len() != 128 * 128 * 3 || input.kernel.len() != 27 {
-            let err = CString::new(r#"{"error":"invalid dimensions"}"#).unwrap();
+        // Validate dimensions (support any square size, but kernel must be 3x3x3 = 27)
+        if input.image.len() % 3 != 0 || input.kernel.len() != 27 {
+            let err = CString::new(r#"{"error":"invalid dimensions: image must be RGB (multiple of 3), kernel must be 27"}"#).unwrap();
+            return err.into_raw();
+        }
+        
+        // Verify it's a square image (total pixels must be a perfect square)
+        let total_pixels = input.image.len() / 3;
+        let width = (total_pixels as f64).sqrt() as usize;
+        if width * width != total_pixels {
+            let err = CString::new(format!(r#"{{"error":"image must be square (got {} pixels, not a perfect square)"}}"#, total_pixels)).unwrap();
             return err.into_raw();
         }
         

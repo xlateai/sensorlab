@@ -3,11 +3,11 @@ import { View, Text, StyleSheet, FlatList, Dimensions } from 'react-native';
 import PlayPauseButton from '@/components/ui/play-pause-button';
 import SensorlibModule from 'sensorlib';
 
-const WIDTH = 128;
-const HEIGHT = 128;
+const WIDTH = 32;
+const HEIGHT = 32;
 const CHANNELS = 3;
 const KERNEL_SIZE = 3;
-const PIXEL_SIZE = 2; // Size of each pixel in the display
+const PIXEL_SIZE = 4; // Size of each pixel in the display
 
 // Convert RGB value (0-1) to color string
 function rgbToColor(r: number, g: number, b: number): string {
@@ -144,56 +144,45 @@ export default function Convolution() {
     };
   }, [paused, applyConvolution, checkIfDead, initialize]);
 
-  // Convert image data to rows for rendering
-  const imageRows = useMemo(() => {
+  // Convert image data to a single flat array of pixel colors for faster rendering
+  const pixelColors = useMemo(() => {
     if (imageData.length === 0) return [];
-    
-    const rows: Array<Array<{ r: number; g: number; b: number }>> = [];
-    for (let y = 0; y < HEIGHT; y++) {
-      const row: Array<{ r: number; g: number; b: number }> = [];
-      for (let x = 0; x < WIDTH; x++) {
-        const idx = (y * WIDTH + x) * CHANNELS;
-        row.push({
-          r: imageData[idx] || 0,
-          g: imageData[idx + 1] || 0,
-          b: imageData[idx + 2] || 0,
-        });
-      }
-      rows.push(row);
+    const colors: string[] = [];
+    for (let i = 0; i < imageData.length; i += CHANNELS) {
+      colors.push(rgbToColor(
+        imageData[i] || 0,
+        imageData[i + 1] || 0,
+        imageData[i + 2] || 0
+      ));
     }
-    return rows;
+    return colors;
   }, [imageData]);
-
-  const renderRow = useCallback(({ item: row, index: y }: { item: Array<{ r: number; g: number; b: number }>, index: number }) => {
-    return (
-      <View style={styles.row}>
-        {row.map((pixel, x) => (
-          <View
-            key={`${y}-${x}`}
-            style={[
-              styles.pixel,
-              { backgroundColor: rgbToColor(pixel.r, pixel.g, pixel.b) }
-            ]}
-          />
-        ))}
-      </View>
-    );
-  }, []);
 
   return (
     <View style={styles.container}>
       <Text style={styles.fpsText}>FPS: {fps}</Text>
       
       <View style={styles.imageContainer}>
-        <FlatList
-          data={imageRows}
-          renderItem={renderRow}
-          keyExtractor={(_, index) => `row-${index}`}
-          scrollEnabled={false}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-        />
+        <View style={styles.pixelGrid}>
+          {pixelColors.map((color, idx) => {
+            const y = Math.floor(idx / WIDTH);
+            const x = idx % WIDTH;
+            return (
+              <View
+                key={`pixel-${idx}`}
+                style={[
+                  styles.pixel,
+                  {
+                    backgroundColor: color,
+                    position: 'absolute',
+                    left: x * PIXEL_SIZE,
+                    top: y * PIXEL_SIZE,
+                  }
+                ]}
+              />
+            );
+          })}
+        </View>
       </View>
       
       <PlayPauseButton
@@ -221,8 +210,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  row: {
-    flexDirection: 'row',
+  pixelGrid: {
+    width: WIDTH * PIXEL_SIZE,
+    height: HEIGHT * PIXEL_SIZE,
+    position: 'relative',
   },
   pixel: {
     width: PIXEL_SIZE,
