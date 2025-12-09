@@ -131,6 +131,27 @@ pub fn step_convolution(context_id: u64) -> Result<Vec<f32>, String> {
     Ok(result)
 }
 
+/// Get current image data without applying convolution
+pub fn get_convolution_image(context_id: u64) -> Result<Vec<f32>, String> {
+    const CHANNELS: usize = 3;
+    
+    let states = CONV_STATES.lock().unwrap();
+    let state = states.get(&context_id)
+        .ok_or_else(|| "context not found".to_string())?;
+    
+    let image_tensor = state.image_tensor.as_ref()
+        .ok_or_else(|| "image tensor not initialized".to_string())?;
+    
+    // Convert from [1,C,H,W] back to [H,W,C]
+    let output_3d = image_tensor.squeeze_dim(0); // [C, H, W]
+    let output_hwc = output_3d.permute([1, 2, 0]); // [H, W, C]
+    let output_data = output_hwc.into_data();
+    let output_slice = output_data.as_slice::<f32>().unwrap();
+    let result = output_slice.to_vec();
+    
+    Ok(result)
+}
+
 /// Clean up state
 pub fn cleanup_convolution(context_id: u64) {
     let mut states = CONV_STATES.lock().unwrap();

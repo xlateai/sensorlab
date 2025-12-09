@@ -273,6 +273,68 @@ struct ConvolutionCleanupInput {
     context_id: u64,
 }
 
+/// Get current Rust convolution image data (without applying step)
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_get_image(input_json: *const c_char) -> *mut c_char {
+    unsafe {
+        if input_json.is_null() {
+            let err = CString::new(r#"{"error":"null input"}"#).unwrap();
+            return err.into_raw();
+        }
+        
+        let input_str = match std::ffi::CStr::from_ptr(input_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                let err = CString::new(r#"{"error":"invalid string"}"#).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        let input: ConvolutionStepInput = match serde_json::from_str(input_str) {
+            Ok(data) => data,
+            Err(e) => {
+                let err = CString::new(format!(r#"{{"error":"parse error: {}"}}"#, e)).unwrap();
+                return err.into_raw();
+            }
+        };
+        
+        match convolution_state::get_convolution_image(input.context_id) {
+            Ok(result) => {
+                let output = ConvolutionStateOutput { result, error: None };
+                let result_json = match serde_json::to_string(&output) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        let err = CString::new(format!(r#"{{"error":"serialize error: {}"}}"#, e)).unwrap();
+                        return err.into_raw();
+                    }
+                };
+                CString::new(result_json).unwrap().into_raw()
+            }
+            Err(e) => {
+                let output = ConvolutionStateOutput { result: vec![], error: Some(e) };
+                let result_json = match serde_json::to_string(&output) {
+                    Ok(json) => json,
+                    Err(_) => {
+                        let err = CString::new(r#"{"error":"failed to serialize error"}"#).unwrap();
+                        return err.into_raw();
+                    }
+                };
+                CString::new(result_json).unwrap().into_raw()
+            }
+        }
+    }
+}
+
+/// Free memory allocated by rustcore_convolution_get_image
+#[unsafe(no_mangle)]
+pub extern "C" fn rustcore_convolution_get_image_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+    }
+}
+
 /// Clean up convolution state
 #[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_cleanup(input_json: *const c_char) -> *mut c_char {

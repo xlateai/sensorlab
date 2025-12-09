@@ -17,3 +17,12 @@ export type SensorlibViewProps = {
   onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;
   style?: StyleProp<ViewStyle>;
 };
+
+export type ConvolutionPixelViewProps = {
+  contextId?: number;
+  backend?: 'Rust' | 'Metal';
+  resolution?: number;
+  imageData?: number[];
+  autoRefresh?: boolean;
+  style?: StyleProp<ViewStyle>;
+};

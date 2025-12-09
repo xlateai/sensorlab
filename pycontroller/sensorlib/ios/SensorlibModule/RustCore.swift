@@ -31,6 +31,12 @@ func rustcore_convolution_step(_ input: UnsafePointer<CChar>?) -> UnsafeMutableP
 @_silgen_name("rustcore_convolution_step_free")
 func rustcore_convolution_step_free(_ ptr: UnsafeMutablePointer<CChar>?)
 
+@_silgen_name("rustcore_convolution_get_image")
+func rustcore_convolution_get_image(_ input: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rustcore_convolution_get_image_free")
+func rustcore_convolution_get_image_free(_ ptr: UnsafeMutablePointer<CChar>?)
+
 @_silgen_name("rustcore_convolution_cleanup")
 func rustcore_convolution_cleanup(_ input: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 
@@ -137,6 +143,24 @@ public func rustcoreConvolutionStep(_ input: String) -> String {
     
     defer {
         rustcore_convolution_step_free(resultPtr)
+    }
+    
+    return String(cString: resultPtr)
+}
+
+/// Swift wrapper for getting current convolution image (Rust backend)
+public func rustcoreConvolutionGetImage(_ input: String) -> String {
+    let inputCString = input.cString(using: .utf8)
+    guard let inputPtr = inputCString else {
+        return "{\"error\":\"invalid input string\"}"
+    }
+    
+    guard let resultPtr = rustcore_convolution_get_image(inputPtr) else {
+        return "{\"error\":\"convolution get image failed\"}"
+    }
+    
+    defer {
+        rustcore_convolution_get_image_free(resultPtr)
     }
     
     return String(cString: resultPtr)

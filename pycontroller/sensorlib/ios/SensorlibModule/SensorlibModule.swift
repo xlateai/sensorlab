@@ -115,5 +115,37 @@ public class SensorlibModule: Module {
 
       Events("onLoad")
     }
+    
+    // Convolution pixel view for native rendering
+    View(ConvolutionPixelView.self) {
+      // Context ID for the convolution state
+      Prop("contextId") { (view: ConvolutionPixelView, id: UInt64) in
+        view.setContextId(id)
+      }
+      
+      // Backend type: "Rust" or "Metal"
+      Prop("backend") { (view: ConvolutionPixelView, backend: String) in
+        view.setBackend(backend)
+      }
+      
+      // Resolution (square image size)
+      Prop("resolution") { (view: ConvolutionPixelView, res: Int) in
+        view.setResolution(res)
+      }
+      
+      // Image data array (optional, can also use refreshFromBackend)
+      Prop("imageData") { (view: ConvolutionPixelView, data: [Float]) in
+        view.updateImageData(data)
+      }
+      
+      // Auto-refresh from backend
+      Prop("autoRefresh") { (view: ConvolutionPixelView, enabled: Bool) in
+        if enabled {
+          view.startAnimation()
+        } else {
+          view.stopAnimation()
+        }
+      }
+    }
   }
 }
