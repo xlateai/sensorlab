@@ -2,7 +2,6 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use serde::{Deserialize, Serialize};
 
-#[macro_use]
 extern crate lazy_static;
 
 mod helloworld;

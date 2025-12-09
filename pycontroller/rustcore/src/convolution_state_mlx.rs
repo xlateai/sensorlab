@@ -1,4 +1,4 @@
-use mlx_rs::{array, Array, Dtype};
+use mlx_rs::Array;
 use std::sync::Mutex;
 use std::collections::HashMap;
 
@@ -46,8 +46,10 @@ pub fn init_or_update_convolution_mlx(
     
     // Create MLX arrays
     // Image: [height, width, channels] format
-    let image_array = array!(image_data, shape=[size, size, CHANNELS], dtype=Dtype::Float32)
-        .map_err(|e| format!("Failed to create image array: {:?}", e))?;
+    // Use Array::from_slice to create from slice, then reshape
+    let image_array = Array::from_slice(image_data, &[(size * size * CHANNELS) as i32])
+        .reshape(&[size as i32, size as i32, CHANNELS as i32])
+        .map_err(|e| format!("Failed to reshape image array: {:?}", e))?;
     
     // Kernel: reshape from [ky, kx, c] to [channels, kernel_size, kernel_size]
     let mut kernel_reshaped = vec![0.0f32; CHANNELS * KERNEL_SIZE * KERNEL_SIZE];
@@ -61,8 +63,9 @@ pub fn init_or_update_convolution_mlx(
         }
     }
     
-    let kernel_array = array!(kernel_reshaped, shape=[CHANNELS, KERNEL_SIZE, KERNEL_SIZE], dtype=Dtype::Float32)
-        .map_err(|e| format!("Failed to create kernel array: {:?}", e))?;
+    let kernel_array = Array::from_slice(&kernel_reshaped, &[(CHANNELS * KERNEL_SIZE * KERNEL_SIZE) as i32])
+        .reshape(&[CHANNELS as i32, KERNEL_SIZE as i32, KERNEL_SIZE as i32])
+        .map_err(|e| format!("Failed to reshape kernel array: {:?}", e))?;
     
     // Store state
     let image_clone = image_array.clone();
@@ -74,10 +77,8 @@ pub fn init_or_update_convolution_mlx(
     });
     
     // Return current image data
-    image_clone.eval().map_err(|e| format!("Failed to evaluate: {:?}", e))?;
-    let output_slice: &[f32] = image_clone
-        .as_slice()
-        .map_err(|e| format!("Failed to get slice: {:?}", e))?;
+    image_clone.eval();
+    let output_slice: &[f32] = image_clone.as_slice();
     
     Ok(output_slice.to_vec())
 }
@@ -98,13 +99,11 @@ pub fn step_convolution_mlx(context_id: u64) -> Result<Vec<f32>, String> {
         .ok_or_else(|| "kernel array not initialized".to_string())?;
     
     // Add batch dimension: [height, width, channels] -> [1, height, width, channels]
-    let image_batched = image_array
-        .expand_dims(0)
+    let image_batched = image_array.expand_dims(0)
         .map_err(|e| format!("Failed to add batch dimension: {:?}", e))?;
     
     // Expand kernel: [channels, kernel_size, kernel_size] -> [channels, kernel_size, kernel_size, 1]
-    let kernel_expanded = kernel_array
-        .expand_dims(3)
+    let kernel_expanded = kernel_array.expand_dims(3)
         .map_err(|e| format!("Failed to expand kernel: {:?}", e))?;
     
     // Apply conv2d with padding=1 (same padding)
@@ -115,23 +114,20 @@ pub fn step_convolution_mlx(context_id: u64) -> Result<Vec<f32>, String> {
         (1, 1),  // stride
         (1, 1),  // padding
         (1, 1),  // dilation
-        CHANNELS, // groups (for depthwise)
+        Some(CHANNELS as i32), // groups (for depthwise)
     )
     .map_err(|e| format!("Failed to apply conv2d: {:?}", e))?;
     
     // Remove batch dimension: [1, height, width, channels] -> [height, width, channels]
-    let output_3d = output
-        .squeeze(0)
+    let output_3d = output.squeeze()
         .map_err(|e| format!("Failed to remove batch dimension: {:?}", e))?;
     
     // Store updated array
     state.image_array = Some(output_3d.clone());
     
     // Evaluate and convert to Vec<f32>
-    output_3d.eval().map_err(|e| format!("Failed to evaluate: {:?}", e))?;
-    let output_slice: &[f32] = output_3d
-        .as_slice()
-        .map_err(|e| format!("Failed to get slice: {:?}", e))?;
+    output_3d.eval();
+    let output_slice: &[f32] = output_3d.as_slice();
     
     Ok(output_slice.to_vec())
 }
@@ -146,10 +142,8 @@ pub fn get_image_mlx(context_id: u64) -> Result<Vec<f32>, String> {
         .ok_or_else(|| "image array not initialized".to_string())?;
     
     // Evaluate and convert to Vec<f32>
-    image_array.eval().map_err(|e| format!("Failed to evaluate: {:?}", e))?;
-    let output_slice: &[f32] = image_array
-        .as_slice()
-        .map_err(|e| format!("Failed to get slice: {:?}", e))?;
+    image_array.eval();
+    let output_slice: &[f32] = image_array.as_slice();
     
     Ok(output_slice.to_vec())
 }
