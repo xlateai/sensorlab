@@ -328,7 +328,15 @@ export default function Convolution() {
     try {
       if (backend === 'Metal') {
         // Metal backend
-        const result = SensorlibModule.metalConvolutionStep(contextIdRef.current);
+        const input = JSON.stringify({
+          context_id: contextIdRef.current,
+        });
+        const resultJson = SensorlibModule.metalConvolutionStep(input);
+        if (!resultJson) {
+          console.error('Metal convolution step returned null');
+          return null;
+        }
+        const result = JSON.parse(resultJson);
         if (result.error) {
           console.error('Metal convolution step error:', result.error);
           return null;
@@ -381,7 +389,10 @@ export default function Convolution() {
     // Clean up old state first
     try {
       if (backend === 'Metal') {
-        SensorlibModule.metalConvolutionCleanup(contextIdRef.current);
+        const cleanupInput = JSON.stringify({
+          context_id: contextIdRef.current,
+        });
+        SensorlibModule.metalConvolutionCleanup(cleanupInput);
       } else {
         const cleanupInput = JSON.stringify({
           context_id: contextIdRef.current,
