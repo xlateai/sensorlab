@@ -37,6 +37,31 @@ func rustcore_convolution_cleanup(_ input: UnsafePointer<CChar>?) -> UnsafeMutab
 @_silgen_name("rustcore_convolution_cleanup_free")
 func rustcore_convolution_cleanup_free(_ ptr: UnsafeMutablePointer<CChar>?)
 
+// MLX-based Metal backend functions
+@_silgen_name("rustcore_mlx_convolution_init")
+func rustcore_mlx_convolution_init(_ input: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rustcore_mlx_convolution_init_free")
+func rustcore_mlx_convolution_init_free(_ ptr: UnsafeMutablePointer<CChar>?)
+
+@_silgen_name("rustcore_mlx_convolution_step")
+func rustcore_mlx_convolution_step(_ input: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rustcore_mlx_convolution_step_free")
+func rustcore_mlx_convolution_step_free(_ ptr: UnsafeMutablePointer<CChar>?)
+
+@_silgen_name("rustcore_mlx_convolution_get_image")
+func rustcore_mlx_convolution_get_image(_ input: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rustcore_mlx_convolution_get_image_free")
+func rustcore_mlx_convolution_get_image_free(_ ptr: UnsafeMutablePointer<CChar>?)
+
+@_silgen_name("rustcore_mlx_convolution_cleanup")
+func rustcore_mlx_convolution_cleanup(_ input: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rustcore_mlx_convolution_cleanup_free")
+func rustcore_mlx_convolution_cleanup_free(_ ptr: UnsafeMutablePointer<CChar>?)
+
 /// Swift wrapper for Rust hello world function
 public func rustcoreHello() -> String {
     guard let cString = rustcore_hello() else {
@@ -130,6 +155,80 @@ public func rustcoreConvolutionCleanup(_ input: String) -> String {
     
     defer {
         rustcore_convolution_cleanup_free(resultPtr)
+    }
+    
+    return String(cString: resultPtr)
+}
+
+// MLX-based Metal backend wrappers
+
+/// Swift wrapper for MLX convolution init (Metal backend)
+public func rustcoreMlxConvolutionInit(_ input: String) -> String {
+    let inputCString = input.cString(using: .utf8)
+    guard let inputPtr = inputCString else {
+        return "{\"error\":\"invalid input string\"}"
+    }
+    
+    guard let resultPtr = rustcore_mlx_convolution_init(inputPtr) else {
+        return "{\"error\":\"mlx convolution init failed\"}"
+    }
+    
+    defer {
+        rustcore_mlx_convolution_init_free(resultPtr)
+    }
+    
+    return String(cString: resultPtr)
+}
+
+/// Swift wrapper for MLX convolution step (Metal backend)
+public func rustcoreMlxConvolutionStep(_ input: String) -> String {
+    let inputCString = input.cString(using: .utf8)
+    guard let inputPtr = inputCString else {
+        return "{\"error\":\"invalid input string\"}"
+    }
+    
+    guard let resultPtr = rustcore_mlx_convolution_step(inputPtr) else {
+        return "{\"error\":\"mlx convolution step failed\"}"
+    }
+    
+    defer {
+        rustcore_mlx_convolution_step_free(resultPtr)
+    }
+    
+    return String(cString: resultPtr)
+}
+
+/// Swift wrapper for MLX convolution get image (Metal backend)
+public func rustcoreMlxConvolutionGetImage(_ input: String) -> String {
+    let inputCString = input.cString(using: .utf8)
+    guard let inputPtr = inputCString else {
+        return "{\"error\":\"invalid input string\"}"
+    }
+    
+    guard let resultPtr = rustcore_mlx_convolution_get_image(inputPtr) else {
+        return "{\"error\":\"mlx convolution get image failed\"}"
+    }
+    
+    defer {
+        rustcore_mlx_convolution_get_image_free(resultPtr)
+    }
+    
+    return String(cString: resultPtr)
+}
+
+/// Swift wrapper for MLX convolution cleanup (Metal backend)
+public func rustcoreMlxConvolutionCleanup(_ input: String) -> String {
+    let inputCString = input.cString(using: .utf8)
+    guard let inputPtr = inputCString else {
+        return "{\"error\":\"invalid input string\"}"
+    }
+    
+    guard let resultPtr = rustcore_mlx_convolution_cleanup(inputPtr) else {
+        return "{\"error\":\"mlx convolution cleanup failed\"}"
+    }
+    
+    defer {
+        rustcore_mlx_convolution_cleanup_free(resultPtr)
     }
     
     return String(cString: resultPtr)

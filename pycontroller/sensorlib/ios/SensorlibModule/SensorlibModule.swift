@@ -51,78 +51,21 @@ public class SensorlibModule: Module {
       return rustcoreConvolutionCleanup(input)
     }
 
-    // Metal convolution functions
+    // Metal convolution functions (routed to Rust MLX backend)
     Function("metalConvolutionInit") { (input: String) in
-      guard let inputData = input.data(using: .utf8),
-            let json = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any],
-            let contextId = json["context_id"] as? NSNumber,
-            let imageDataArray = json["image"] as? [NSNumber],
-            let kernelDataArray = json["kernel"] as? [NSNumber] else {
-        return "{\"error\":\"invalid input\"}"
-      }
-      
-      let imageData = imageDataArray.map { $0.floatValue }
-      let kernelData = kernelDataArray.map { $0.floatValue }
-      let success = metalConvolutionInit(contextId: contextId.uint64Value, imageData: imageData, kernelData: kernelData)
-      
-      if success {
-        return "{\"success\":true}"
-      } else {
-        return "{\"error\":\"initialization failed\"}"
-      }
+      return rustcoreMlxConvolutionInit(input)
     }
 
     Function("metalConvolutionStep") { (input: String) in
-      guard let inputData = input.data(using: .utf8),
-            let json = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any],
-            let contextId = json["context_id"] as? NSNumber else {
-        return "{\"error\":\"invalid input\"}"
-      }
-      
-      guard let result = metalConvolutionStep(contextId: contextId.uint64Value) else {
-        return "{\"error\":\"convolution step failed\"}"
-      }
-      
-      // Convert Float array to JSON
-      let resultArray = result.map { $0 }
-      guard let jsonData = try? JSONSerialization.data(withJSONObject: ["result": resultArray]),
-            let jsonString = String(data: jsonData, encoding: .utf8) else {
-        return "{\"error\":\"serialization failed\"}"
-      }
-      
-      return jsonString
+      return rustcoreMlxConvolutionStep(input)
     }
 
     Function("metalConvolutionGetImage") { (input: String) in
-      guard let inputData = input.data(using: .utf8),
-            let json = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any],
-            let contextId = json["context_id"] as? NSNumber else {
-        return "{\"error\":\"invalid input\"}"
-      }
-      
-      guard let result = metalConvolutionGetImage(contextId: contextId.uint64Value) else {
-        return "{\"error\":\"failed to get image data\"}"
-      }
-      
-      // Convert Float array to JSON
-      let resultArray = result.map { $0 }
-      guard let jsonData = try? JSONSerialization.data(withJSONObject: ["result": resultArray]),
-            let jsonString = String(data: jsonData, encoding: .utf8) else {
-        return "{\"error\":\"serialization failed\"}"
-      }
-      
-      return jsonString
+      return rustcoreMlxConvolutionGetImage(input)
     }
 
     Function("metalConvolutionCleanup") { (input: String) in
-      guard let inputData = input.data(using: .utf8),
-            let json = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any],
-            let contextId = json["context_id"] as? NSNumber else {
-        return "{\"error\":\"invalid input\"}"
-      }
-      
-      metalConvolutionCleanup(contextId: contextId.uint64Value)
-      return "{\"success\":true}"
+      return rustcoreMlxConvolutionCleanup(input)
     }
 
     // Unified haptics play function - delegates to HapticsModule
