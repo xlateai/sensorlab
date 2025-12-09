@@ -143,7 +143,8 @@ pub fn get_convolution_image(context_id: u64) -> Result<Vec<f32>, String> {
         .ok_or_else(|| "image tensor not initialized".to_string())?;
     
     // Convert from [1,C,H,W] back to [H,W,C]
-    let output_3d = image_tensor.squeeze_dim(0); // [C, H, W]
+    // Clone the tensor since we can't move out of a shared reference
+    let output_3d = image_tensor.clone().squeeze_dim(0); // [C, H, W]
     let output_hwc = output_3d.permute([1, 2, 0]); // [H, W, C]
     let output_data = output_hwc.into_data();
     let output_slice = output_data.as_slice::<f32>().unwrap();

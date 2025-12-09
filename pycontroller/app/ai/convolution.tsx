@@ -2,9 +2,18 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, FlatList, Dimensions, Modal, Pressable, ScrollView, TextInput } from 'react-native';
 import PlayPauseButton from '@/components/ui/play-pause-button';
 import SensorlibModule from 'sensorlib';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - ConvolutionPixelView exported from sensorlib
-import { ConvolutionPixelView } from 'sensorlib';
+
+// Try to import ConvolutionPixelView, with fallback if not available
+let ConvolutionPixelView: React.ComponentType<any> | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - ConvolutionPixelView exported from sensorlib
+  const sensorlib = require('sensorlib');
+  ConvolutionPixelView = sensorlib.ConvolutionPixelView;
+} catch (e) {
+  // Native view not available yet - will use JavaScript fallback
+  console.warn('ConvolutionPixelView not available, using JavaScript rendering');
+}
 
 const DEFAULT_RESOLUTION = 32;
 const CHANNELS = 3;
@@ -547,7 +556,22 @@ export default function Convolution() {
     initializeImage();
   }, [initializeImage]);
 
-  // Note: pixelColors and pixelSize are no longer needed since rendering is done natively
+  // Calculate pixel size based on resolution (square, fits in fixed size)
+  const pixelSize = FIXED_IMAGE_SIZE / resolution;
+
+  // Convert image data to a single flat array of pixel colors for faster rendering (fallback for when native view isn't available)
+  const pixelColors = useMemo(() => {
+    if (imageData.length === 0) return [];
+    const colors: string[] = [];
+    for (let i = 0; i < imageData.length; i += CHANNELS) {
+      colors.push(rgbToColor(
+        imageData[i] || 0,
+        imageData[i + 1] || 0,
+        imageData[i + 2] || 0
+      ));
+    }
+    return colors;
+  }, [imageData]);
 
   // Convert kernel to 3x3 grid for visualization
   const kernelGrid = useMemo(() => {
@@ -572,15 +596,41 @@ export default function Convolution() {
     <View style={styles.container}>
       <Text style={styles.fpsText}>FPS: {fps}</Text>
       
-      {/* Image Display - Now using native Swift rendering (no JavaScript pixel rendering) */}
-      <ConvolutionPixelView
-        contextId={contextIdRef.current}
-        backend={backend}
-        resolution={resolution}
-        imageData={imageData}
-        autoRefresh={false}
-        style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}
-      />
+      {/* Image Display - Use native Swift rendering if available, otherwise fallback to JavaScript */}
+      {ConvolutionPixelView ? (
+        <ConvolutionPixelView
+          contextId={contextIdRef.current}
+          backend={backend}
+          resolution={resolution}
+          imageData={imageData}
+          autoRefresh={false}
+          style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}
+        />
+      ) : (
+        <View style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
+          <View style={[styles.pixelGrid, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
+            {pixelColors.map((color, idx) => {
+              const y = Math.floor(idx / resolution);
+              const x = idx % resolution;
+              return (
+                <View
+                  key={`pixel-${idx}`}
+                  style={[
+                    {
+                      width: pixelSize,
+                      height: pixelSize,
+                      backgroundColor: color,
+                      position: 'absolute',
+                      left: x * pixelSize,
+                      top: y * pixelSize,
+                    }
+                  ]}
+                />
+              );
+            })}
+          </View>
+        </View>
+      )}
       
       {/* Kernel Visualization */}
       <View style={styles.kernelContainer}>
@@ -729,6 +779,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  pixelGrid: {
+    position: 'relative',
   },
   kernelContainer: {
     alignItems: 'center',
