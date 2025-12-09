@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, Modal, Pressable, ScrollView, TextInput } from 'react-native';
 import PlayPauseButton from '@/components/ui/play-pause-button';
 import SensorlibModule from 'sensorlib';
 
-const WIDTH = 32;
-const HEIGHT = 32;
+const DEFAULT_RESOLUTION = 32;
 const CHANNELS = 3;
 const KERNEL_SIZE = 3;
-const PIXEL_SIZE = 4; // Size of each pixel in the display
+const FIXED_IMAGE_SIZE = 160; // Fixed size in pixels (20% bigger than 32*4 = 128)
 
 // Convert RGB value (0-1) to color string
 function rgbToColor(r: number, g: number, b: number): string {
@@ -17,7 +16,121 @@ function rgbToColor(r: number, g: number, b: number): string {
   return `rgb(${r255},${g255},${b255})`;
 }
 
+// Backend selector component
+function BackendSelector({
+  backend,
+  onBackendChange,
+}: {
+  backend: 'Rust' | 'Metal';
+  onBackendChange: (backend: 'Rust' | 'Metal') => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const backends: Array<'Rust' | 'Metal'> = ['Rust', 'Metal'];
+
+  const handleBackendSelect = (selectedBackend: 'Rust' | 'Metal') => {
+    onBackendChange(selectedBackend);
+    setShowPicker(false);
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setShowPicker(true)}
+        style={{
+          backgroundColor: '#39ff14',
+          paddingVertical: 12,
+          paddingHorizontal: 20,
+          borderRadius: 8,
+        }}
+        android_ripple={null}
+      >
+        <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+          {backend}
+        </Text>
+      </Pressable>
+      <Modal
+        visible={showPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPicker(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+          onPress={() => setShowPicker(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: 12,
+              padding: 20,
+              width: '80%',
+              maxHeight: '60%',
+              borderWidth: 1,
+              borderColor: '#39ff14',
+            }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>
+              Select Backend
+            </Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {backends.map((b) => (
+                <Pressable
+                  key={b}
+                  onPress={() => handleBackendSelect(b)}
+                  style={{
+                    backgroundColor: backend === b ? '#39ff14' : '#333',
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    borderRadius: 8,
+                    marginBottom: 8,
+                  }}
+                  android_ripple={null}
+                >
+                  <Text
+                    style={{
+                      color: backend === b ? '#000' : '#fff',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      fontSize: 16,
+                    }}
+                  >
+                    {b}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setShowPicker(false)}
+              style={{
+                backgroundColor: '#333',
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 8,
+                marginTop: 16,
+              }}
+              android_ripple={null}
+            >
+              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                Cancel
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 export default function Convolution() {
+  const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
+  const [resolutionInput, setResolutionInput] = useState(DEFAULT_RESOLUTION.toString());
+  const [backend, setBackend] = useState<'Rust' | 'Metal'>('Rust');
   const [imageData, setImageData] = useState<number[]>([]);
   const [kernel, setKernel] = useState<number[]>([]);
   const [paused, setPaused] = useState(true);
@@ -94,25 +207,36 @@ export default function Convolution() {
     return sum < 0.001; // Very small threshold
   }, []);
 
-  // Initialize on mount
-  useEffect(() => {
-    const init = () => {
-      // Random RGB image
-      const newImage = Array.from({ length: WIDTH * HEIGHT * CHANNELS }, () => Math.random());
-      // Random 3x3x3 kernel (-1 to +1)
-      const newKernel = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
-      
-      setImageData(newImage);
-      setKernel(newKernel);
-      
-      // Initialize Rust state
-      if (initConvolution(newImage, newKernel)) {
-        setImageData(newImage);
-      }
-    };
+  // Initialize image and kernel
+  const initializeImage = useCallback(() => {
+    // Clean up old state first
+    try {
+      const cleanupInput = JSON.stringify({
+        context_id: contextIdRef.current,
+      });
+      SensorlibModule.rustcoreConvolutionCleanup(cleanupInput);
+    } catch (error) {
+      // Ignore cleanup errors
+    }
     
-    init();
-  }, [initConvolution]);
+    // Random RGB image
+    const newImage = Array.from({ length: resolution * resolution * CHANNELS }, () => Math.random());
+    // Random 3x3x3 kernel (-1 to +1)
+    const newKernel = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
+    
+    setImageData(newImage);
+    setKernel(newKernel);
+    
+    // Initialize Rust state
+    if (initConvolution(newImage, newKernel)) {
+      setImageData(newImage);
+    }
+  }, [resolution, initConvolution]);
+
+  // Initialize on mount or when resolution changes
+  useEffect(() => {
+    initializeImage();
+  }, [initializeImage]);
 
   // Cleanup convolution state
   useEffect(() => {
@@ -175,13 +299,9 @@ export default function Convolution() {
         if (newImage) {
           // Check if dead
           if (checkIfDead(newImage)) {
-            // Re-initialize
-            const newImageData = Array.from({ length: WIDTH * HEIGHT * CHANNELS }, () => Math.random());
-            const newKernelData = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
-            setKernel(newKernelData);
-            if (initConvolution(newImageData, newKernelData)) {
-              setImageData(newImageData);
-            }
+            // Pause and clear image (leave black)
+            setPaused(true);
+            setImageData(Array(resolution * resolution * CHANNELS).fill(0));
             return;
           }
           
@@ -203,7 +323,42 @@ export default function Convolution() {
         animationFrameRef.current = null;
       }
     };
-  }, [paused, applyConvolutionStep, checkIfDead, initConvolution]);
+  }, [paused, applyConvolutionStep, checkIfDead, resolution]);
+
+  // Handle play button - initialize if image is dead/black
+  const handlePlayPause = useCallback(() => {
+    if (paused) {
+      // Check if image is dead/black
+      const isDead = imageData.length === 0 || imageData.every(v => Math.abs(v) < 0.001);
+      if (isDead) {
+        // Re-initialize before starting
+        initializeImage();
+      }
+      setPaused(false);
+    } else {
+      setPaused(true);
+    }
+  }, [paused, imageData, initializeImage]);
+
+  // Handle resolution change
+  const handleResolutionSubmit = useCallback(() => {
+    const numValue = parseInt(resolutionInput, 10);
+    if (!isNaN(numValue) && numValue > 0 && numValue <= 256) {
+      setResolution(numValue);
+      // Image will be re-initialized via useEffect
+    } else {
+      setResolutionInput(resolution.toString());
+    }
+  }, [resolutionInput, resolution]);
+
+  // Reset button handler
+  const handleReset = useCallback(() => {
+    setPaused(true);
+    initializeImage();
+  }, [initializeImage]);
+
+  // Calculate pixel size based on resolution (to fit in fixed size)
+  const pixelSize = FIXED_IMAGE_SIZE / resolution;
 
   // Convert image data to a single flat array of pixel colors for faster rendering
   const pixelColors = useMemo(() => {
@@ -219,25 +374,78 @@ export default function Convolution() {
     return colors;
   }, [imageData]);
 
+  // Convert kernel to 3x3 grid for visualization
+  const kernelGrid = useMemo(() => {
+    if (kernel.length === 0) return [];
+    const grid: Array<Array<{ r: number; g: number; b: number }>> = [];
+    for (let ky = 0; ky < KERNEL_SIZE; ky++) {
+      const row: Array<{ r: number; g: number; b: number }> = [];
+      for (let kx = 0; kx < KERNEL_SIZE; kx++) {
+        const idx = (ky * KERNEL_SIZE + kx) * CHANNELS;
+        row.push({
+          r: kernel[idx] || 0,
+          g: kernel[idx + 1] || 0,
+          b: kernel[idx + 2] || 0,
+        });
+      }
+      grid.push(row);
+    }
+    return grid;
+  }, [kernel]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.fpsText}>FPS: {fps}</Text>
       
-      <View style={styles.imageContainer}>
-        <View style={styles.pixelGrid}>
+      {/* Controls */}
+      <View style={styles.controlsRow}>
+        <View style={styles.controlGroup}>
+          <Text style={styles.controlLabel}>Resolution:</Text>
+          <View style={styles.resolutionInputRow}>
+            <TextInput
+              style={styles.resolutionInput}
+              value={resolutionInput}
+              onChangeText={setResolutionInput}
+              onSubmitEditing={handleResolutionSubmit}
+              onBlur={handleResolutionSubmit}
+              keyboardType="numeric"
+              selectTextOnFocus
+              placeholder={DEFAULT_RESOLUTION.toString()}
+              placeholderTextColor="#888"
+            />
+            <Text style={styles.resolutionLabel}>x{resolution}</Text>
+            <Pressable
+              onPress={handleResolutionSubmit}
+              style={styles.submitButton}
+              android_ripple={null}
+            >
+              <Text style={styles.submitButtonText}>Apply</Text>
+            </Pressable>
+          </View>
+        </View>
+        <BackendSelector
+          backend={backend}
+          onBackendChange={setBackend}
+        />
+      </View>
+      
+      {/* Image Display */}
+      <View style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
+        <View style={[styles.pixelGrid, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
           {pixelColors.map((color, idx) => {
-            const y = Math.floor(idx / WIDTH);
-            const x = idx % WIDTH;
+            const y = Math.floor(idx / resolution);
+            const x = idx % resolution;
             return (
               <View
                 key={`pixel-${idx}`}
                 style={[
-                  styles.pixel,
                   {
+                    width: pixelSize,
+                    height: pixelSize,
                     backgroundColor: color,
                     position: 'absolute',
-                    left: x * PIXEL_SIZE,
-                    top: y * PIXEL_SIZE,
+                    left: x * pixelSize,
+                    top: y * pixelSize,
                   }
                 ]}
               />
@@ -246,10 +454,45 @@ export default function Convolution() {
         </View>
       </View>
       
-      <PlayPauseButton
-        paused={paused}
-        onToggle={() => setPaused(p => !p)}
-      />
+      {/* Kernel Visualization */}
+      <View style={styles.kernelContainer}>
+        <Text style={styles.kernelLabel}>Kernel (3x3 RGB):</Text>
+        <View style={styles.kernelGrid}>
+          {kernelGrid.map((row, rowIdx) => (
+            <View key={`row-${rowIdx}`} style={styles.kernelRow}>
+              {row.map((pixel, colIdx) => (
+                <View
+                  key={`kernel-${rowIdx}-${colIdx}`}
+                  style={[
+                    styles.kernelPixel,
+                    {
+                      backgroundColor: rgbToColor(
+                        (pixel.r + 1) / 2, // Normalize from [-1,1] to [0,1]
+                        (pixel.g + 1) / 2,
+                        (pixel.b + 1) / 2
+                      ),
+                    }
+                  ]}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
+      
+      <View style={styles.buttonRow}>
+        <PlayPauseButton
+          paused={paused}
+          onToggle={handlePlayPause}
+        />
+        <Pressable
+          onPress={handleReset}
+          style={styles.resetButton}
+          android_ripple={null}
+        >
+          <Text style={styles.resetButtonText}>Reset</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -258,26 +501,138 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     gap: 16,
+    padding: 16,
   },
   fpsText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
   },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  controlGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  controlLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  resolutionInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  resolutionInput: {
+    backgroundColor: '#333',
+    color: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 4,
+    minWidth: 50,
+    textAlign: 'center',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#39ff14',
+  },
+  resolutionLabel: {
+    color: '#888',
+    fontSize: 12,
+  },
+  submitButton: {
+    backgroundColor: '#39ff14',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  submitButtonText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resetButton: {
+    backgroundColor: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#39ff14',
+  },
+  resetButtonText: {
+    color: '#39ff14',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   imageContainer: {
-    width: WIDTH * PIXEL_SIZE,
-    height: HEIGHT * PIXEL_SIZE,
     backgroundColor: '#111',
     borderRadius: 8,
     overflow: 'hidden',
   },
   pixelGrid: {
-    width: WIDTH * PIXEL_SIZE,
-    height: HEIGHT * PIXEL_SIZE,
     position: 'relative',
   },
-  pixel: {
-    width: PIXEL_SIZE,
-    height: PIXEL_SIZE,
+  kernelContainer: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  kernelLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  kernelGrid: {
+    gap: 2,
+  },
+  kernelRow: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  kernelPixel: {
+    width: 24,
+    height: 24,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  submitButton: {
+    backgroundColor: '#39ff14',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  submitButtonText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resetButton: {
+    backgroundColor: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#39ff14',
+  },
+  resetButtonText: {
+    color: '#39ff14',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
