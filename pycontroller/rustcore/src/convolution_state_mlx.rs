@@ -77,7 +77,7 @@ pub fn init_or_update_convolution_mlx(
     });
     
     // Return current image data
-    image_clone.eval();
+    image_clone.eval().map_err(|e| format!("Failed to evaluate: {:?}", e))?;
     let output_slice: &[f32] = image_clone.as_slice();
     
     Ok(output_slice.to_vec())
@@ -126,7 +126,7 @@ pub fn step_convolution_mlx(context_id: u64) -> Result<Vec<f32>, String> {
     state.image_array = Some(output_3d.clone());
     
     // Evaluate and convert to Vec<f32>
-    output_3d.eval();
+    output_3d.eval().map_err(|e| format!("Failed to evaluate: {:?}", e))?;
     let output_slice: &[f32] = output_3d.as_slice();
     
     Ok(output_slice.to_vec())
@@ -142,7 +142,7 @@ pub fn get_image_mlx(context_id: u64) -> Result<Vec<f32>, String> {
         .ok_or_else(|| "image array not initialized".to_string())?;
     
     // Evaluate and convert to Vec<f32>
-    image_array.eval();
+    image_array.eval().map_err(|e| format!("Failed to evaluate: {:?}", e))?;
     let output_slice: &[f32] = image_array.as_slice();
     
     Ok(output_slice.to_vec())
