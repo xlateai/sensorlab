@@ -16,26 +16,56 @@ function rgbToColor(r: number, g: number, b: number): string {
   return `rgb(${r255},${g255},${b255})`;
 }
 
-// Backend selector component
-function BackendSelector({
+// Settings dropdown component
+function SettingsMenu({
+  width,
+  height,
   backend,
+  onWidthChange,
+  onHeightChange,
   onBackendChange,
+  onApply,
 }: {
+  width: number;
+  height: number;
   backend: 'Rust' | 'Metal';
+  onWidthChange: (width: number) => void;
+  onHeightChange: (height: number) => void;
   onBackendChange: (backend: 'Rust' | 'Metal') => void;
+  onApply: () => void;
 }) {
-  const [showPicker, setShowPicker] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [tempWidth, setTempWidth] = useState(width.toString());
+  const [tempHeight, setTempHeight] = useState(height.toString());
+  const [tempBackend, setTempBackend] = useState(backend);
   const backends: Array<'Rust' | 'Metal'> = ['Rust', 'Metal'];
 
-  const handleBackendSelect = (selectedBackend: 'Rust' | 'Metal') => {
-    onBackendChange(selectedBackend);
-    setShowPicker(false);
+  const handleOpen = () => {
+    setTempWidth(width.toString());
+    setTempHeight(height.toString());
+    setTempBackend(backend);
+    setShowSettings(true);
+  };
+
+  const handleApply = () => {
+    const widthNum = parseInt(tempWidth, 10);
+    const heightNum = parseInt(tempHeight, 10);
+    
+    if (!isNaN(widthNum) && widthNum > 0 && widthNum <= 256) {
+      onWidthChange(widthNum);
+    }
+    if (!isNaN(heightNum) && heightNum > 0 && heightNum <= 256) {
+      onHeightChange(heightNum);
+    }
+    onBackendChange(tempBackend);
+    onApply();
+    setShowSettings(false);
   };
 
   return (
     <>
       <Pressable
-        onPress={() => setShowPicker(true)}
+        onPress={handleOpen}
         style={{
           backgroundColor: '#39ff14',
           paddingVertical: 12,
@@ -45,14 +75,14 @@ function BackendSelector({
         android_ripple={null}
       >
         <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
-          {backend}
+          Settings
         </Text>
       </Pressable>
       <Modal
-        visible={showPicker}
+        visible={showSettings}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowPicker(false)}
+        onRequestClose={() => setShowSettings(false)}
       >
         <Pressable
           style={{
@@ -61,65 +91,146 @@ function BackendSelector({
             justifyContent: 'center',
             alignItems: 'center',
           }}
-          onPress={() => setShowPicker(false)}
+          onPress={() => setShowSettings(false)}
         >
           <Pressable
             style={{
               backgroundColor: '#1a1a1a',
               borderRadius: 12,
               padding: 20,
-              width: '80%',
-              maxHeight: '60%',
+              width: '85%',
+              maxHeight: '70%',
               borderWidth: 1,
               borderColor: '#39ff14',
             }}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>
-              Select Backend
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
+              Settings
             </Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              {backends.map((b) => (
-                <Pressable
-                  key={b}
-                  onPress={() => handleBackendSelect(b)}
+            
+            {/* Table-like layout */}
+            <View style={{ marginBottom: 20 }}>
+              {/* Width row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <View style={{ width: 80 }}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>Width:</Text>
+                </View>
+                <TextInput
                   style={{
-                    backgroundColor: backend === b ? '#39ff14' : '#333',
-                    paddingVertical: 16,
-                    paddingHorizontal: 20,
-                    borderRadius: 8,
-                    marginBottom: 8,
+                    flex: 1,
+                    backgroundColor: '#333',
+                    color: '#fff',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 4,
+                    fontSize: 14,
+                    borderWidth: 1,
+                    borderColor: '#39ff14',
+                    marginLeft: 12,
                   }}
-                  android_ripple={null}
-                >
-                  <Text
-                    style={{
-                      color: backend === b ? '#000' : '#fff',
-                      textAlign: 'center',
-                      fontWeight: '600',
-                      fontSize: 16,
-                    }}
-                  >
-                    {b}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Pressable
-              onPress={() => setShowPicker(false)}
-              style={{
-                backgroundColor: '#333',
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                borderRadius: 8,
-                marginTop: 16,
-              }}
-              android_ripple={null}
-            >
-              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
-                Cancel
-              </Text>
-            </Pressable>
+                  value={tempWidth}
+                  onChangeText={setTempWidth}
+                  keyboardType="numeric"
+                  selectTextOnFocus
+                  placeholder="32"
+                  placeholderTextColor="#888"
+                />
+              </View>
+              
+              {/* Height row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <View style={{ width: 80 }}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>Height:</Text>
+                </View>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#333',
+                    color: '#fff',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 4,
+                    fontSize: 14,
+                    borderWidth: 1,
+                    borderColor: '#39ff14',
+                    marginLeft: 12,
+                  }}
+                  value={tempHeight}
+                  onChangeText={setTempHeight}
+                  keyboardType="numeric"
+                  selectTextOnFocus
+                  placeholder="32"
+                  placeholderTextColor="#888"
+                />
+              </View>
+              
+              {/* Backend row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <View style={{ width: 80 }}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>Backend:</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  {backends.map((b) => (
+                    <Pressable
+                      key={b}
+                      onPress={() => setTempBackend(b)}
+                      style={{
+                        backgroundColor: tempBackend === b ? '#39ff14' : '#333',
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderRadius: 6,
+                        marginBottom: 8,
+                      }}
+                      android_ripple={null}
+                    >
+                      <Text
+                        style={{
+                          color: tempBackend === b ? '#000' : '#fff',
+                          textAlign: 'center',
+                          fontWeight: '600',
+                          fontSize: 14,
+                        }}
+                      >
+                        {b}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </View>
+            
+            {/* Apply button at bottom right */}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+              <Pressable
+                onPress={() => setShowSettings(false)}
+                style={{
+                  backgroundColor: '#333',
+                  paddingVertical: 12,
+                  paddingHorizontal: 20,
+                  borderRadius: 8,
+                }}
+                android_ripple={null}
+              >
+                <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleApply}
+                style={{
+                  backgroundColor: '#39ff14',
+                  paddingVertical: 12,
+                  paddingHorizontal: 24,
+                  borderRadius: 8,
+                }}
+                android_ripple={null}
+              >
+                <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                  Apply
+                </Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -130,8 +241,6 @@ function BackendSelector({
 export default function Convolution() {
   const [width, setWidth] = useState(DEFAULT_RESOLUTION);
   const [height, setHeight] = useState(DEFAULT_RESOLUTION);
-  const [widthInput, setWidthInput] = useState(DEFAULT_RESOLUTION.toString());
-  const [heightInput, setHeightInput] = useState(DEFAULT_RESOLUTION.toString());
   const [backend, setBackend] = useState<'Rust' | 'Metal'>('Rust');
   const [imageData, setImageData] = useState<number[]>([]);
   const [kernel, setKernel] = useState<number[]>([]);
@@ -342,27 +451,12 @@ export default function Convolution() {
     }
   }, [paused, imageData, initializeImage]);
 
-  // Handle width change
-  const handleWidthSubmit = useCallback(() => {
-    const numValue = parseInt(widthInput, 10);
-    if (!isNaN(numValue) && numValue > 0 && numValue <= 256) {
-      setWidth(numValue);
-      // Image will be re-initialized via useEffect
-    } else {
-      setWidthInput(width.toString());
-    }
-  }, [widthInput, width]);
-
-  // Handle height change
-  const handleHeightSubmit = useCallback(() => {
-    const numValue = parseInt(heightInput, 10);
-    if (!isNaN(numValue) && numValue > 0 && numValue <= 256) {
-      setHeight(numValue);
-      // Image will be re-initialized via useEffect
-    } else {
-      setHeightInput(height.toString());
-    }
-  }, [heightInput, height]);
+  // Handle settings apply
+  const handleSettingsApply = useCallback(() => {
+    // Settings are applied in the SettingsMenu component
+    // This callback is just to trigger re-initialization if needed
+    initializeImage();
+  }, [initializeImage]);
 
   // Reset button handler
   const handleReset = useCallback(() => {
@@ -479,64 +573,16 @@ export default function Convolution() {
         </Pressable>
       </View>
       
-      {/* Controls */}
-      <View style={styles.controlsContainer}>
-        <View style={styles.controlsRow}>
-          <View style={styles.controlGroup}>
-            <Text style={styles.controlLabel}>Width:</Text>
-            <View style={styles.resolutionInputRow}>
-              <TextInput
-                style={styles.resolutionInput}
-                value={widthInput}
-                onChangeText={setWidthInput}
-                onSubmitEditing={handleWidthSubmit}
-                onBlur={handleWidthSubmit}
-                keyboardType="numeric"
-                selectTextOnFocus
-                placeholder={DEFAULT_RESOLUTION.toString()}
-                placeholderTextColor="#888"
-              />
-              <Pressable
-                onPress={handleWidthSubmit}
-                style={styles.submitButton}
-                android_ripple={null}
-              >
-                <Text style={styles.submitButtonText}>Apply</Text>
-              </Pressable>
-            </View>
-          </View>
-          <View style={styles.controlGroup}>
-            <Text style={styles.controlLabel}>Height:</Text>
-            <View style={styles.resolutionInputRow}>
-              <TextInput
-                style={styles.resolutionInput}
-                value={heightInput}
-                onChangeText={setHeightInput}
-                onSubmitEditing={handleHeightSubmit}
-                onBlur={handleHeightSubmit}
-                keyboardType="numeric"
-                selectTextOnFocus
-                placeholder={DEFAULT_RESOLUTION.toString()}
-                placeholderTextColor="#888"
-              />
-              <Pressable
-                onPress={handleHeightSubmit}
-                style={styles.submitButton}
-                android_ripple={null}
-              >
-                <Text style={styles.submitButtonText}>Apply</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-        <View style={styles.backendRow}>
-          <Text style={styles.controlLabel}>Backend:</Text>
-          <BackendSelector
-            backend={backend}
-            onBackendChange={setBackend}
-          />
-        </View>
-      </View>
+      {/* Settings */}
+      <SettingsMenu
+        width={width}
+        height={height}
+        backend={backend}
+        onWidthChange={setWidth}
+        onHeightChange={setHeight}
+        onBackendChange={setBackend}
+        onApply={handleSettingsApply}
+      />
     </View>
   );
 }
