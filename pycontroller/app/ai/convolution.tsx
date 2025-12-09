@@ -128,8 +128,10 @@ function BackendSelector({
 }
 
 export default function Convolution() {
-  const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
-  const [resolutionInput, setResolutionInput] = useState(DEFAULT_RESOLUTION.toString());
+  const [width, setWidth] = useState(DEFAULT_RESOLUTION);
+  const [height, setHeight] = useState(DEFAULT_RESOLUTION);
+  const [widthInput, setWidthInput] = useState(DEFAULT_RESOLUTION.toString());
+  const [heightInput, setHeightInput] = useState(DEFAULT_RESOLUTION.toString());
   const [backend, setBackend] = useState<'Rust' | 'Metal'>('Rust');
   const [imageData, setImageData] = useState<number[]>([]);
   const [kernel, setKernel] = useState<number[]>([]);
@@ -220,7 +222,7 @@ export default function Convolution() {
     }
     
     // Random RGB image
-    const newImage = Array.from({ length: resolution * resolution * CHANNELS }, () => Math.random());
+    const newImage = Array.from({ length: width * height * CHANNELS }, () => Math.random());
     // Random 3x3x3 kernel (-1 to +1)
     const newKernel = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
     
@@ -231,7 +233,7 @@ export default function Convolution() {
     if (initConvolution(newImage, newKernel)) {
       setImageData(newImage);
     }
-  }, [resolution, initConvolution]);
+  }, [width, height, initConvolution]);
 
   // Initialize on mount or when resolution changes
   useEffect(() => {
@@ -301,7 +303,7 @@ export default function Convolution() {
           if (checkIfDead(newImage)) {
             // Pause and clear image (leave black)
             setPaused(true);
-            setImageData(Array(resolution * resolution * CHANNELS).fill(0));
+            setImageData(Array(width * height * CHANNELS).fill(0));
             return;
           }
           
@@ -323,7 +325,7 @@ export default function Convolution() {
         animationFrameRef.current = null;
       }
     };
-  }, [paused, applyConvolutionStep, checkIfDead, resolution]);
+  }, [paused, applyConvolutionStep, checkIfDead, width, height]);
 
   // Handle play button - initialize if image is dead/black
   const handlePlayPause = useCallback(() => {
@@ -340,16 +342,27 @@ export default function Convolution() {
     }
   }, [paused, imageData, initializeImage]);
 
-  // Handle resolution change
-  const handleResolutionSubmit = useCallback(() => {
-    const numValue = parseInt(resolutionInput, 10);
+  // Handle width change
+  const handleWidthSubmit = useCallback(() => {
+    const numValue = parseInt(widthInput, 10);
     if (!isNaN(numValue) && numValue > 0 && numValue <= 256) {
-      setResolution(numValue);
+      setWidth(numValue);
       // Image will be re-initialized via useEffect
     } else {
-      setResolutionInput(resolution.toString());
+      setWidthInput(width.toString());
     }
-  }, [resolutionInput, resolution]);
+  }, [widthInput, width]);
+
+  // Handle height change
+  const handleHeightSubmit = useCallback(() => {
+    const numValue = parseInt(heightInput, 10);
+    if (!isNaN(numValue) && numValue > 0 && numValue <= 256) {
+      setHeight(numValue);
+      // Image will be re-initialized via useEffect
+    } else {
+      setHeightInput(height.toString());
+    }
+  }, [heightInput, height]);
 
   // Reset button handler
   const handleReset = useCallback(() => {
@@ -357,8 +370,12 @@ export default function Convolution() {
     initializeImage();
   }, [initializeImage]);
 
-  // Calculate pixel size based on resolution (to fit in fixed size)
-  const pixelSize = FIXED_IMAGE_SIZE / resolution;
+  // Calculate pixel size based on dimensions (to fit in fixed size, maintaining aspect ratio)
+  const aspectRatio = width / height;
+  const displayWidth = aspectRatio >= 1 ? FIXED_IMAGE_SIZE : FIXED_IMAGE_SIZE * aspectRatio;
+  const displayHeight = aspectRatio >= 1 ? FIXED_IMAGE_SIZE / aspectRatio : FIXED_IMAGE_SIZE;
+  const pixelSizeX = displayWidth / width;
+  const pixelSizeY = displayHeight / height;
 
   // Convert image data to a single flat array of pixel colors for faster rendering
   const pixelColors = useMemo(() => {
@@ -397,55 +414,23 @@ export default function Convolution() {
     <View style={styles.container}>
       <Text style={styles.fpsText}>FPS: {fps}</Text>
       
-      {/* Controls */}
-      <View style={styles.controlsRow}>
-        <View style={styles.controlGroup}>
-          <Text style={styles.controlLabel}>Resolution:</Text>
-          <View style={styles.resolutionInputRow}>
-            <TextInput
-              style={styles.resolutionInput}
-              value={resolutionInput}
-              onChangeText={setResolutionInput}
-              onSubmitEditing={handleResolutionSubmit}
-              onBlur={handleResolutionSubmit}
-              keyboardType="numeric"
-              selectTextOnFocus
-              placeholder={DEFAULT_RESOLUTION.toString()}
-              placeholderTextColor="#888"
-            />
-            <Text style={styles.resolutionLabel}>x{resolution}</Text>
-            <Pressable
-              onPress={handleResolutionSubmit}
-              style={styles.submitButton}
-              android_ripple={null}
-            >
-              <Text style={styles.submitButtonText}>Apply</Text>
-            </Pressable>
-          </View>
-        </View>
-        <BackendSelector
-          backend={backend}
-          onBackendChange={setBackend}
-        />
-      </View>
-      
       {/* Image Display */}
-      <View style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
-        <View style={[styles.pixelGrid, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
+      <View style={[styles.imageContainer, { width: displayWidth, height: displayHeight }]}>
+        <View style={[styles.pixelGrid, { width: displayWidth, height: displayHeight }]}>
           {pixelColors.map((color, idx) => {
-            const y = Math.floor(idx / resolution);
-            const x = idx % resolution;
+            const y = Math.floor(idx / width);
+            const x = idx % width;
             return (
               <View
                 key={`pixel-${idx}`}
                 style={[
                   {
-                    width: pixelSize,
-                    height: pixelSize,
+                    width: pixelSizeX,
+                    height: pixelSizeY,
                     backgroundColor: color,
                     position: 'absolute',
-                    left: x * pixelSize,
-                    top: y * pixelSize,
+                    left: x * pixelSizeX,
+                    top: y * pixelSizeY,
                   }
                 ]}
               />
@@ -490,8 +475,67 @@ export default function Convolution() {
           style={styles.resetButton}
           android_ripple={null}
         >
-          <Text style={styles.resetButtonText}>Reset</Text>
+          <Text style={styles.resetButtonIcon}>↻</Text>
         </Pressable>
+      </View>
+      
+      {/* Controls */}
+      <View style={styles.controlsContainer}>
+        <View style={styles.controlsRow}>
+          <View style={styles.controlGroup}>
+            <Text style={styles.controlLabel}>Width:</Text>
+            <View style={styles.resolutionInputRow}>
+              <TextInput
+                style={styles.resolutionInput}
+                value={widthInput}
+                onChangeText={setWidthInput}
+                onSubmitEditing={handleWidthSubmit}
+                onBlur={handleWidthSubmit}
+                keyboardType="numeric"
+                selectTextOnFocus
+                placeholder={DEFAULT_RESOLUTION.toString()}
+                placeholderTextColor="#888"
+              />
+              <Pressable
+                onPress={handleWidthSubmit}
+                style={styles.submitButton}
+                android_ripple={null}
+              >
+                <Text style={styles.submitButtonText}>Apply</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.controlGroup}>
+            <Text style={styles.controlLabel}>Height:</Text>
+            <View style={styles.resolutionInputRow}>
+              <TextInput
+                style={styles.resolutionInput}
+                value={heightInput}
+                onChangeText={setHeightInput}
+                onSubmitEditing={handleHeightSubmit}
+                onBlur={handleHeightSubmit}
+                keyboardType="numeric"
+                selectTextOnFocus
+                placeholder={DEFAULT_RESOLUTION.toString()}
+                placeholderTextColor="#888"
+              />
+              <Pressable
+                onPress={handleHeightSubmit}
+                style={styles.submitButton}
+                android_ripple={null}
+              >
+                <Text style={styles.submitButtonText}>Apply</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+        <View style={styles.backendRow}>
+          <Text style={styles.controlLabel}>Backend:</Text>
+          <BackendSelector
+            backend={backend}
+            onBackendChange={setBackend}
+          />
+        </View>
       </View>
     </View>
   );
@@ -564,16 +608,29 @@ const styles = StyleSheet.create({
   },
   resetButton: {
     backgroundColor: '#333',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#39ff14',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  resetButtonText: {
+  resetButtonIcon: {
     color: '#39ff14',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  controlsContainer: {
+    width: '100%',
+    gap: 16,
+    marginTop: 8,
+  },
+  backendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    justifyContent: 'center',
   },
   imageContainer: {
     backgroundColor: '#111',
@@ -605,34 +662,5 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     borderWidth: 1,
     borderColor: '#333',
-  },
-  submitButton: {
-    backgroundColor: '#39ff14',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  submitButtonText: {
-    color: '#000',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  resetButton: {
-    backgroundColor: '#333',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#39ff14',
-  },
-  resetButtonText: {
-    color: '#39ff14',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
