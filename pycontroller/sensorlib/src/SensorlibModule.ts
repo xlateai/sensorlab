@@ -11,6 +11,10 @@ declare class SensorlibModule extends NativeModule<SensorlibModuleEvents> {
   rustcoreConvolutionInit(input: string): string;
   rustcoreConvolutionStep(input: string): string;
   rustcoreConvolutionCleanup(input: string): string;
+  metalConvolutionInit(input: string): string;
+  metalConvolutionStep(input: string): string;
+  metalConvolutionGetImage(input: string): string;
+  metalConvolutionCleanup(input: string): string;
   setValueAsync(value: string): Promise<void>;
 }
 

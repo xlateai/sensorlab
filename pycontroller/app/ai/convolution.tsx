@@ -280,63 +280,95 @@ export default function Convolution() {
   // Initialize convolution state
   const initConvolution = useCallback((image: number[], kernel: number[]) => {
     try {
-      const input = JSON.stringify({
-        context_id: contextIdRef.current,
-        image,
-        kernel,
-      });
-      
-      const resultJson = SensorlibModule.rustcoreConvolutionInit(input);
-      if (!resultJson) {
-        console.error('Convolution init returned null');
-        return false;
+      if (backend === 'Metal') {
+        // Metal backend
+        const input = JSON.stringify({
+          context_id: contextIdRef.current,
+          image,
+          kernel,
+        });
+        const resultJson = SensorlibModule.metalConvolutionInit(input);
+        const result = JSON.parse(resultJson);
+        if (result.error) {
+          console.error('Metal convolution init error:', result.error);
+          return false;
+        }
+        return result.success === true;
+      } else {
+        // Rust backend
+        const input = JSON.stringify({
+          context_id: contextIdRef.current,
+          image,
+          kernel,
+        });
+        
+        const resultJson = SensorlibModule.rustcoreConvolutionInit(input);
+        if (!resultJson) {
+          console.error('Convolution init returned null');
+          return false;
+        }
+        
+        const result = JSON.parse(resultJson);
+        
+        if (result.error) {
+          console.error('Convolution init error:', result.error);
+          return false;
+        }
+        
+        return true;
       }
-      
-      const result = JSON.parse(resultJson);
-      
-      if (result.error) {
-        console.error('Convolution init error:', result.error);
-        return false;
-      }
-      
-      return true;
     } catch (error) {
       console.error('Convolution init failed:', error);
       return false;
     }
-  }, []);
+  }, [backend]);
 
   // Apply convolution step (stateful, no serialization overhead)
   const applyConvolutionStep = useCallback((): number[] | null => {
     try {
-      const input = JSON.stringify({
-        context_id: contextIdRef.current,
-      });
-      
-      const resultJson = SensorlibModule.rustcoreConvolutionStep(input);
-      if (!resultJson) {
-        console.error('Convolution step returned null');
-        return null;
+      if (backend === 'Metal') {
+        // Metal backend
+        const result = SensorlibModule.metalConvolutionStep(contextIdRef.current);
+        if (result.error) {
+          console.error('Metal convolution step error:', result.error);
+          return null;
+        }
+        if (!result.result || !Array.isArray(result.result)) {
+          console.error('Metal convolution step returned invalid result:', result);
+          return null;
+        }
+        return result.result;
+      } else {
+        // Rust backend
+        const input = JSON.stringify({
+          context_id: contextIdRef.current,
+        });
+        
+        const resultJson = SensorlibModule.rustcoreConvolutionStep(input);
+        if (!resultJson) {
+          console.error('Convolution step returned null');
+          return null;
+        }
+        
+        const result = JSON.parse(resultJson);
+        
+        if (result.error) {
+          console.error('Convolution step error:', result.error);
+          return null;
+        }
+        
+        if (!result.result || !Array.isArray(result.result)) {
+          console.error('Convolution step returned invalid result:', result);
+          return null;
+        }
+        
+        return result.result;
       }
-      
-      const result = JSON.parse(resultJson);
-      
-      if (result.error) {
-        console.error('Convolution step error:', result.error);
-        return null;
-      }
-      
-      if (!result.result || !Array.isArray(result.result)) {
-        console.error('Convolution step returned invalid result:', result);
-        return null;
-      }
-      
-      return result.result;
     } catch (error) {
       console.error('Convolution step failed:', error);
       return null;
     }
-  }, []);
+  }, [backend]);
 
   // Check if image has died out (sum is 0)
   const checkIfDead = useCallback((data: number[]): boolean => {
@@ -348,10 +380,14 @@ export default function Convolution() {
   const initializeImage = useCallback(() => {
     // Clean up old state first
     try {
-      const cleanupInput = JSON.stringify({
-        context_id: contextIdRef.current,
-      });
-      SensorlibModule.rustcoreConvolutionCleanup(cleanupInput);
+      if (backend === 'Metal') {
+        SensorlibModule.metalConvolutionCleanup(contextIdRef.current);
+      } else {
+        const cleanupInput = JSON.stringify({
+          context_id: contextIdRef.current,
+        });
+        SensorlibModule.rustcoreConvolutionCleanup(cleanupInput);
+      }
     } catch (error) {
       // Ignore cleanup errors
     }
@@ -364,11 +400,11 @@ export default function Convolution() {
     setImageData(newImage);
     setKernel(newKernel);
     
-    // Initialize Rust state
+    // Initialize convolution state (Rust or Metal)
     if (initConvolution(newImage, newKernel)) {
       setImageData(newImage);
     }
-  }, [resolution, initConvolution]);
+  }, [resolution, backend, initConvolution]);
 
   // Initialize on mount or when resolution changes
   useEffect(() => {
@@ -379,15 +415,22 @@ export default function Convolution() {
   useEffect(() => {
     return () => {
       try {
-        const input = JSON.stringify({
-          context_id: contextIdRef.current,
-        });
-        SensorlibModule.rustcoreConvolutionCleanup(input);
+        if (backend === 'Metal') {
+          const input = JSON.stringify({
+            context_id: contextIdRef.current,
+          });
+          SensorlibModule.metalConvolutionCleanup(input);
+        } else {
+          const input = JSON.stringify({
+            context_id: contextIdRef.current,
+          });
+          SensorlibModule.rustcoreConvolutionCleanup(input);
+        }
       } catch (error) {
         console.error('Convolution cleanup failed:', error);
       }
     };
-  }, []);
+  }, [backend]);
 
   // Main animation loop - runs as fast as possible
   const processingRef = useRef(false);
@@ -730,3 +773,4 @@ const styles = StyleSheet.create({
     borderColor: '#333',
   },
 });
+
