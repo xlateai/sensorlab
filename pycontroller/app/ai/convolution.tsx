@@ -18,44 +18,34 @@ function rgbToColor(r: number, g: number, b: number): string {
 
 // Settings dropdown component
 function SettingsMenu({
-  width,
-  height,
+  resolution,
   backend,
-  onWidthChange,
-  onHeightChange,
+  onResolutionChange,
   onBackendChange,
   onApply,
 }: {
-  width: number;
-  height: number;
+  resolution: number;
   backend: 'Rust' | 'Metal';
-  onWidthChange: (width: number) => void;
-  onHeightChange: (height: number) => void;
+  onResolutionChange: (resolution: number) => void;
   onBackendChange: (backend: 'Rust' | 'Metal') => void;
   onApply: () => void;
 }) {
   const [showSettings, setShowSettings] = useState(false);
-  const [tempWidth, setTempWidth] = useState(width.toString());
-  const [tempHeight, setTempHeight] = useState(height.toString());
+  const [tempResolution, setTempResolution] = useState(resolution.toString());
   const [tempBackend, setTempBackend] = useState(backend);
   const backends: Array<'Rust' | 'Metal'> = ['Rust', 'Metal'];
 
   const handleOpen = () => {
-    setTempWidth(width.toString());
-    setTempHeight(height.toString());
+    setTempResolution(resolution.toString());
     setTempBackend(backend);
     setShowSettings(true);
   };
 
   const handleApply = () => {
-    const widthNum = parseInt(tempWidth, 10);
-    const heightNum = parseInt(tempHeight, 10);
+    const resolutionNum = parseInt(tempResolution, 10);
     
-    if (!isNaN(widthNum) && widthNum > 0 && widthNum <= 256) {
-      onWidthChange(widthNum);
-    }
-    if (!isNaN(heightNum) && heightNum > 0 && heightNum <= 256) {
-      onHeightChange(heightNum);
+    if (!isNaN(resolutionNum) && resolutionNum > 0 && resolutionNum <= 256) {
+      onResolutionChange(resolutionNum);
     }
     onBackendChange(tempBackend);
     onApply();
@@ -96,91 +86,102 @@ function SettingsMenu({
           <Pressable
             style={{
               backgroundColor: '#1a1a1a',
-              borderRadius: 12,
-              padding: 20,
-              width: '85%',
-              maxHeight: '70%',
+              borderRadius: 16,
+              padding: 24,
+              width: '90%',
+              maxWidth: 400,
               borderWidth: 1,
-              borderColor: '#39ff14',
+              borderColor: '#333',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
             }}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' }}>
+            <Text style={{ 
+              color: '#fff', 
+              fontSize: 20, 
+              fontWeight: '700', 
+              marginBottom: 24, 
+              textAlign: 'center',
+              letterSpacing: 0.5,
+            }}>
               Settings
             </Text>
             
-            {/* Table-like layout */}
-            <View style={{ marginBottom: 20 }}>
-              {/* Width row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ width: 80 }}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>Width:</Text>
+            {/* Settings rows */}
+            <View style={{ marginBottom: 24, gap: 20 }}>
+              {/* Resolution row */}
+              <View>
+                <Text style={{ 
+                  color: '#aaa', 
+                  fontSize: 12, 
+                  fontWeight: '600', 
+                  marginBottom: 8,
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}>
+                  Resolution
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#0a0a0a',
+                      color: '#fff',
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      fontSize: 16,
+                      borderWidth: 1,
+                      borderColor: '#333',
+                      fontWeight: '500',
+                    }}
+                    value={tempResolution}
+                    onChangeText={setTempResolution}
+                    keyboardType="numeric"
+                    selectTextOnFocus
+                    placeholder="32"
+                    placeholderTextColor="#555"
+                  />
+                  <Text style={{ 
+                    color: '#888', 
+                    fontSize: 14, 
+                    fontWeight: '500',
+                    minWidth: 40,
+                  }}>
+                    × {tempResolution}
+                  </Text>
                 </View>
-                <TextInput
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#333',
-                    color: '#fff',
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 4,
-                    fontSize: 14,
-                    borderWidth: 1,
-                    borderColor: '#39ff14',
-                    marginLeft: 12,
-                  }}
-                  value={tempWidth}
-                  onChangeText={setTempWidth}
-                  keyboardType="numeric"
-                  selectTextOnFocus
-                  placeholder="32"
-                  placeholderTextColor="#888"
-                />
-              </View>
-              
-              {/* Height row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ width: 80 }}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>Height:</Text>
-                </View>
-                <TextInput
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#333',
-                    color: '#fff',
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 4,
-                    fontSize: 14,
-                    borderWidth: 1,
-                    borderColor: '#39ff14',
-                    marginLeft: 12,
-                  }}
-                  value={tempHeight}
-                  onChangeText={setTempHeight}
-                  keyboardType="numeric"
-                  selectTextOnFocus
-                  placeholder="32"
-                  placeholderTextColor="#888"
-                />
               </View>
               
               {/* Backend row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ width: 80 }}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>Backend:</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+              <View>
+                <Text style={{ 
+                  color: '#aaa', 
+                  fontSize: 12, 
+                  fontWeight: '600', 
+                  marginBottom: 8,
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}>
+                  Backend
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
                   {backends.map((b) => (
                     <Pressable
                       key={b}
                       onPress={() => setTempBackend(b)}
                       style={{
-                        backgroundColor: tempBackend === b ? '#39ff14' : '#333',
-                        paddingVertical: 12,
+                        flex: 1,
+                        backgroundColor: tempBackend === b ? '#39ff14' : '#0a0a0a',
+                        paddingVertical: 14,
                         paddingHorizontal: 16,
-                        borderRadius: 6,
-                        marginBottom: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: tempBackend === b ? '#39ff14' : '#333',
                       }}
                       android_ripple={null}
                     >
@@ -189,7 +190,8 @@ function SettingsMenu({
                           color: tempBackend === b ? '#000' : '#fff',
                           textAlign: 'center',
                           fontWeight: '600',
-                          fontSize: 14,
+                          fontSize: 15,
+                          letterSpacing: 0.3,
                         }}
                       >
                         {b}
@@ -200,19 +202,33 @@ function SettingsMenu({
               </View>
             </View>
             
-            {/* Apply button at bottom right */}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+            {/* Action buttons */}
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'flex-end', 
+              gap: 12,
+              paddingTop: 8,
+              borderTopWidth: 1,
+              borderTopColor: '#222',
+            }}>
               <Pressable
                 onPress={() => setShowSettings(false)}
                 style={{
-                  backgroundColor: '#333',
+                  backgroundColor: 'transparent',
                   paddingVertical: 12,
                   paddingHorizontal: 20,
                   borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#333',
                 }}
                 android_ripple={null}
               >
-                <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                <Text style={{ 
+                  color: '#aaa', 
+                  textAlign: 'center', 
+                  fontWeight: '600', 
+                  fontSize: 14,
+                }}>
                   Cancel
                 </Text>
               </Pressable>
@@ -221,12 +237,23 @@ function SettingsMenu({
                 style={{
                   backgroundColor: '#39ff14',
                   paddingVertical: 12,
-                  paddingHorizontal: 24,
+                  paddingHorizontal: 28,
                   borderRadius: 8,
+                  shadowColor: '#39ff14',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 4,
+                  elevation: 4,
                 }}
                 android_ripple={null}
               >
-                <Text style={{ color: '#000', textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
+                <Text style={{ 
+                  color: '#000', 
+                  textAlign: 'center', 
+                  fontWeight: '700', 
+                  fontSize: 14,
+                  letterSpacing: 0.5,
+                }}>
                   Apply
                 </Text>
               </Pressable>
@@ -239,8 +266,7 @@ function SettingsMenu({
 }
 
 export default function Convolution() {
-  const [width, setWidth] = useState(DEFAULT_RESOLUTION);
-  const [height, setHeight] = useState(DEFAULT_RESOLUTION);
+  const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
   const [backend, setBackend] = useState<'Rust' | 'Metal'>('Rust');
   const [imageData, setImageData] = useState<number[]>([]);
   const [kernel, setKernel] = useState<number[]>([]);
@@ -330,8 +356,8 @@ export default function Convolution() {
       // Ignore cleanup errors
     }
     
-    // Random RGB image
-    const newImage = Array.from({ length: width * height * CHANNELS }, () => Math.random());
+    // Random RGB image (square)
+    const newImage = Array.from({ length: resolution * resolution * CHANNELS }, () => Math.random());
     // Random 3x3x3 kernel (-1 to +1)
     const newKernel = Array.from({ length: KERNEL_SIZE * KERNEL_SIZE * CHANNELS }, () => (Math.random() * 2 - 1));
     
@@ -342,7 +368,7 @@ export default function Convolution() {
     if (initConvolution(newImage, newKernel)) {
       setImageData(newImage);
     }
-  }, [width, height, initConvolution]);
+  }, [resolution, initConvolution]);
 
   // Initialize on mount or when resolution changes
   useEffect(() => {
@@ -412,7 +438,7 @@ export default function Convolution() {
           if (checkIfDead(newImage)) {
             // Pause and clear image (leave black)
             setPaused(true);
-            setImageData(Array(width * height * CHANNELS).fill(0));
+            setImageData(Array(resolution * resolution * CHANNELS).fill(0));
             return;
           }
           
@@ -434,7 +460,7 @@ export default function Convolution() {
         animationFrameRef.current = null;
       }
     };
-  }, [paused, applyConvolutionStep, checkIfDead, width, height]);
+  }, [paused, applyConvolutionStep, checkIfDead, resolution]);
 
   // Handle play button - initialize if image is dead/black
   const handlePlayPause = useCallback(() => {
@@ -464,12 +490,8 @@ export default function Convolution() {
     initializeImage();
   }, [initializeImage]);
 
-  // Calculate pixel size based on dimensions (to fit in fixed size, maintaining aspect ratio)
-  const aspectRatio = width / height;
-  const displayWidth = aspectRatio >= 1 ? FIXED_IMAGE_SIZE : FIXED_IMAGE_SIZE * aspectRatio;
-  const displayHeight = aspectRatio >= 1 ? FIXED_IMAGE_SIZE / aspectRatio : FIXED_IMAGE_SIZE;
-  const pixelSizeX = displayWidth / width;
-  const pixelSizeY = displayHeight / height;
+  // Calculate pixel size based on resolution (square, fits in fixed size)
+  const pixelSize = FIXED_IMAGE_SIZE / resolution;
 
   // Convert image data to a single flat array of pixel colors for faster rendering
   const pixelColors = useMemo(() => {
@@ -509,22 +531,22 @@ export default function Convolution() {
       <Text style={styles.fpsText}>FPS: {fps}</Text>
       
       {/* Image Display */}
-      <View style={[styles.imageContainer, { width: displayWidth, height: displayHeight }]}>
-        <View style={[styles.pixelGrid, { width: displayWidth, height: displayHeight }]}>
+      <View style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
+        <View style={[styles.pixelGrid, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}>
           {pixelColors.map((color, idx) => {
-            const y = Math.floor(idx / width);
-            const x = idx % width;
+            const y = Math.floor(idx / resolution);
+            const x = idx % resolution;
             return (
               <View
                 key={`pixel-${idx}`}
                 style={[
                   {
-                    width: pixelSizeX,
-                    height: pixelSizeY,
+                    width: pixelSize,
+                    height: pixelSize,
                     backgroundColor: color,
                     position: 'absolute',
-                    left: x * pixelSizeX,
-                    top: y * pixelSizeY,
+                    left: x * pixelSize,
+                    top: y * pixelSize,
                   }
                 ]}
               />
@@ -575,11 +597,9 @@ export default function Convolution() {
       
       {/* Settings */}
       <SettingsMenu
-        width={width}
-        height={height}
+        resolution={resolution}
         backend={backend}
-        onWidthChange={setWidth}
-        onHeightChange={setHeight}
+        onResolutionChange={setResolution}
         onBackendChange={setBackend}
         onApply={handleSettingsApply}
       />
