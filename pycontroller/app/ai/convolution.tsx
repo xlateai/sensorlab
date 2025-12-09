@@ -469,6 +469,14 @@ export default function Convolution() {
   }, [kernel]);
 
   useEffect(() => {
+    // If using native view with autoRefresh, it handles the animation loop internally
+    // We only need the JavaScript loop for the fallback rendering
+    if (ConvolutionPixelView) {
+      // Native view handles everything - just track FPS if needed
+      // For now, we'll skip the JS loop when native view is available
+      return;
+    }
+    
     if (paused) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -526,7 +534,7 @@ export default function Convolution() {
         animationFrameRef.current = null;
       }
     };
-  }, [paused, applyConvolutionStep, checkIfDead, resolution]);
+  }, [paused, applyConvolutionStep, checkIfDead, resolution, ConvolutionPixelView]);
 
   // Handle play button - initialize if image is dead/black
   const handlePlayPause = useCallback(() => {
@@ -602,8 +610,7 @@ export default function Convolution() {
           contextId={contextIdRef.current}
           backend={backend}
           resolution={resolution}
-          imageData={imageData}
-          autoRefresh={false}
+          autoRefresh={!paused}
           style={[styles.imageContainer, { width: FIXED_IMAGE_SIZE, height: FIXED_IMAGE_SIZE }]}
         />
       ) : (

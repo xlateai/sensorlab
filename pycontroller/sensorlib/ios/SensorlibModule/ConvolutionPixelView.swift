@@ -76,7 +76,22 @@ class ConvolutionPixelView: ExpoView {
       }
     }
     
-    if !resultData.isEmpty {
+    // Only update if data changed (avoid unnecessary rendering)
+    if !resultData.isEmpty && resultData.count == imageData.count {
+      // Quick check if data actually changed
+      var changed = false
+      for i in 0..<min(resultData.count, imageData.count) {
+        if abs(resultData[i] - imageData[i]) > 0.001 {
+          changed = true
+          break
+        }
+      }
+      
+      if changed || imageData.isEmpty {
+        imageData = resultData
+        updateDisplay()
+      }
+    } else if !resultData.isEmpty {
       imageData = resultData
       updateDisplay()
     }
@@ -99,10 +114,35 @@ class ConvolutionPixelView: ExpoView {
   }
   
   @objc private func displayLinkTick() {
-    refreshFromBackend()
+    // Apply convolution step and then refresh display
+    // This keeps everything in native code - no JavaScript bridge
+    applyConvolutionStep()
+    
+    // Only refresh display if we have valid data
+    // This avoids unnecessary rendering when data hasn't changed
+    if !imageData.isEmpty {
+      refreshFromBackend()
+    }
   }
   
-  /// Render pixels to the layer
+  /// Apply convolution step directly in native code
+  private func applyConvolutionStep() {
+    let inputJson = """
+    {
+      "context_id": \(contextId)
+    }
+    """
+    
+    // Apply step without getting result (we'll read it in refreshFromBackend)
+    if backend == "Metal" {
+      _ = rustcoreMlxConvolutionStep(inputJson)
+    } else {
+      _ = rustcoreConvolutionStep(inputJson)
+    }
+  }
+  
+  /// Render pixels to the layer using efficient bitmap approach
+  /// This creates a single bitmap image instead of drawing thousands of rectangles
   private func updateDisplay() {
     guard let pixelLayer = pixelLayer,
           !imageData.isEmpty,
@@ -111,64 +151,63 @@ class ConvolutionPixelView: ExpoView {
       return
     }
     
-    let width = Int(bounds.width)
-    let height = Int(bounds.height)
+    let imageWidth = resolution
+    let imageHeight = resolution
     
-    guard width > 0 && height > 0 else { return }
-    
-    let pixelSize = max(1, min(width, height) / resolution)
-    let imageWidth = resolution * pixelSize
-    let imageHeight = resolution * pixelSize
-    
-    // Create bitmap context
     let colorSpace = CGColorSpaceCreateDeviceRGB()
-    let bytesPerPixel = 4
+    let bytesPerPixel = 4 // RGBA
     let bytesPerRow = imageWidth * bytesPerPixel
     let bitsPerComponent = 8
     
+    // Allocate buffer for pixel data
+    let bufferSize = imageWidth * imageHeight * bytesPerPixel
+    guard let buffer = malloc(bufferSize) else {
+      return
+    }
+    defer { free(buffer) }
+    
+    let bufferPointer = buffer.assumingMemoryBound(to: UInt8.self)
+    
+    // Fill buffer directly from imageData in one pass (much faster!)
+    let channels = 3
+    var srcIdx = 0
+    var dstIdx = 0
+    
+    for _ in 0..<(imageWidth * imageHeight) {
+      guard srcIdx + 2 < imageData.count else { break }
+      
+      // Clamp and convert to 0-255
+      let r = UInt8(max(0, min(255, Int(imageData[srcIdx] * 255.0))))
+      let g = UInt8(max(0, min(255, Int(imageData[srcIdx + 1] * 255.0))))
+      let b = UInt8(max(0, min(255, Int(imageData[srcIdx + 2] * 255.0))))
+      
+      // Write RGBA directly to buffer (RGBA format)
+      bufferPointer[dstIdx] = r
+      bufferPointer[dstIdx + 1] = g
+      bufferPointer[dstIdx + 2] = b
+      bufferPointer[dstIdx + 3] = 255 // Alpha (opaque)
+      
+      srcIdx += channels
+      dstIdx += bytesPerPixel
+    }
+    
+    // Create context from buffer
     guard let context = CGContext(
-      data: nil,
+      data: buffer,
       width: imageWidth,
       height: imageHeight,
       bitsPerComponent: bitsPerComponent,
       bytesPerRow: bytesPerRow,
       space: colorSpace,
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
     ) else {
       return
     }
     
-    // Draw pixels
-    let channels = 3
-    for y in 0..<resolution {
-      for x in 0..<resolution {
-        let idx = (y * resolution + x) * channels
-        guard idx + 2 < imageData.count else { continue }
-        
-        let r = max(0.0, min(1.0, Double(imageData[idx])))
-        let g = max(0.0, min(1.0, Double(imageData[idx + 1])))
-        let b = max(0.0, min(1.0, Double(imageData[idx + 2])))
-        
-        let color = CGColor(
-          red: r,
-          green: g,
-          blue: b,
-          alpha: 1.0
-        )
-        
-        context.setFillColor(color)
-        let rect = CGRect(
-          x: x * pixelSize,
-          y: y * pixelSize,
-          width: pixelSize,
-          height: pixelSize
-        )
-        context.fill(rect)
-      }
-    }
-    
-    // Create image from context
+    // Create image from context and set it on the layer
     if let cgImage = context.makeImage() {
+      // Use contentsGravity to scale the image to fit the view bounds
+      pixelLayer.contentsGravity = .resize
       pixelLayer.contents = cgImage
     }
   }
