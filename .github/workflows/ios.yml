@@ -8,44 +8,36 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Install dependencies
         working-directory: ./pycontroller
         run: npm ci
         shell: bash
+
       - name: 🦀 Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
       - name: 🦀 Build Rust library for iOS
         working-directory: ./pycontroller/rustcore
+        shell: bash
         run: |
           chmod +x build-ios.sh
           ./build-ios.sh
-        shell: bash
-      - name: ✅ Verify Rust library exists
-        run: |
-          LIB_PATH="./pycontroller/sensorlib/ios/libs/librustcore.a"
-          if [ ! -f "$LIB_PATH" ]; then
-            echo "❌ Error: Rust library not found at $LIB_PATH"
-            exit 1
-          fi
-          echo "✅ Found Rust library at $LIB_PATH"
-          ls -lh "$LIB_PATH"
-          file "$LIB_PATH"
-          echo "📦 Library architecture info:"
-          lipo -info "$LIB_PATH" || echo "⚠️  lipo check failed (might be okay)"
-          echo "🔍 Checking for rustcore_hello symbol:"
-          nm "$LIB_PATH" | grep rustcore_hello || echo "⚠️  Symbol check failed"
-        shell: bash
-      - name: 📦 Install CocoaPods and run pod install
-        working-directory: ./pycontroller/ios
-        run: |
-          sudo gem install cocoapods
-          pod install
-        shell: bash
+
+          # ⬅️ Add these directories if missing
+          mkdir -p ../sensorlib/libs
+
+          echo "📁 Copying Rust library to podspec directory..."
+          cp ../sensorlib/ios/libs/librustcore.a ../sensorlib/libs/librustcore.a
+
+          echo "✅ Done copying Rust libraries"
+
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
         with:
@@ -53,11 +45,12 @@ jobs:
           eas-version: latest
           expo-cache: true
           working-directory: ./pycontroller
-          # Create personal access token https://expo.dev/settings/access-tokens
           token: ${{ secrets.EXPO_TOKEN }}
+
       - name: Build iOS app
         working-directory: ./pycontroller
         run: eas build --local -p ios --profile production --non-interactive --output app.ipa
+
       - name: 'Upload app to TestFlight'
         uses: apple-actions/upload-testflight-build@v1
         with:
