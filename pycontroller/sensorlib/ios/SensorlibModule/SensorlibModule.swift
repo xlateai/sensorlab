@@ -147,5 +147,23 @@ public class SensorlibModule: Module {
         }
       }
     }
+    
+    // Viewport view for game engine rendering
+    View(ViewportView.self) {
+      // Viewport width
+      Prop("width") { (view: ViewportView, w: Int) in
+        view.setWidth(w)
+      }
+      
+      // Viewport height
+      Prop("height") { (view: ViewportView, h: Int) in
+        view.setHeight(h)
+      }
+      
+      // Seed for random pixel generation (triggers regeneration)
+      Prop("seed") { (view: ViewportView, s: UInt64) in
+        view.setSeed(s)
+      }
+    }
   }
 }

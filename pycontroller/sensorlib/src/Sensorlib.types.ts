@@ -26,3 +26,10 @@ export type ConvolutionPixelViewProps = {
   autoRefresh?: boolean;
   style?: StyleProp<ViewStyle>;
 };
+
+export type ViewportViewProps = {
+  width: number;
+  height: number;
+  seed?: number;
+  style?: StyleProp<ViewStyle>;
+};

@@ -1,0 +1,13 @@
+import * as React from 'react';
+import { View, Text } from 'react-native';
+
+import { ViewportViewProps } from './Sensorlib.types';
+
+// Web fallback - native view is iOS only
+export default function ViewportView(props: ViewportViewProps) {
+  return (
+    <View style={[{ backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }, props.style]}>
+      <Text style={{ color: '#fff' }}>ViewportView (iOS only)</Text>
+    </View>
+  );
+}

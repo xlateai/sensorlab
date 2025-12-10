@@ -3,4 +3,5 @@
 export { default } from './SensorlibModule';
 export { default as SensorlibView } from './SensorlibView';
 export { default as ConvolutionPixelView } from './ConvolutionPixelView';
+export { default as ViewportView } from './ViewportView';
 export * from  './Sensorlib.types';

@@ -1,72 +1,29 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+
+// Import ViewportView from sensorlib
+let ViewportView: React.ComponentType<any> | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - ViewportView exported from sensorlib
+  const sensorlib = require('sensorlib');
+  ViewportView = sensorlib.ViewportView;
+} catch (e) {
+  // Native view not available yet - will use JavaScript fallback
+  console.warn('ViewportView not available, using JavaScript rendering');
+}
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Generate random pixel data
-function generateRandomPixelData(width: number, height: number): Array<Array<{ r: number; g: number; b: number }>> {
-  const pixels: Array<Array<{ r: number; g: number; b: number }>> = [];
-  
-  for (let y = 0; y < height; y++) {
-    const row: Array<{ r: number; g: number; b: number }> = [];
-    for (let x = 0; x < width; x++) {
-      row.push({
-        r: Math.floor(Math.random() * 256),
-        g: Math.floor(Math.random() * 256),
-        b: Math.floor(Math.random() * 256),
-      });
-    }
-    pixels.push(row);
-  }
-  
-  return pixels;
-}
-
-// High resolution pixel renderer component
-// Uses a more efficient approach for React Native
-function PixelMapRenderer({ 
-  width, 
-  height, 
-  pixelSize = 1,
-  seed 
-}: { 
-  width: number; 
-  height: number; 
-  pixelSize?: number;
-  seed?: string | number;
-}) {
-  const pixelData = useMemo(() => generateRandomPixelData(width, height), [width, height, seed]);
-  
-  // For performance, we'll render rows and use flexWrap for pixels
-  return (
-    <View style={styles.pixelContainer}>
-      {pixelData.map((row, y) => (
-        <View key={y} style={[styles.pixelRow, { height: pixelSize }]}>
-          {row.map((pixel, x) => (
-            <View
-              key={`${x}-${y}`}
-              style={{
-                width: pixelSize,
-                height: pixelSize,
-                backgroundColor: `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`,
-              }}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
 export default function VisualShowcase() {
   const [resolution, setResolution] = useState<'low' | 'medium' | 'high' | 'ultra'>('medium');
-  const [regenerateKey, setRegenerateKey] = useState(0);
+  const [seed, setSeed] = useState(0);
   
   const resolutionConfig = {
-    low: { width: 100, height: 100, pixelSize: 2 },
-    medium: { width: 200, height: 200, pixelSize: 1 },
-    high: { width: 400, height: 400, pixelSize: 0.5 },
-    ultra: { width: 800, height: 800, pixelSize: 0.25 },
+    low: { width: 100, height: 100 },
+    medium: { width: 200, height: 200 },
+    high: { width: 400, height: 400 },
+    ultra: { width: 800, height: 800 },
   };
   
   const config = resolutionConfig[resolution];
@@ -76,8 +33,8 @@ export default function VisualShowcase() {
   const displayHeight = config.height * scale;
   
   const handleRegenerate = () => {
-    // Force re-render by updating the key
-    setRegenerateKey(prev => prev + 1);
+    // Update seed to trigger regeneration in native view
+    setSeed(prev => prev + 1);
   };
   
   return (
@@ -114,18 +71,23 @@ export default function VisualShowcase() {
         </Pressable>
         
         <Text style={styles.info}>
-          {config.width} × {config.height} pixels ({config.width * config.height.toLocaleString()} total)
+          {config.width} × {config.height} pixels ({(config.width * config.height).toLocaleString()} total)
         </Text>
       </View>
       
       <View style={[styles.imageContainer, { width: displayWidth, height: displayHeight }]}>
-        <PixelMapRenderer
-          key={`${resolution}-${regenerateKey}`}
-          width={config.width}
-          height={config.height}
-          pixelSize={config.pixelSize}
-          seed={regenerateKey}
-        />
+        {ViewportView ? (
+          React.createElement(ViewportView, {
+            width: config.width,
+            height: config.height,
+            seed: seed,
+            style: StyleSheet.absoluteFill,
+          })
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ color: '#888' }}>ViewportView not available</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -194,11 +156,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#000',
-  },
-  pixelContainer: {
-    flexDirection: 'column',
-  },
-  pixelRow: {
-    flexDirection: 'row',
   },
 });
