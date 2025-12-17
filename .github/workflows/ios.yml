@@ -24,11 +24,16 @@ jobs:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
 
       - name: 🦀 Build Rust library for iOS
-        working-directory: ./pycontroller
+        working-directory: ./pycontroller/rustcore
         shell: bash
         run: |
-          chmod +x rustcore/build-ios.sh
-          sh ./rustcore/build-ios.sh
+          chmod +x build-ios.sh
+          ./build-ios.sh
+          # Copy library to the location expected by the podspec
+          mkdir -p ../sensorlib/libs
+          echo "📁 Copying Rust library to podspec directory..."
+          cp ../sensorlib/ios/libs/librustcore.a ../sensorlib/libs/librustcore.a
+          echo "✅ Done copying Rust libraries"
           
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
