@@ -9,3 +9,4 @@ const NativeView: React.ComponentType<ConvolutionPixelViewProps> =
 export default function ConvolutionPixelView(props: ConvolutionPixelViewProps) {
   return <NativeView {...props} />;
 }
+

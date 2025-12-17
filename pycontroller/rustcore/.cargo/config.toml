@@ -14,3 +14,4 @@ rustflags = [
 rustflags = [
     "-C", "link-arg=-miphoneos-version-min=15.1",
 ]
+

@@ -9,3 +9,4 @@ const NativeView: React.ComponentType<ViewportViewProps> =
 export default function ViewportView(props: ViewportViewProps) {
   return <NativeView {...props} />;
 }
+

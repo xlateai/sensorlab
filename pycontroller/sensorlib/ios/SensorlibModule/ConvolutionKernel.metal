@@ -20,3 +20,4 @@ kernel void convolution3d(
     float4 color = inputTexture.read(gid);
     outputTexture.write(color, gid);
 }
+

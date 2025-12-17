@@ -153,3 +153,4 @@ pub fn cleanup_convolution_mlx(context_id: u64) {
     let mut states = CONV_STATES_MLX.lock().unwrap();
     states.remove(&context_id);
 }
+
