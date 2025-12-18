@@ -22,11 +22,20 @@ Pod::Spec.new do |s|
 
   
   # Rust library - vendored_libraries automatically links it
+  # Path is relative to the podspec location (sensorlib/ios/)
   s.vendored_libraries = "libs/librustcore.a"
+  s.preserve_paths = "libs/librustcore.a"
   s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"
   
-  # Swift/Objective-C compatibility
+  # Swift/Objective-C compatibility and linker configuration
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
+    # Ensure the library is linked - vendored_libraries should handle this, but be explicit
+    'OTHER_LDFLAGS' => '$(inherited)',
+  }
+  
+  # Ensure the library is preserved and available
+  s.user_target_xcconfig = {
+    'OTHER_LDFLAGS' => '$(inherited)',
   }
 end
