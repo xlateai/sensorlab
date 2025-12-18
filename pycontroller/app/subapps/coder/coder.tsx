@@ -74,6 +74,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#333333',
     paddingHorizontal: 8,
     paddingBottom: 8,
+    zIndex: 1000,
+    elevation: 1000, // For Android
   },
   tabButton: {
     flex: 1,
