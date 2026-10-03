@@ -91,10 +91,12 @@ jobs:
   react-native:
     needs: validate-dispatch
     if: needs.validate-dispatch.outputs.valid == 'true' && needs.validate-dispatch.outputs.defer_preview != 'true'
-    uses: xlateai/devlate/.github/workflows/react-native-project.yml@9b6d9736fda37073e51f270b3622ccf765c43d16
+    uses: xlateai/xos/.github/workflows/external-project.yml@ce6afee5495c3128e44ce5558ac60b0bb805034d
     with:
       project-name: sensorlab
-      devlate-ref: 9b6d9736fda37073e51f270b3622ccf765c43d16
+      xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
+      project-adapter: react_native
+      required-commands: ""
       project-path: pycontroller
       command-subject: ${{ inputs.command-subject || '' }}
       pull-request-number: ${{ inputs.pull-request-number || '' }}
