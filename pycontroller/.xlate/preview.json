@@ -1,0 +1,20 @@
+{
+  "name": "Sensor Lab",
+  "version": "1.0.1",
+  "icon": "assets/images/icon.png",
+  "native_generation": "expo",
+  "ios": {
+    "identifier": "com.dyllan.xlate",
+    "workspace": "ios/xlate.xcworkspace",
+    "scheme": "xlate",
+    "configuration": "Release",
+    "portable_pod_checksums": true
+  },
+  "android": {
+    "identifier": "com.dyllan.xlate",
+    "directory": "android",
+    "module": "app",
+    "task": "assembleRelease",
+    "apk": "app/build/outputs/apk/release/app-release-unsigned.apk"
+  }
+}
