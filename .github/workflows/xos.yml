@@ -91,11 +91,11 @@ jobs:
   react-native:
     needs: validate-dispatch
     if: needs.validate-dispatch.outputs.valid == 'true' && needs.validate-dispatch.outputs.defer_preview != 'true'
-    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@5c7d31728878851ac4f81e57f593f968614ecb8d
+    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@0dba14514fdbb3d352c7bdf6d8c0931a060fbba0
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
-      actions-ref: 59807b26853bf979c1fe964840336ff94068c3c2
+      actions-ref: 0dba14514fdbb3d352c7bdf6d8c0931a060fbba0
       project-adapter: react_native
       required-commands: ""
       project-path: pycontroller
@@ -108,6 +108,7 @@ jobs:
       reissue-source-sha: ${{ inputs.reissue-source-sha || '' }}
       signing-application-identifier: ${{ inputs.signing-application-identifier || '' }}
       signing-environment: ${{ inputs.signing-environment || '' }}
+      build-signing-environment: xos-preview-ios-com-dyllan-xlate-56a75bad5afd3d6f
       build-host: ${{ inputs.build-host || 'https://builds.xlate.ai' }}
       preview-title: ${{ inputs.preview-title || '' }}
       preview-what-changed: ${{ inputs.preview-what-changed || '' }}
