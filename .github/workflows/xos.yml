@@ -95,7 +95,7 @@ jobs:
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
-      actions-ref: 2539e2defc8cd7c37d818fd68d6c5be3bf1c1f2a
+      actions-ref: b80d390641070cc6b05add490263dc4055bc7885
       project-adapter: react_native
       application-identifier: com.dyllan.xlate
       required-commands: ""
