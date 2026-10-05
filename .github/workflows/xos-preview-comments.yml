@@ -17,8 +17,8 @@ jobs:
       - name: checkout pinned command validator
         uses: actions/checkout@v4
         with:
-          repository: xlateai/devlate
-          ref: 9b6d9736fda37073e51f270b3622ccf765c43d16
+          repository: xlateai/xos
+          ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
           # Centrally provisioned for trusted Xlate repositories; never entered
           # by an application developer during XOS Preview setup.
           token: ${{ secrets.XOS_REPO_TOKEN }}
