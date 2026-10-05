@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   build-and-release:
-    if: ${{ !startsWith(github.ref_name, 'testflight-upload-') }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,44 +70,9 @@ jobs:
           retention-days: 7
 
       - name: 'Upload app to TestFlight'
-        uses: apple-actions/upload-testflight-build@v1
+        uses: apple-actions/upload-testflight-build@v3
         with:
           app-path: './pycontroller/app.ipa'
           issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-
-  upload-existing-ipa:
-    if: startsWith(github.ref_name, 'testflight-upload-')
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Verify App Store Connect credentials
-        run: node .github/scripts/testflight-status.mjs
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: sensorlab-testflight-ipa
-          run-id: 37267007588
-          github-token: ${{ github.token }}
-          path: release-artifacts
-      - name: Upload saved build 1.0.1 (23) to TestFlight
-        uses: apple-actions/upload-testflight-build@v3
-        with:
-          app-path: release-artifacts/app.ipa
-          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-      - name: Verify Apple processing
-        run: node .github/scripts/testflight-status.mjs --wait
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-          TESTFLIGHT_BUILD_NUMBER: '23'
