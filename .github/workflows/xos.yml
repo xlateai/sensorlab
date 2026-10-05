@@ -9,6 +9,10 @@ on:
       pull-request-number: { required: false, default: "" }
       expected-sha: { required: false, default: "" }
       preview-request-id: { required: false, default: "" }
+      app-store-connect-api-key-id:
+        description: Public 10-character App Store Connect API key identifier.
+        required: false
+        default: ""
       signing-build-id: { required: false, default: "" }
       signing-platform: { required: false, default: "" }
       device-preparation-id: { required: false, default: "" }
@@ -98,7 +102,7 @@ jobs:
       actions-ref: 77fc2acc2899c3b990be57a2c4409077e61928ac
       project-adapter: react_native
       application-identifier: com.dyllan.xlate
-      app-store-connect-api-key-id: ${{ vars.APP_STORE_CONNECT_API_KEY_ID }}
+      app-store-connect-api-key-id: ${{ inputs.app-store-connect-api-key-id || vars.APP_STORE_CONNECT_API_KEY_ID }}
       apple-team-id: JYY6VVYGVG
       required-commands: ""
       project-path: pycontroller
