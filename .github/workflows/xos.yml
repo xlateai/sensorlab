@@ -91,11 +91,11 @@ jobs:
   react-native:
     needs: validate-dispatch
     if: needs.validate-dispatch.outputs.valid == 'true' && needs.validate-dispatch.outputs.defer_preview != 'true'
-    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@2539e2defc8cd7c37d818fd68d6c5be3bf1c1f2a
+    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@4119350064263412a56477a73d1307b2f86def02
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
-      actions-ref: 0c5bb0f90535db57f47f7cd5e32516f079fa920c
+      actions-ref: 4119350064263412a56477a73d1307b2f86def02
       project-adapter: react_native
       application-identifier: com.dyllan.xlate
       required-commands: ""
