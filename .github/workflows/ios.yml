@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
         working-directory: ./pycontroller
@@ -24,8 +24,8 @@ jobs:
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
-          working-directory: ./pycontroller
+          eas-version: 24.10.0
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Verify Expo authentication
