@@ -21,14 +21,27 @@ jobs:
         run: npm ci
         shell: bash
 
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          working-directory: ./pycontroller
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Verify Expo authentication
+        working-directory: ./pycontroller
+        run: eas whoami
+
       - name: 🦀 Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
+          components: llvm-tools
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: pycontroller/rustcore
+          save-if: ${{ always() }}
 
       - name: Build Rust library for iOS device
         working-directory: ./pycontroller/rustcore
@@ -38,17 +51,9 @@ jobs:
           cargo build --locked --target aarch64-apple-ios --release --lib
           mkdir -p ../sensorlib/ios/libs
           cp target/aarch64-apple-ios/release/librustcore.a ../sensorlib/ios/libs/librustcore.a
-          nm ../sensorlib/ios/libs/librustcore.a > "$RUNNER_TEMP/rustcore-symbols.txt"
+          RUST_HOST=$(rustc -vV | sed -n 's/^host: //p')
+          "$(rustc --print sysroot)/lib/rustlib/$RUST_HOST/bin/llvm-nm" --defined-only ../sensorlib/ios/libs/librustcore.a > "$RUNNER_TEMP/rustcore-symbols.txt"
           grep -q rustcore_convolution "$RUNNER_TEMP/rustcore-symbols.txt"
-
-      - name: 🏗 Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          expo-cache: true
-          working-directory: ./pycontroller
-          token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build iOS app
         working-directory: ./pycontroller
