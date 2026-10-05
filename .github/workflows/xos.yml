@@ -95,7 +95,7 @@ jobs:
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
-      actions-ref: 5c7d31728878851ac4f81e57f593f968614ecb8d
+      actions-ref: 59807b26853bf979c1fe964840336ff94068c3c2
       project-adapter: react_native
       required-commands: ""
       project-path: pycontroller
