@@ -41,7 +41,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: pycontroller/rustcore
-          save-if: ${{ always() }}
+          save-if: 'true'
 
       - name: Build Rust library for iOS device
         working-directory: ./pycontroller/rustcore
