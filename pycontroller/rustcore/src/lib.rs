@@ -23,14 +23,14 @@ struct ConvolutionOutput {
 
 /// Hello world function that returns a C-compatible string
 /// The caller is responsible for freeing the memory using rustcore_hello_free
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_hello() -> *mut c_char {
     let s = CString::new("Hello from Rust! 🦀").expect("CString::new failed");
     s.into_raw()
 }
 
 /// Free the memory allocated by rustcore_hello
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_hello_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -41,7 +41,7 @@ pub extern "C" fn rustcore_hello_free(ptr: *mut c_char) {
 
 /// Run ML training and return output as a C-compatible string
 /// The caller is responsible for freeing the memory using rustcore_ml_training_free
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_ml_training() -> *mut c_char {
     let output = helloworld::run_training();
     let s = CString::new(output).expect("CString::new failed");
@@ -49,7 +49,7 @@ pub extern "C" fn rustcore_ml_training() -> *mut c_char {
 }
 
 /// Free the memory allocated by rustcore_ml_training
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_ml_training_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -62,7 +62,7 @@ pub extern "C" fn rustcore_ml_training_free(ptr: *mut c_char) {
 /// Takes JSON string with {"image": [f32...], "kernel": [f32...]}
 /// Returns JSON string with {"result": [f32...]}
 /// Note: This function does NOT take ownership of input_json - caller must free it separately
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -116,7 +116,7 @@ pub extern "C" fn rustcore_convolution(input_json: *const c_char) -> *mut c_char
 }
 
 /// Free memory allocated by rustcore_convolution
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -141,7 +141,7 @@ struct ConvolutionStateOutput {
 }
 
 /// Initialize or update convolution state (keeps tensors in memory)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_init(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -198,7 +198,7 @@ struct ConvolutionStepInput {
 }
 
 /// Apply one convolution step (in-place, no serialization overhead)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_step(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -250,7 +250,7 @@ pub extern "C" fn rustcore_convolution_step(input_json: *const c_char) -> *mut c
 }
 
 /// Free memory allocated by stateful convolution functions
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_init_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -259,7 +259,7 @@ pub extern "C" fn rustcore_convolution_init_free(ptr: *mut c_char) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_step_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -274,7 +274,7 @@ struct ConvolutionCleanupInput {
 }
 
 /// Get current Rust convolution image data (without applying step)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_get_image(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -326,7 +326,7 @@ pub extern "C" fn rustcore_convolution_get_image(input_json: *const c_char) -> *
 }
 
 /// Free memory allocated by rustcore_convolution_get_image
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_get_image_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -336,7 +336,7 @@ pub extern "C" fn rustcore_convolution_get_image_free(ptr: *mut c_char) {
 }
 
 /// Clean up convolution state
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_cleanup(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -366,7 +366,7 @@ pub extern "C" fn rustcore_convolution_cleanup(input_json: *const c_char) -> *mu
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_convolution_cleanup_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -378,7 +378,7 @@ pub extern "C" fn rustcore_convolution_cleanup_free(ptr: *mut c_char) {
 // MLX-based Metal backend functions (for comparison with Rust backend)
 
 /// Initialize or update MLX convolution state (Metal backend)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_init(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -430,7 +430,7 @@ pub extern "C" fn rustcore_mlx_convolution_init(input_json: *const c_char) -> *m
 }
 
 /// Apply one MLX convolution step (Metal backend)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_step(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -482,7 +482,7 @@ pub extern "C" fn rustcore_mlx_convolution_step(input_json: *const c_char) -> *m
 }
 
 /// Get current MLX image data (Metal backend)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_get_image(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -534,7 +534,7 @@ pub extern "C" fn rustcore_mlx_convolution_get_image(input_json: *const c_char) 
 }
 
 /// Clean up MLX convolution state (Metal backend)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_cleanup(input_json: *const c_char) -> *mut c_char {
     unsafe {
         if input_json.is_null() {
@@ -564,7 +564,7 @@ pub extern "C" fn rustcore_mlx_convolution_cleanup(input_json: *const c_char) ->
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_init_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -573,7 +573,7 @@ pub extern "C" fn rustcore_mlx_convolution_init_free(ptr: *mut c_char) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_step_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -582,7 +582,7 @@ pub extern "C" fn rustcore_mlx_convolution_step_free(ptr: *mut c_char) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_get_image_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -591,7 +591,7 @@ pub extern "C" fn rustcore_mlx_convolution_get_image_free(ptr: *mut c_char) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rustcore_mlx_convolution_cleanup_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {

@@ -24,65 +24,23 @@ jobs:
       - name: 🦀 Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          targets: aarch64-apple-ios
 
-      - name: 🦀 Build Rust library for iOS
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pycontroller/rustcore
+
+      - name: Build Rust library for iOS device
         working-directory: ./pycontroller/rustcore
         shell: bash
         run: |
-          chmod +x build-ios.sh
-          ./build-ios.sh
-          # Verify the library exists at the expected location (podspec location)
-          echo "📁 Verifying Rust library location..."
-          LIB_PATH="../sensorlib/ios/libs/librustcore.a"
-          if [ ! -f "$LIB_PATH" ]; then
-            echo "❌ Error: librustcore.a not found at expected location"
-            echo "   Expected: $LIB_PATH"
-            ls -la ../sensorlib/ios/libs/ || echo "   Directory doesn't exist"
-            exit 1
-          fi
-          # Verify the library contains the expected symbols
-          echo "🔍 Checking library symbols..."
-          if ! nm "$LIB_PATH" 2>/dev/null | grep -q "rustcore_convolution"; then
-            echo "⚠️  Warning: rustcore_convolution symbol not found in library"
-            echo "   Library info:"
-            file "$LIB_PATH"
-            lipo -info "$LIB_PATH" || true
-            echo "   Available symbols (first 20):"
-            nm "$LIB_PATH" 2>/dev/null | head -20 || echo "   Could not read symbols"
-          else
-            echo "✅ Found rustcore_convolution symbol in library"
-          fi
-          # Also copy to alternative location (for compatibility)
-          mkdir -p ../sensorlib/libs
-          cp "$LIB_PATH" ../sensorlib/libs/librustcore.a
-          echo "✅ Rust library verified and copied to both locations"
-          
-      - name: 🔍 Verify library before EAS build
-        working-directory: ./pycontroller
-        shell: bash
-        run: |
-          echo "🔍 Final verification of Rust library..."
-          LIB_PATH="sensorlib/ios/libs/librustcore.a"
-          if [ ! -f "$LIB_PATH" ]; then
-            echo "❌ Error: librustcore.a not found before EAS build"
-            echo "   Expected: $LIB_PATH"
-            find . -name "librustcore.a" -type f 2>/dev/null || echo "   Library not found anywhere"
-            exit 1
-          fi
-          echo "✅ Library exists: $LIB_PATH"
-          echo "   File size: $(stat -f%z "$LIB_PATH" 2>/dev/null || stat -c%s "$LIB_PATH" 2>/dev/null || echo "unknown") bytes"
-          echo "   Architecture:"
-          lipo -info "$LIB_PATH" || true
-          echo "   Checking for rustcore_convolution symbol:"
-          if nm "$LIB_PATH" 2>/dev/null | grep -q "rustcore_convolution"; then
-            echo "   ✅ Symbol found in library"
-          else
-            echo "   ⚠️  Symbol not found - this may cause linker errors"
-            echo "   Available symbols (first 10):"
-            nm "$LIB_PATH" 2>/dev/null | head -10 || echo "   Could not read symbols"
-          fi
-          
+          set -euo pipefail
+          cargo build --locked --target aarch64-apple-ios --release --lib
+          mkdir -p ../sensorlib/ios/libs
+          cp target/aarch64-apple-ios/release/librustcore.a ../sensorlib/ios/libs/librustcore.a
+          nm ../sensorlib/ios/libs/librustcore.a > "$RUNNER_TEMP/rustcore-symbols.txt"
+          grep -q rustcore_convolution "$RUNNER_TEMP/rustcore-symbols.txt"
+
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8
         with:
@@ -95,6 +53,12 @@ jobs:
       - name: Build iOS app
         working-directory: ./pycontroller
         run: eas build --local -p ios --profile production --non-interactive --output app.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sensorlab-testflight-ipa
+          path: pycontroller/app.ipa
+          retention-days: 7
 
       - name: 'Upload app to TestFlight'
         uses: apple-actions/upload-testflight-build@v1
