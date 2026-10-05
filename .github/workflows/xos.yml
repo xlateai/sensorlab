@@ -91,10 +91,11 @@ jobs:
   react-native:
     needs: validate-dispatch
     if: needs.validate-dispatch.outputs.valid == 'true' && needs.validate-dispatch.outputs.defer_preview != 'true'
-    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@aa0db845347a6617dd2c270721bf0d1517c70677
+    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@5c7d31728878851ac4f81e57f593f968614ecb8d
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
+      actions-ref: 5c7d31728878851ac4f81e57f593f968614ecb8d
       project-adapter: react_native
       required-commands: ""
       project-path: pycontroller
@@ -112,9 +113,6 @@ jobs:
       preview-what-changed: ${{ inputs.preview-what-changed || '' }}
       preview-what-to-test: ${{ inputs.preview-what-to-test || '' }}
     secrets:
-      # Provisioned centrally for trusted Xlate repositories. XOS Preview setup
-      # never asks an application developer to create or paste this credential.
-      XOS_REPO_TOKEN: ${{ secrets.XOS_REPO_TOKEN }}
       APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
