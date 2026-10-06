@@ -95,11 +95,11 @@ jobs:
   react-native:
     needs: validate-dispatch
     if: needs.validate-dispatch.outputs.valid == 'true' && needs.validate-dispatch.outputs.defer_preview != 'true'
-    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@e38de51000cb12212c1ac377967dfd4c5b89d231
+    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@e26d9ac9bf43c3ec22d17b3246a2ddcd036ebae2
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
-      actions-ref: e38de51000cb12212c1ac377967dfd4c5b89d231
+      actions-ref: e26d9ac9bf43c3ec22d17b3246a2ddcd036ebae2
       project-adapter: react_native
       application-identifier: com.dyllan.xlate
       app-store-connect-api-key-id: ${{ inputs.app-store-connect-api-key-id || vars.APP_STORE_CONNECT_API_KEY_ID }}
@@ -121,7 +121,7 @@ jobs:
       preview-what-changed: ${{ inputs.preview-what-changed || '' }}
       preview-what-to-test: ${{ inputs.preview-what-to-test || '' }}
     secrets:
-      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
