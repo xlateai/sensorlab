@@ -10,4 +10,6 @@ cp rustcore/target/aarch64-apple-ios/release/librustcore.a sensorlib/ios/libs/li
 
 rust_host="$(rustc -vV | sed -n 's/^host: //p')"
 llvm_nm="$(rustc --print sysroot)/lib/rustlib/$rust_host/bin/llvm-nm"
-"$llvm_nm" --defined-only sensorlib/ios/libs/librustcore.a | grep -q rustcore_convolution
+symbols_file="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sensorlab-rustcore-symbols.txt"
+"$llvm_nm" --defined-only sensorlib/ios/libs/librustcore.a > "$symbols_file"
+grep -q rustcore_convolution "$symbols_file"
