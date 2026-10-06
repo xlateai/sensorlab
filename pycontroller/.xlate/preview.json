@@ -5,8 +5,9 @@
   "native_generation": "expo",
   "ios": {
     "identifier": "com.dyllan.xlate",
-    "workspace": "ios/xlate.xcworkspace",
-    "scheme": "xlate",
+    "workspace": "ios/SensorLab.xcworkspace",
+    "scheme": "SensorLab",
+    "info_plist": "ios/SensorLab/Info.plist",
     "configuration": "Release",
     "portable_pod_checksums": true
   },
