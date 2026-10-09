@@ -1,0 +1,23 @@
+name: Distributions
+run-name: Devlate ${{ fromJSON(inputs.request || '{}').request_id || github.sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: Optional Devlate request (JSON)
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+  id-token: write
+jobs:
+  distribute:
+    uses: xlateai/preview-actions/.github/workflows/devlate.yml@9e2b63f162112ffd84163f1e822b1684e6d493f1
+    with:
+      project-path: pycontroller
+      platforms: auto
+      signing-environment: xos-preview-ios-com-dyllan-xlate-56a75bad5afd3d6f
+      apple-team-id: JYY6VVYGVG
+    secrets: inherit
