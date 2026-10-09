@@ -47,7 +47,7 @@ jobs:
           COMMAND: ${{ steps.authorize.outputs.command }}
           PR_NUMBER: ${{ steps.authorize.outputs.pull_request_number }}
         run: |
-          gh workflow run xos.yml --ref "$HEAD_REF" \
+          gh workflow run xos.yml --repo "$GITHUB_REPOSITORY" --ref "$HEAD_REF" \
             -f command-subject="$COMMAND" \
             -f pull-request-number="$PR_NUMBER" \
             -f expected-sha="$HEAD_SHA"

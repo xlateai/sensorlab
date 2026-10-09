@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
           subject="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" --jq '.commit.message | split("\n")[0]')"
           command="${subject%% *}"
-          gh workflow run xos.yml --ref "$HEAD_REF" \
+          gh workflow run xos.yml --repo "$GITHUB_REPOSITORY" --ref "$HEAD_REF" \
             -f command-subject="$command" \
             -f pull-request-number="$PR_NUMBER" \
             -f expected-sha="$HEAD_SHA"
@@ -95,11 +95,11 @@ jobs:
   react-native:
     needs: validate-dispatch
     if: needs.validate-dispatch.outputs.valid == 'true' && needs.validate-dispatch.outputs.defer_preview != 'true'
-    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@81df9f83bab809b4f25b62b129826a0c7957fd86
+    uses: xlateai/preview-actions/.github/workflows/native-preview.yml@f31afcc30b67cf0233cc2b49bf711db3bd83e8c0
     with:
       project-name: sensorlab
       xos-ref: ce6afee5495c3128e44ce5558ac60b0bb805034d
-      actions-ref: 81df9f83bab809b4f25b62b129826a0c7957fd86
+      actions-ref: f31afcc30b67cf0233cc2b49bf711db3bd83e8c0
       project-adapter: react_native
       application-identifier: com.dyllan.xlate
       app-store-connect-api-key-id: ${{ inputs.app-store-connect-api-key-id || vars.APP_STORE_CONNECT_API_KEY_ID }}
